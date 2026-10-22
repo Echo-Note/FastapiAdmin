@@ -51,7 +51,26 @@
       @confirm="handleSubmit()"
     >
       <template v-if="dialogVisible.type === 'detail'">
-        <FaDescriptions :column="4" :data="detailFormData" :items="detailItems" max-height="70vh" />
+        <ElScrollbar max-height="70vh">
+          <FaDescriptions :column="4" :data="detailFormData" :items="detailItems" />
+          <div class="mt-4">
+            <div class="mb-2 text-sm font-medium text-gray-700">采集字段（{{ detailFormData.form_schema?.length ?? 0 }} 个）</div>
+            <ElTable :data="detailFormData.form_schema ?? []" border size="small">
+              <ElTableColumn type="index" label="序" width="50" align="center" />
+              <ElTableColumn label="显示名" prop="label" min-width="110" show-overflow-tooltip />
+              <ElTableColumn label="字段标识" prop="name" min-width="120" show-overflow-tooltip />
+              <ElTableColumn label="类型" prop="type" width="90" align="center" />
+              <ElTableColumn label="必填" width="60" align="center">
+                <template #default="{ row }">
+                  <span :class="row.required ? 'text-red-500' : 'text-gray-400'">{{ row.required ? "是" : "否" }}</span>
+                </template>
+              </ElTableColumn>
+              <ElTableColumn label="选项" min-width="150" show-overflow-tooltip>
+                <template #default="{ row }">{{ row.options?.map((o: { label: string }) => o.label).join("、") || "—" }}</template>
+              </ElTableColumn>
+            </ElTable>
+          </div>
+        </ElScrollbar>
       </template>
       <template v-else>
         <FaForm
@@ -67,23 +86,28 @@
           label-position="right"
           :span="24"
           :gutter="16"
-        />
+        >
+          <template #form_schema>
+            <FormSchemaEditor v-model="formData.form_schema" />
+          </template>
+        </FaForm>
       </template>
     </FaDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import TaskTypeAPI, { type TaskTypeTable } from "@/api/module_market/task-type";
+import TaskTypeAPI, { type TaskTypeTable, type FormSchemaField } from "@/api/module_market/task-type";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
+import FormSchemaEditor from "@/components/forms/form-schema-editor/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
 
 defineOptions({ name: "MarketTaskType", inheritAttrs: false });
 
-/** 本地表单类型：form_schema 以 JSON 字符串编辑，提交时转数组 */
+/** 本地表单类型：form_schema 以 FormSchemaField 数组编辑，由可视化配置器维护 */
 interface TaskTypeLocalForm {
   id?: number;
   code?: string;
@@ -95,12 +119,7 @@ interface TaskTypeLocalForm {
   default_price?: number;
   exec_standard?: string;
   required?: boolean;
-  form_schema?: string;
-}
-
-function safeParseJson(text?: string): Record<string, unknown>[] {
-  if (!text || !text.trim()) return [];
-  return JSON.parse(text) as Record<string, unknown>[];
+  form_schema?: FormSchemaField[];
 }
 
 const searchForm = ref<{ code?: string; name?: string }>({ code: undefined, name: undefined });
@@ -163,12 +182,12 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "执行标准", prop: "exec_standard", span: 4 },
 ];
 
-const formData = ref<TaskTypeLocalForm>({ id: undefined, code: undefined, name: undefined, service_type: undefined, service_item: undefined, service_task: undefined, unit: undefined, default_price: undefined, exec_standard: undefined, required: false, form_schema: "[]" });
+const formData = ref<TaskTypeLocalForm>({ id: undefined, code: undefined, name: undefined, service_type: undefined, service_item: undefined, service_task: undefined, unit: undefined, default_price: undefined, exec_standard: undefined, required: false, form_schema: [] });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: TaskTypeLocalForm = { id: undefined, code: undefined, name: undefined, service_type: undefined, service_item: undefined, service_task: undefined, unit: undefined, default_price: undefined, exec_standard: undefined, required: false, form_schema: "[]" };
+const initialFormData: TaskTypeLocalForm = { id: undefined, code: undefined, name: undefined, service_type: undefined, service_item: undefined, service_task: undefined, unit: undefined, default_price: undefined, exec_standard: undefined, required: false, form_schema: [] };
 
 const rules = reactive({
   code: [{ required: true, message: "请输入唯一编码", trigger: "blur" }],
@@ -190,7 +209,7 @@ const formItems = computed<FormItem[]>(() => [
   { label: "默认单价", key: "default_price", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right" } },
   { label: "是否必选", key: "required", type: "switch", span: 24 },
   { label: "执行标准", key: "exec_standard", type: "input", span: 24, props: { type: "textarea", rows: 3, placeholder: "请输入执行标准" } },
-  { label: "采集字段 Schema", key: "form_schema", type: "input", span: 24, props: { type: "textarea", rows: 6, placeholder: 'JSON 数组，如 [{"name":"医院名称","type":"text","required":true}]' } },
+  { label: "采集字段", key: "form_schema", span: 24 },
 ]);
 
 const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = useCrudForm<TaskTypeLocalForm>({
@@ -201,10 +220,10 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   formRenderKey,
   detailApi: async (id: number) => {
     const res = await TaskTypeAPI.detailTaskType(id);
-    return { data: { data: { ...res.data.data, form_schema: JSON.stringify(res.data.data?.form_schema ?? [], null, 2) } as TaskTypeLocalForm } };
+    return { data: { data: { ...res.data.data, form_schema: res.data.data?.form_schema ?? [] } as TaskTypeLocalForm } };
   },
-  createApi: async (form: TaskTypeLocalForm) => TaskTypeAPI.createTaskType({ ...form, form_schema: safeParseJson(form.form_schema) }),
-  updateApi: async (id: number, form: TaskTypeLocalForm) => TaskTypeAPI.updateTaskType(id, { ...form, form_schema: safeParseJson(form.form_schema) }),
+  createApi: async (form: TaskTypeLocalForm) => TaskTypeAPI.createTaskType({ ...form, form_schema: form.form_schema ?? [] }),
+  updateApi: async (id: number, form: TaskTypeLocalForm) => TaskTypeAPI.updateTaskType(id, { ...form, form_schema: form.form_schema ?? [] }),
   titles: { create: "新增任务类型", update: "修改任务类型", detail: "任务类型详情" },
   detailFormData,
   onCreateSuccess: refreshCreate,

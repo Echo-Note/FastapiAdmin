@@ -60,7 +60,7 @@ export interface TaskTypeTable extends BaseType {
   default_price?: number;
   exec_standard?: string;
   required?: boolean;
-  form_schema?: Record<string, unknown>[];
+  form_schema?: FormSchemaField[];
 }
 
 export interface TaskTypeForm extends BaseFormType {
@@ -73,5 +73,41 @@ export interface TaskTypeForm extends BaseFormType {
   default_price?: number;
   exec_standard?: string;
   required?: boolean;
-  form_schema?: Record<string, unknown>[];
+  form_schema?: FormSchemaField[];
+}
+
+/** 采集字段类型（对齐后端 FormSchemaField Pydantic 模型） */
+export type FormSchemaFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "date"
+  | "select"
+  | "radio"
+  | "checkbox"
+  | "image"
+  | "file";
+
+/** 采集字段选项 */
+export interface FormSchemaOption {
+  /** 选项显示名 */
+  label: string;
+  /** 选项值 */
+  value: string;
+}
+
+/** 采集字段定义 */
+export interface FormSchemaField {
+  /** 字段唯一标识，作为表单数据的 key（建议英文/拼音，如 hospital_name，勿重复） */
+  name: string;
+  /** 字段显示名称（如 医院名称） */
+  label: string;
+  /** 字段类型 */
+  type: FormSchemaFieldType;
+  /** 是否必填 */
+  required?: boolean;
+  /** 输入占位提示 */
+  placeholder?: string;
+  /** 选项列表（仅 select/radio/checkbox 需要） */
+  options?: FormSchemaOption[];
 }

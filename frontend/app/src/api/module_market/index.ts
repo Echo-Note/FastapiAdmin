@@ -67,7 +67,7 @@ export interface AssignmentItem {
 export interface FormSchemaField {
   name: string
   label?: string
-  type?: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'radio' | 'checkbox'
+  type?: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'radio' | 'checkbox' | 'image' | 'file'
   required?: boolean
   placeholder?: string
   options?: { label: string, value: string | number }[]
@@ -163,5 +163,19 @@ export const MarketAPI = {
   /** 机构列表（提交成果选择对象机构，走小程序端 mini 接口，无需运营端 RBAC 权限） */
   getInstitutions(params?: Record<string, any>) {
     return http.Get<MarketPageResult<InstitutionItem>>(`${MARKET_BASE}/mini/institutions`, params)
+  },
+
+  /**
+   * 采集成果文件上传（图片/附件）
+   *
+   * 走统一 http 层 upload（`requestType: 'upload'`），上传到 `/common/file/upload`，
+   * upload_type=file（通用文件）。返回 uni.uploadFile 成功结果，调用方需解析
+   * `JSON.parse(res.data).data.file_url` 得到文件访问地址。
+   *
+   * @param filePath 本地临时文件路径（uni.chooseImage / uni.chooseFile 选择结果）
+   * @returns uni.uploadFile 成功回调结果（statusCode + data 响应体字符串）
+   */
+  uploadFile(filePath: string): Promise<UniApp.UploadFileSuccessCallbackResult> {
+    return http.Post('/common/file/upload?upload_type=file', { filePath, name: 'file' }, { requestType: 'upload' })
   },
 }

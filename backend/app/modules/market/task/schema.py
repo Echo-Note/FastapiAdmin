@@ -20,14 +20,15 @@ class FormSchemaField(BaseModel):
     每个字段对应表单上的一个输入项：
     - name      字段唯一标识，作为表单数据的 key（建议英文/拼音，如 hospital_name，勿重复）
     - label     字段显示名（如 医院名称）
-    - type      字段类型：text/textarea/number/date/select/radio/checkbox
+    - type      字段类型：text/textarea/number/date/select/radio/checkbox/image/file
     - required  是否必填
     - options   选项列表（仅 select/radio/checkbox 需要）
+    - image     图片上传（如打卡照片、机构内/外部照片），file 为文件附件（如合同、单据、宣传资料）
     """
 
     name: str = Field(min_length=1, max_length=64, description="字段唯一标识(建议英文/拼音，如 hospital_name)")
     label: str = Field(min_length=1, max_length=128, description="字段显示名(如 医院名称)")
-    type: Literal["text", "textarea", "number", "date", "select", "radio", "checkbox"] = Field(default="text", description="字段类型")
+    type: Literal["text", "textarea", "number", "date", "select", "radio", "checkbox", "image", "file"] = Field(default="text", description="字段类型")
     required: bool = Field(default=False, description="是否必填")
     placeholder: str | None = Field(default=None, max_length=255, description="输入占位提示")
     options: list[FormSchemaOption] | None = Field(default=None, description="选项列表(仅 select/radio/checkbox 需要)")

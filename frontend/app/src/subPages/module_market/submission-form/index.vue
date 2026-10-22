@@ -80,6 +80,79 @@ function fieldValueText(field: FormSchemaField) {
   return String(v)
 }
 
+/** 当前正在上传的字段名（防止重复上传） */
+const uploadingField = ref('')
+
+/** 解析上传响应，返回 file_url，失败提示并返回 null */
+function parseUploadUrl(result: UniApp.UploadFileSuccessCallbackResult): string | null {
+  try {
+    const parsed = JSON.parse(result.data) as { code: number, msg?: string, data?: { file_url?: string } }
+    if (parsed.code === 0 && parsed.data?.file_url)
+      return parsed.data.file_url
+    toast.error(parsed.msg || '上传失败')
+  }
+  catch {
+    toast.error('上传失败')
+  }
+  return null
+}
+
+/** 选择并上传图片（image 字段） */
+function chooseAndUploadImage(field: FormSchemaField) {
+  if (uploadingField.value)
+    return
+  uni.chooseImage({
+    count: 1,
+    sizeType: ['compressed'],
+    success: async (res) => {
+      const filePath = res.tempFilePaths?.[0]
+      if (!filePath)
+        return
+      uploadingField.value = field.name
+      try {
+        const result = await MarketAPI.uploadFile(filePath)
+        const url = parseUploadUrl(result)
+        if (url)
+          formData[field.name] = url
+      }
+      catch {
+        toast.error('上传失败')
+      }
+      finally {
+        uploadingField.value = ''
+      }
+    },
+  })
+}
+
+/** 选择并上传文件（file 字段） */
+function chooseAndUploadFile(field: FormSchemaField) {
+  if (uploadingField.value)
+    return
+  uni.chooseFile({
+    count: 1,
+    success: async (res) => {
+      const tempFiles = res.tempFiles as any
+      const filePath = Array.isArray(tempFiles) ? tempFiles[0]?.path : tempFiles?.path
+      if (!filePath)
+        return
+      uploadingField.value = field.name
+      try {
+        const result = await MarketAPI.uploadFile(filePath)
+        const url = parseUploadUrl(result)
+        if (url)
+          formData[field.name] = url
+      }
+      catch {
+        toast.error('上传失败')
+      }
+      finally {
+        uploadingField.value = ''
+      }
+    },
+  })
+}
+
 function institutionName() {
   return institutions.value.find(i => i.id === institutionId.value)?.name ?? ''
 }
@@ -190,6 +263,23 @@ onLoad((query) => {
                 type="textarea"
                 :placeholder="field.placeholder || fieldLabel(field)"
               />
+              <view v-else-if="field.type === 'image'" class="flex-1" @click="chooseAndUploadImage(field)">
+                <image
+                  v-if="formData[field.name]"
+                  :src="formData[field.name]"
+                  mode="aspectFill"
+                  class="h-40 w-40 rounded-2 object-cover"
+                />
+                <view v-else class="flex h-24 items-center justify-center rounded-2 bg-gray-50 text-sm text-gray-400">
+                  {{ uploadingField === field.name ? '上传中…' : '点击上传图片' }}
+                </view>
+              </view>
+              <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(field)">
+                <view class="flex h-12 items-center justify-between rounded-2 bg-gray-50 px-3 text-sm">
+                  <text class="text-gray-600">{{ formData[field.name] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
+                  <text class="text-gray-400">{{ uploadingField === field.name ? '上传中…' : '' }}</text>
+                </view>
+              </view>
               <wd-input
                 v-else
                 v-model="formData[field.name]"

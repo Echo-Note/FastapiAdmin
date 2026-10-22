@@ -103,12 +103,12 @@
       {
         "name": "commercial_contract",
         "label": "商业合同",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "inbound_receipt",
         "label": "入库单",
-        "type": "textarea"
+        "type": "file"
       }
     ]
   },
@@ -216,12 +216,12 @@
       {
         "name": "commercial_contract",
         "label": "商业合同",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "inbound_receipt",
         "label": "入库单",
-        "type": "textarea"
+        "type": "file"
       }
     ]
   },
@@ -329,12 +329,12 @@
       {
         "name": "commercial_contract",
         "label": "商业合同",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "inbound_receipt",
         "label": "入库单",
-        "type": "textarea"
+        "type": "file"
       }
     ]
   },
@@ -442,12 +442,12 @@
       {
         "name": "commercial_contract",
         "label": "商业合同",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "inbound_receipt",
         "label": "入库单",
-        "type": "textarea"
+        "type": "file"
       }
     ]
   },
@@ -542,7 +542,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -627,7 +627,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -717,7 +717,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -812,7 +812,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -897,7 +897,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -987,7 +987,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1082,7 +1082,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1167,7 +1167,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1257,7 +1257,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1352,7 +1352,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1437,7 +1437,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1527,7 +1527,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1592,7 +1592,7 @@
       {
         "name": "display_photo",
         "label": "陈列照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
@@ -1602,7 +1602,7 @@
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1710,12 +1710,12 @@
       {
         "name": "commercial_contract",
         "label": "商业合同",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "inbound_receipt",
         "label": "入库单",
-        "type": "textarea"
+        "type": "file"
       }
     ]
   },
@@ -1800,12 +1800,12 @@
       {
         "name": "receipt_photo",
         "label": "票据照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1880,12 +1880,12 @@
       {
         "name": "flow_photo",
         "label": "流向证明照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -1965,12 +1965,12 @@
       {
         "name": "bill_photo",
         "label": "票款证明照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "checkin_photo",
         "label": "打卡照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -2364,7 +2364,7 @@
       {
         "name": "photo",
         "label": "照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -2453,7 +2453,7 @@
       {
         "name": "photo",
         "label": "照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -2542,7 +2542,7 @@
       {
         "name": "photo",
         "label": "照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -2661,7 +2661,7 @@
       {
         "name": "photo",
         "label": "照片",
-        "type": "textarea"
+        "type": "image"
       }
     ]
   },
@@ -3503,12 +3503,12 @@
       {
         "name": "promo_material",
         "label": "宣传资料",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "promo_photo",
         "label": "宣传照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
@@ -3580,12 +3580,12 @@
       {
         "name": "promo_material",
         "label": "宣传资料",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "promo_photo",
         "label": "宣传照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
@@ -3657,12 +3657,12 @@
       {
         "name": "promo_material",
         "label": "宣传资料",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "promo_photo",
         "label": "宣传照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
@@ -3734,12 +3734,12 @@
       {
         "name": "promo_material",
         "label": "宣传资料",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "promo_photo",
         "label": "宣传照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
@@ -3811,12 +3811,12 @@
       {
         "name": "promo_material",
         "label": "宣传资料",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "promo_photo",
         "label": "宣传照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
@@ -3888,12 +3888,12 @@
       {
         "name": "promo_material",
         "label": "宣传资料",
-        "type": "textarea"
+        "type": "file"
       },
       {
         "name": "promo_photo",
         "label": "宣传照片",
-        "type": "textarea"
+        "type": "image"
       },
       {
         "name": "note",
