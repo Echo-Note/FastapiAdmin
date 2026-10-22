@@ -51,6 +51,9 @@ backend/env/.env.prod
 backend/env/.env.test
 
 docker/.env
+# 本地开发数据库/缓存持久化数据，不入库
+docker/pg_data/
+docker/redis_data/
 docker/nginx/app/dist
 docker/nginx/docs/dist
 docker/nginx/web/dist

@@ -1,0 +1,78 @@
+# ============================================
+# FastapiAdmin 本地开发环境（PostgreSQL 版）
+# ============================================
+# 仅含数据库与 Redis，后端在本地用 uv 直接运行。
+# 使用方式:
+#   docker compose --env-file .env -f docker-compose.pg.yaml up -d
+# ============================================
+# 说明:
+#   - PostgreSQL 18（最新稳定版）
+#   - Redis 8（最新稳定版）
+#   - 数据持久化到本地目录 docker/pg_data、docker/redis_data（已加入 .gitignore）
+# ============================================
+
+services:
+  # ==================== 数据库服务（PostgreSQL） ====================
+  postgres:
+    container_name: postgres
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Shanghai"
+      POSTGRES_USER: "${POSTGRES_USER:-fastapiadmin}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?错误: 请设置 POSTGRES_PASSWORD 环境变量}"
+      POSTGRES_DB: "${POSTGRES_DB:-fastapiadmin}"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./pg_data:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - app_network
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fastapiadmin} -d ${POSTGRES_DB:-fastapiadmin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Redis 服务 ====================
+  redis:
+    container_name: redis
+    image: redis:8-alpine
+    restart: unless-stopped
+    environment:
+      TZ: "Asia/Shanghai"
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ./redis_data:/data
+      - ./redis/conf/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: >
+      redis-server /usr/local/etc/redis/redis.conf
+      --requirepass ${REDIS_PASSWORD:?错误: 请设置 REDIS_PASSWORD 环境变量}
+    networks:
+      - app_network
+    healthcheck:
+      test:
+        ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ==================== 网络 ====================
+networks:
+  app_network:
+    driver: bridge
