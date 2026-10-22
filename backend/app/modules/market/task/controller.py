@@ -40,6 +40,16 @@ async def get_task_type_list_controller(
     return SuccessResponse(data=result, msg="查询任务类型成功")
 
 
+@TaskTypeRouter.get("/detail/{id}", summary="查询任务类型模板详情", response_model=ResponseSchema[TaskTypeOutSchema])
+async def get_task_type_detail_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:tasktype:query"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="任务类型ID", ge=1)],
+) -> JSONResponse:
+    result = await TaskTypeService(auth, db).detail(id=id)
+    return SuccessResponse(data=result, msg="查询任务类型详情成功")
+
+
 @TaskTypeRouter.post("/create", status_code=status.HTTP_201_CREATED, summary="创建任务类型模板", response_model=ResponseSchema[TaskTypeOutSchema])
 async def create_task_type_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:tasktype:create"]))],

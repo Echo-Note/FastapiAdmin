@@ -11,34 +11,41 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产厂家",
+        "name": "manufacturer",
+        "label": "生产厂家",
         "type": "text"
       },
       {
-        "name": "准入结果",
+        "name": "admission_result",
+        "label": "准入结果",
         "type": "select",
         "required": true,
         "options": [
@@ -53,15 +60,18 @@
         ]
       },
       {
-        "name": "通过日期",
+        "name": "pass_date",
+        "label": "通过日期",
         "type": "date"
       },
       {
-        "name": "确认部门",
+        "name": "confirm_dept",
+        "label": "确认部门",
         "type": "text"
       },
       {
-        "name": "采购状态",
+        "name": "purchase_status",
+        "label": "采购状态",
         "type": "select",
         "required": true,
         "options": [
@@ -76,23 +86,28 @@
         ]
       },
       {
-        "name": "首次采购日期",
+        "name": "first_purchase_date",
+        "label": "首次采购日期",
         "type": "date"
       },
       {
-        "name": "供货商业",
+        "name": "supply_commercial",
+        "label": "供货商业",
         "type": "text"
       },
       {
-        "name": "采购数量",
+        "name": "purchase_qty",
+        "label": "采购数量",
         "type": "number"
       },
       {
-        "name": "商业合同",
+        "name": "commercial_contract",
+        "label": "商业合同",
         "type": "textarea"
       },
       {
-        "name": "入库单",
+        "name": "inbound_receipt",
+        "label": "入库单",
         "type": "textarea"
       }
     ]
@@ -109,34 +124,41 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构名称",
+        "name": "primary_care_name",
+        "label": "基层医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产厂家",
+        "name": "manufacturer",
+        "label": "生产厂家",
         "type": "text"
       },
       {
-        "name": "准入结果",
+        "name": "admission_result",
+        "label": "准入结果",
         "type": "select",
         "required": true,
         "options": [
@@ -151,15 +173,18 @@
         ]
       },
       {
-        "name": "通过日期",
+        "name": "pass_date",
+        "label": "通过日期",
         "type": "date"
       },
       {
-        "name": "确认部门",
+        "name": "confirm_dept",
+        "label": "确认部门",
         "type": "text"
       },
       {
-        "name": "采购状态",
+        "name": "purchase_status",
+        "label": "采购状态",
         "type": "select",
         "required": true,
         "options": [
@@ -174,23 +199,28 @@
         ]
       },
       {
-        "name": "首次采购日期",
+        "name": "first_purchase_date",
+        "label": "首次采购日期",
         "type": "date"
       },
       {
-        "name": "供货商业",
+        "name": "supply_commercial",
+        "label": "供货商业",
         "type": "text"
       },
       {
-        "name": "采购数量",
+        "name": "purchase_qty",
+        "label": "采购数量",
         "type": "number"
       },
       {
-        "name": "商业合同",
+        "name": "commercial_contract",
+        "label": "商业合同",
         "type": "textarea"
       },
       {
-        "name": "入库单",
+        "name": "inbound_receipt",
+        "label": "入库单",
         "type": "textarea"
       }
     ]
@@ -207,34 +237,41 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构名称",
+        "name": "private_medical_name",
+        "label": "民营医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产厂家",
+        "name": "manufacturer",
+        "label": "生产厂家",
         "type": "text"
       },
       {
-        "name": "准入结果",
+        "name": "admission_result",
+        "label": "准入结果",
         "type": "select",
         "required": true,
         "options": [
@@ -249,15 +286,18 @@
         ]
       },
       {
-        "name": "通过日期",
+        "name": "pass_date",
+        "label": "通过日期",
         "type": "date"
       },
       {
-        "name": "确认部门",
+        "name": "confirm_dept",
+        "label": "确认部门",
         "type": "text"
       },
       {
-        "name": "采购状态",
+        "name": "purchase_status",
+        "label": "采购状态",
         "type": "select",
         "required": true,
         "options": [
@@ -272,23 +312,28 @@
         ]
       },
       {
-        "name": "首次采购日期",
+        "name": "first_purchase_date",
+        "label": "首次采购日期",
         "type": "date"
       },
       {
-        "name": "供货商业",
+        "name": "supply_commercial",
+        "label": "供货商业",
         "type": "text"
       },
       {
-        "name": "采购数量",
+        "name": "purchase_qty",
+        "label": "采购数量",
         "type": "number"
       },
       {
-        "name": "商业合同",
+        "name": "commercial_contract",
+        "label": "商业合同",
         "type": "textarea"
       },
       {
-        "name": "入库单",
+        "name": "inbound_receipt",
+        "label": "入库单",
         "type": "textarea"
       }
     ]
@@ -305,34 +350,41 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构名称",
+        "name": "pharmacy_name",
+        "label": "零售药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产厂家",
+        "name": "manufacturer",
+        "label": "生产厂家",
         "type": "text"
       },
       {
-        "name": "准入结果",
+        "name": "admission_result",
+        "label": "准入结果",
         "type": "select",
         "required": true,
         "options": [
@@ -347,15 +399,18 @@
         ]
       },
       {
-        "name": "通过日期",
+        "name": "pass_date",
+        "label": "通过日期",
         "type": "date"
       },
       {
-        "name": "确认部门",
+        "name": "confirm_dept",
+        "label": "确认部门",
         "type": "text"
       },
       {
-        "name": "采购状态",
+        "name": "purchase_status",
+        "label": "采购状态",
         "type": "select",
         "required": true,
         "options": [
@@ -370,23 +425,28 @@
         ]
       },
       {
-        "name": "首次采购日期",
+        "name": "first_purchase_date",
+        "label": "首次采购日期",
         "type": "date"
       },
       {
-        "name": "供货商业",
+        "name": "supply_commercial",
+        "label": "供货商业",
         "type": "text"
       },
       {
-        "name": "采购数量",
+        "name": "purchase_qty",
+        "label": "采购数量",
         "type": "number"
       },
       {
-        "name": "商业合同",
+        "name": "commercial_contract",
+        "label": "商业合同",
         "type": "textarea"
       },
       {
-        "name": "入库单",
+        "name": "inbound_receipt",
+        "label": "入库单",
         "type": "textarea"
       }
     ]
@@ -403,69 +463,85 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "配送数量",
+        "name": "delivery_qty",
+        "label": "配送数量",
         "type": "number"
       },
       {
-        "name": "配送时间",
+        "name": "delivery_time",
+        "label": "配送时间",
         "type": "date"
       },
       {
-        "name": "验收情况",
+        "name": "acceptance_status",
+        "label": "验收情况",
         "type": "text"
       },
       {
-        "name": "配送商业",
+        "name": "delivery_commercial",
+        "label": "配送商业",
         "type": "text"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -482,61 +558,75 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "销售数量",
+        "name": "sales_qty",
+        "label": "销售数量",
         "type": "number"
       },
       {
-        "name": "退损数量",
+        "name": "return_qty",
+        "label": "退损数量",
         "type": "number"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -553,65 +643,80 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "规格",
+        "name": "spec",
+        "label": "规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "有效期至",
+        "name": "expiry_date",
+        "label": "有效期至",
         "type": "date"
       },
       {
-        "name": "实盘数量",
+        "name": "actual_qty",
+        "label": "实盘数量",
         "type": "number"
       },
       {
-        "name": "盘点差异",
+        "name": "inventory_diff",
+        "label": "盘点差异",
         "type": "text"
       },
       {
-        "name": "说明",
+        "name": "note",
+        "label": "说明",
         "type": "text"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -628,69 +733,85 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "基层医疗机构名称",
+        "name": "primary_care_name",
+        "label": "基层医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构类型",
+        "name": "org_type",
+        "label": "机构类型",
         "type": "text"
       },
       {
-        "name": "上级管理主体",
+        "name": "supervisor",
+        "label": "上级管理主体",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "配送数量",
+        "name": "delivery_qty",
+        "label": "配送数量",
         "type": "number"
       },
       {
-        "name": "配送时间",
+        "name": "delivery_time",
+        "label": "配送时间",
         "type": "date"
       },
       {
-        "name": "验收情况",
+        "name": "acceptance_status",
+        "label": "验收情况",
         "type": "text"
       },
       {
-        "name": "配送商业",
+        "name": "delivery_commercial",
+        "label": "配送商业",
         "type": "text"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -707,61 +828,75 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "基层医疗机构名称",
+        "name": "primary_care_name",
+        "label": "基层医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构类型",
+        "name": "org_type",
+        "label": "机构类型",
         "type": "text"
       },
       {
-        "name": "上级管理主体",
+        "name": "supervisor",
+        "label": "上级管理主体",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "销售数量",
+        "name": "sales_qty",
+        "label": "销售数量",
         "type": "number"
       },
       {
-        "name": "退损数量",
+        "name": "return_qty",
+        "label": "退损数量",
         "type": "number"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -778,65 +913,80 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "基层医疗机构名称",
+        "name": "primary_care_name",
+        "label": "基层医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "机构类型",
+        "name": "org_type",
+        "label": "机构类型",
         "type": "text"
       },
       {
-        "name": "上级管理主体",
+        "name": "supervisor",
+        "label": "上级管理主体",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "规格",
+        "name": "spec",
+        "label": "规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "有效期至",
+        "name": "expiry_date",
+        "label": "有效期至",
         "type": "date"
       },
       {
-        "name": "实盘数量",
+        "name": "actual_qty",
+        "label": "实盘数量",
         "type": "number"
       },
       {
-        "name": "盘点差异",
+        "name": "inventory_diff",
+        "label": "盘点差异",
         "type": "text"
       },
       {
-        "name": "说明",
+        "name": "note",
+        "label": "说明",
         "type": "text"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -853,69 +1003,85 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "民营医疗机构名称",
+        "name": "private_medical_name",
+        "label": "民营医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "单体/集团",
+        "name": "org_form",
+        "label": "单体/集团",
         "type": "text"
       },
       {
-        "name": "所属集团",
+        "name": "group",
+        "label": "所属集团",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "配送数量",
+        "name": "delivery_qty",
+        "label": "配送数量",
         "type": "number"
       },
       {
-        "name": "配送时间",
+        "name": "delivery_time",
+        "label": "配送时间",
         "type": "date"
       },
       {
-        "name": "验收情况",
+        "name": "acceptance_status",
+        "label": "验收情况",
         "type": "text"
       },
       {
-        "name": "配送商业",
+        "name": "delivery_commercial",
+        "label": "配送商业",
         "type": "text"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -932,61 +1098,75 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "民营医疗机构名称",
+        "name": "private_medical_name",
+        "label": "民营医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "单体/集团",
+        "name": "org_form",
+        "label": "单体/集团",
         "type": "text"
       },
       {
-        "name": "所属集团",
+        "name": "group",
+        "label": "所属集团",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "销售数量",
+        "name": "sales_qty",
+        "label": "销售数量",
         "type": "number"
       },
       {
-        "name": "退损数量",
+        "name": "return_qty",
+        "label": "退损数量",
         "type": "number"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1003,65 +1183,80 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "民营医疗机构名称",
+        "name": "private_medical_name",
+        "label": "民营医疗机构名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "单体/集团",
+        "name": "org_form",
+        "label": "单体/集团",
         "type": "text"
       },
       {
-        "name": "所属集团",
+        "name": "group",
+        "label": "所属集团",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "规格",
+        "name": "spec",
+        "label": "规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "有效期至",
+        "name": "expiry_date",
+        "label": "有效期至",
         "type": "date"
       },
       {
-        "name": "实盘数量",
+        "name": "actual_qty",
+        "label": "实盘数量",
         "type": "number"
       },
       {
-        "name": "盘点差异",
+        "name": "inventory_diff",
+        "label": "盘点差异",
         "type": "text"
       },
       {
-        "name": "说明",
+        "name": "note",
+        "label": "说明",
         "type": "text"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1078,69 +1273,85 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "零售药店名称",
+        "name": "pharmacy_name",
+        "label": "零售药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "配送数量",
+        "name": "delivery_qty",
+        "label": "配送数量",
         "type": "number"
       },
       {
-        "name": "配送时间",
+        "name": "delivery_time",
+        "label": "配送时间",
         "type": "date"
       },
       {
-        "name": "验收情况",
+        "name": "acceptance_status",
+        "label": "验收情况",
         "type": "text"
       },
       {
-        "name": "配送商业",
+        "name": "delivery_commercial",
+        "label": "配送商业",
         "type": "text"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1157,61 +1368,75 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "零售药店名称",
+        "name": "pharmacy_name",
+        "label": "零售药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "销售数量",
+        "name": "sales_qty",
+        "label": "销售数量",
         "type": "number"
       },
       {
-        "name": "退损数量",
+        "name": "return_qty",
+        "label": "退损数量",
         "type": "number"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1228,65 +1453,80 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "零售药店名称",
+        "name": "pharmacy_name",
+        "label": "零售药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "规格",
+        "name": "spec",
+        "label": "规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "有效期至",
+        "name": "expiry_date",
+        "label": "有效期至",
         "type": "date"
       },
       {
-        "name": "实盘数量",
+        "name": "actual_qty",
+        "label": "实盘数量",
         "type": "number"
       },
       {
-        "name": "盘点差异",
+        "name": "inventory_diff",
+        "label": "盘点差异",
         "type": "text"
       },
       {
-        "name": "说明",
+        "name": "note",
+        "label": "说明",
         "type": "text"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1303,53 +1543,65 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "零售药店名称",
+        "name": "pharmacy_name",
+        "label": "零售药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "陈列产品名称",
+        "name": "display_product_name",
+        "label": "陈列产品名称",
         "type": "text"
       },
       {
-        "name": "陈列位置",
+        "name": "display_position",
+        "label": "陈列位置",
         "type": "text"
       },
       {
-        "name": "陈列数量",
+        "name": "display_qty",
+        "label": "陈列数量",
         "type": "number"
       },
       {
-        "name": "陈列照片",
+        "name": "display_photo",
+        "label": "陈列照片",
         "type": "textarea"
       },
       {
-        "name": "说明",
+        "name": "note",
+        "label": "说明",
         "type": "text"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1366,34 +1618,41 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "商业公司名称",
+        "name": "commercial_name",
+        "label": "商业公司名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产厂家",
+        "name": "manufacturer",
+        "label": "生产厂家",
         "type": "text"
       },
       {
-        "name": "准入结果",
+        "name": "admission_result",
+        "label": "准入结果",
         "type": "select",
         "required": true,
         "options": [
@@ -1408,15 +1667,18 @@
         ]
       },
       {
-        "name": "通过日期",
+        "name": "pass_date",
+        "label": "通过日期",
         "type": "date"
       },
       {
-        "name": "确认部门",
+        "name": "confirm_dept",
+        "label": "确认部门",
         "type": "text"
       },
       {
-        "name": "采购状态",
+        "name": "purchase_status",
+        "label": "采购状态",
         "type": "select",
         "required": true,
         "options": [
@@ -1431,23 +1693,28 @@
         ]
       },
       {
-        "name": "首次采购日期",
+        "name": "first_purchase_date",
+        "label": "首次采购日期",
         "type": "date"
       },
       {
-        "name": "供货商业",
+        "name": "supply_commercial",
+        "label": "供货商业",
         "type": "text"
       },
       {
-        "name": "采购数量",
+        "name": "purchase_qty",
+        "label": "采购数量",
         "type": "number"
       },
       {
-        "name": "商业合同",
+        "name": "commercial_contract",
+        "label": "商业合同",
         "type": "textarea"
       },
       {
-        "name": "入库单",
+        "name": "inbound_receipt",
+        "label": "入库单",
         "type": "textarea"
       }
     ]
@@ -1464,65 +1731,80 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "商业公司名称",
+        "name": "commercial_name",
+        "label": "商业公司名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名",
+        "name": "product_name",
+        "label": "产品名",
         "type": "text"
       },
       {
-        "name": "规格",
+        "name": "spec",
+        "label": "规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "批号",
+        "name": "batch_no",
+        "label": "批号",
         "type": "text"
       },
       {
-        "name": "期初库存",
+        "name": "opening_stock",
+        "label": "期初库存",
         "type": "number"
       },
       {
-        "name": "本期购进",
+        "name": "purchase_in",
+        "label": "本期购进",
         "type": "number"
       },
       {
-        "name": "采购退回",
+        "name": "purchase_return",
+        "label": "采购退回",
         "type": "number"
       },
       {
-        "name": "期末库存",
+        "name": "closing_stock",
+        "label": "期末库存",
         "type": "number"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "票据照片",
+        "name": "receipt_photo",
+        "label": "票据照片",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1539,57 +1821,70 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "商业公司名称",
+        "name": "commercial_name",
+        "label": "商业公司名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "产品名",
+        "name": "product_name",
+        "label": "产品名",
         "type": "text"
       },
       {
-        "name": "规格",
+        "name": "spec",
+        "label": "规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "终端机构",
+        "name": "terminal_institution",
+        "label": "终端机构",
         "type": "text"
       },
       {
-        "name": "数量",
+        "name": "qty",
+        "label": "数量",
         "type": "number"
       },
       {
-        "name": "备注",
+        "name": "remark",
+        "label": "备注",
         "type": "text"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "流向证明照片",
+        "name": "flow_photo",
+        "label": "流向证明照片",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1606,61 +1901,75 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "商业公司名称",
+        "name": "commercial_name",
+        "label": "商业公司名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "执行月份",
+        "name": "exec_month",
+        "label": "执行月份",
         "type": "date"
       },
       {
-        "name": "往来主体全称",
+        "name": "counterparty",
+        "label": "往来主体全称",
         "type": "text"
       },
       {
-        "name": "账户/业务范围",
+        "name": "account_scope",
+        "label": "账户/业务范围",
         "type": "text"
       },
       {
-        "name": "本期开票",
+        "name": "invoice_amount",
+        "label": "本期开票",
         "type": "number"
       },
       {
-        "name": "本期红冲",
+        "name": "red_invoice_amount",
+        "label": "本期红冲",
         "type": "number"
       },
       {
-        "name": "本期回款",
+        "name": "collection_amount",
+        "label": "本期回款",
         "type": "number"
       },
       {
-        "name": "本期退款",
+        "name": "refund_amount",
+        "label": "本期退款",
         "type": "number"
       },
       {
-        "name": "备注",
+        "name": "remark",
+        "label": "备注",
         "type": "text"
       },
       {
-        "name": "异常说明",
+        "name": "exception_note",
+        "label": "异常说明",
         "type": "textarea"
       },
       {
-        "name": "票款证明照片",
+        "name": "bill_photo",
+        "label": "票款证明照片",
         "type": "textarea"
       },
       {
-        "name": "打卡照片",
+        "name": "checkin_photo",
+        "label": "打卡照片",
         "type": "textarea"
       }
     ]
@@ -1677,39 +1986,48 @@
     "required": false,
     "form_schema": [
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集日期",
+        "name": "collect_date",
+        "label": "采集日期",
         "type": "date"
       },
       {
-        "name": "竞品产品名/规格",
+        "name": "competitor_product",
+        "label": "竞品产品名/规格",
         "type": "text"
       },
       {
-        "name": "品牌/生产企业",
+        "name": "brand",
+        "label": "品牌/生产企业",
         "type": "text"
       },
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text"
       },
       {
-        "name": "终端",
+        "name": "terminal",
+        "label": "终端",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "优势",
+        "name": "advantage",
+        "label": "优势",
         "type": "textarea"
       },
       {
-        "name": "劣势",
+        "name": "disadvantage",
+        "label": "劣势",
         "type": "textarea"
       }
     ]
@@ -1726,43 +2044,53 @@
     "required": false,
     "form_schema": [
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集日期",
+        "name": "collect_date",
+        "label": "采集日期",
         "type": "date"
       },
       {
-        "name": "竞品产品名/规格",
+        "name": "competitor_product",
+        "label": "竞品产品名/规格",
         "type": "text"
       },
       {
-        "name": "品牌/生产企业",
+        "name": "brand",
+        "label": "品牌/生产企业",
         "type": "text"
       },
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text"
       },
       {
-        "name": "终端",
+        "name": "terminal",
+        "label": "终端",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "营销终端",
+        "name": "marketing_terminal",
+        "label": "营销终端",
         "type": "text"
       },
       {
-        "name": "营销科室",
+        "name": "marketing_dept",
+        "label": "营销科室",
         "type": "text"
       },
       {
-        "name": "销量",
+        "name": "sales_volume",
+        "label": "销量",
         "type": "number"
       }
     ]
@@ -1779,43 +2107,53 @@
     "required": false,
     "form_schema": [
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集日期",
+        "name": "collect_date",
+        "label": "采集日期",
         "type": "date"
       },
       {
-        "name": "竞品产品名/规格",
+        "name": "competitor_product",
+        "label": "竞品产品名/规格",
         "type": "text"
       },
       {
-        "name": "品牌/生产企业",
+        "name": "brand",
+        "label": "品牌/生产企业",
         "type": "text"
       },
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text"
       },
       {
-        "name": "终端",
+        "name": "terminal",
+        "label": "终端",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "价格终端",
+        "name": "price_terminal",
+        "label": "价格终端",
         "type": "text"
       },
       {
-        "name": "价格科室",
+        "name": "price_dept",
+        "label": "价格科室",
         "type": "text"
       },
       {
-        "name": "价格",
+        "name": "price",
+        "label": "价格",
         "type": "number"
       }
     ]
@@ -1832,43 +2170,53 @@
     "required": false,
     "form_schema": [
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集日期",
+        "name": "collect_date",
+        "label": "采集日期",
         "type": "date"
       },
       {
-        "name": "产品名称/规格",
+        "name": "product_name",
+        "label": "产品名称/规格",
         "type": "text"
       },
       {
-        "name": "品牌/生产企业",
+        "name": "brand",
+        "label": "品牌/生产企业",
         "type": "text"
       },
       {
-        "name": "产品价格",
+        "name": "product_price",
+        "label": "产品价格",
         "type": "number"
       },
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text"
       },
       {
-        "name": "区域市场销售总量",
+        "name": "market_sales_total",
+        "label": "区域市场销售总量",
         "type": "number"
       },
       {
-        "name": "区域市场销售占比",
+        "name": "market_sales_ratio",
+        "label": "区域市场销售占比",
         "type": "number"
       },
       {
-        "name": "区域覆盖终端总量",
+        "name": "market_terminal_total",
+        "label": "区域覆盖终端总量",
         "type": "number"
       },
       {
-        "name": "区域覆盖终端占比",
+        "name": "market_terminal_ratio",
+        "label": "区域覆盖终端占比",
         "type": "number"
       }
     ]
@@ -1885,39 +2233,48 @@
     "required": false,
     "form_schema": [
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集日期",
+        "name": "collect_date",
+        "label": "采集日期",
         "type": "date"
       },
       {
-        "name": "产品名称/规格",
+        "name": "product_name",
+        "label": "产品名称/规格",
         "type": "text"
       },
       {
-        "name": "品牌/生产企业",
+        "name": "brand",
+        "label": "品牌/生产企业",
         "type": "text"
       },
       {
-        "name": "产品价格",
+        "name": "product_price",
+        "label": "产品价格",
         "type": "number"
       },
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text"
       },
       {
-        "name": "目标终端/对象",
+        "name": "target_terminal",
+        "label": "目标终端/对象",
         "type": "text"
       },
       {
-        "name": "目标终端数量",
+        "name": "target_terminal_qty",
+        "label": "目标终端数量",
         "type": "number"
       },
       {
-        "name": "目标销售量",
+        "name": "target_sales_qty",
+        "label": "目标销售量",
         "type": "number"
       }
     ]
@@ -1934,64 +2291,79 @@
     "required": false,
     "form_schema": [
       {
-        "name": "调研人",
+        "name": "researcher",
+        "label": "调研人",
         "type": "text"
       },
       {
-        "name": "调研日期",
+        "name": "research_date",
+        "label": "调研日期",
         "type": "date"
       },
       {
-        "name": "医院完整名称",
+        "name": "hospital_name",
+        "label": "医院完整名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "省/市/区及地址",
+        "name": "address",
+        "label": "省/市/区及地址",
         "type": "text"
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "重点/专长科室",
+        "name": "specialty_dept",
+        "label": "重点/专长科室",
         "type": "text"
       },
       {
-        "name": "科室负责人",
+        "name": "dept_head",
+        "label": "科室负责人",
         "type": "text"
       },
       {
-        "name": "病床规模",
+        "name": "bed_scale",
+        "label": "病床规模",
         "type": "number"
       },
       {
-        "name": "月门诊量",
+        "name": "monthly_visits",
+        "label": "月门诊量",
         "type": "number"
       },
       {
-        "name": "机构负责人",
+        "name": "org_head",
+        "label": "机构负责人",
         "type": "text"
       },
       {
-        "name": "现有配送渠道",
+        "name": "delivery_channel",
+        "label": "现有配送渠道",
         "type": "text"
       },
       {
-        "name": "同类产品概况",
+        "name": "competitor_overview",
+        "label": "同类产品概况",
         "type": "textarea"
       },
       {
-        "name": "总结/建议",
+        "name": "summary",
+        "label": "总结/建议",
         "type": "textarea"
       },
       {
-        "name": "照片",
+        "name": "photo",
+        "label": "照片",
         "type": "textarea"
       }
     ]
@@ -2008,64 +2380,79 @@
     "required": false,
     "form_schema": [
       {
-        "name": "调研人",
+        "name": "researcher",
+        "label": "调研人",
         "type": "text"
       },
       {
-        "name": "调研日期",
+        "name": "research_date",
+        "label": "调研日期",
         "type": "date"
       },
       {
-        "name": "基层医疗完整名称",
+        "name": "primary_care_name",
+        "label": "基层医疗完整名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "省/市/区及地址",
+        "name": "address",
+        "label": "省/市/区及地址",
         "type": "text"
       },
       {
-        "name": "机构类型",
+        "name": "org_type",
+        "label": "机构类型",
         "type": "text"
       },
       {
-        "name": "上级管理主体",
+        "name": "supervisor",
+        "label": "上级管理主体",
         "type": "text"
       },
       {
-        "name": "服务辖区与人口",
+        "name": "service_area",
+        "label": "服务辖区与人口",
         "type": "text"
       },
       {
-        "name": "诊疗科目与特色",
+        "name": "specialty",
+        "label": "诊疗科目与特色",
         "type": "text"
       },
       {
-        "name": "病床规模",
+        "name": "bed_scale",
+        "label": "病床规模",
         "type": "number"
       },
       {
-        "name": "月门诊量",
+        "name": "monthly_visits",
+        "label": "月门诊量",
         "type": "number"
       },
       {
-        "name": "机构负责人",
+        "name": "org_head",
+        "label": "机构负责人",
         "type": "text"
       },
       {
-        "name": "现有配送渠道",
+        "name": "delivery_channel",
+        "label": "现有配送渠道",
         "type": "text"
       },
       {
-        "name": "同类产品概况",
+        "name": "competitor_overview",
+        "label": "同类产品概况",
         "type": "textarea"
       },
       {
-        "name": "总结/建议",
+        "name": "summary",
+        "label": "总结/建议",
         "type": "textarea"
       },
       {
-        "name": "照片",
+        "name": "photo",
+        "label": "照片",
         "type": "textarea"
       }
     ]
@@ -2082,64 +2469,79 @@
     "required": false,
     "form_schema": [
       {
-        "name": "调研人",
+        "name": "researcher",
+        "label": "调研人",
         "type": "text"
       },
       {
-        "name": "调研日期",
+        "name": "research_date",
+        "label": "调研日期",
         "type": "date"
       },
       {
-        "name": "民营医疗完整名称",
+        "name": "private_medical_name",
+        "label": "民营医疗完整名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "省/市/区及地址",
+        "name": "address",
+        "label": "省/市/区及地址",
         "type": "text"
       },
       {
-        "name": "单体/集团",
+        "name": "org_form",
+        "label": "单体/集团",
         "type": "text"
       },
       {
-        "name": "所属集团",
+        "name": "group",
+        "label": "所属集团",
         "type": "text"
       },
       {
-        "name": "服务辖区与人口",
+        "name": "service_area",
+        "label": "服务辖区与人口",
         "type": "text"
       },
       {
-        "name": "诊疗科目与特色",
+        "name": "specialty",
+        "label": "诊疗科目与特色",
         "type": "text"
       },
       {
-        "name": "病床规模",
+        "name": "bed_scale",
+        "label": "病床规模",
         "type": "number"
       },
       {
-        "name": "月门诊量",
+        "name": "monthly_visits",
+        "label": "月门诊量",
         "type": "number"
       },
       {
-        "name": "机构负责人",
+        "name": "org_head",
+        "label": "机构负责人",
         "type": "text"
       },
       {
-        "name": "现有配送渠道",
+        "name": "delivery_channel",
+        "label": "现有配送渠道",
         "type": "text"
       },
       {
-        "name": "同类产品概况",
+        "name": "competitor_overview",
+        "label": "同类产品概况",
         "type": "textarea"
       },
       {
-        "name": "总结/建议",
+        "name": "summary",
+        "label": "总结/建议",
         "type": "textarea"
       },
       {
-        "name": "照片",
+        "name": "photo",
+        "label": "照片",
         "type": "textarea"
       }
     ]
@@ -2156,88 +2558,109 @@
     "required": false,
     "form_schema": [
       {
-        "name": "调研人",
+        "name": "researcher",
+        "label": "调研人",
         "type": "text"
       },
       {
-        "name": "调研日期",
+        "name": "research_date",
+        "label": "调研日期",
         "type": "date"
       },
       {
-        "name": "零售药店完整名称",
+        "name": "pharmacy_name",
+        "label": "零售药店完整名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "省/市/区及地址",
+        "name": "address",
+        "label": "省/市/区及地址",
         "type": "text"
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "营业面积",
+        "name": "area",
+        "label": "营业面积",
         "type": "number"
       },
       {
-        "name": "在岗店员人数",
+        "name": "staff_count",
+        "label": "在岗店员人数",
         "type": "number"
       },
       {
-        "name": "日均客流",
+        "name": "daily_flow",
+        "label": "日均客流",
         "type": "number"
       },
       {
-        "name": "主营药品品类",
+        "name": "main_category",
+        "label": "主营药品品类",
         "type": "text"
       },
       {
-        "name": "重点主推品种",
+        "name": "main_product",
+        "label": "重点主推品种",
         "type": "text"
       },
       {
-        "name": "合作配送商业",
+        "name": "delivery_commercial",
+        "label": "合作配送商业",
         "type": "text"
       },
       {
-        "name": "配送时效",
+        "name": "delivery_timeliness",
+        "label": "配送时效",
         "type": "text"
       },
       {
-        "name": "补货周期",
+        "name": "replenish_cycle",
+        "label": "补货周期",
         "type": "text"
       },
       {
-        "name": "病床规模",
+        "name": "bed_scale",
+        "label": "病床规模",
         "type": "number"
       },
       {
-        "name": "月门诊量",
+        "name": "monthly_visits",
+        "label": "月门诊量",
         "type": "number"
       },
       {
-        "name": "机构负责人",
+        "name": "org_head",
+        "label": "机构负责人",
         "type": "text"
       },
       {
-        "name": "现有配送渠道",
+        "name": "delivery_channel",
+        "label": "现有配送渠道",
         "type": "text"
       },
       {
-        "name": "同类产品概况",
+        "name": "competitor_overview",
+        "label": "同类产品概况",
         "type": "textarea"
       },
       {
-        "name": "总结/建议",
+        "name": "summary",
+        "label": "总结/建议",
         "type": "textarea"
       },
       {
-        "name": "照片",
+        "name": "photo",
+        "label": "照片",
         "type": "textarea"
       }
     ]
@@ -2254,69 +2677,85 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "受访医务人员昵称",
+        "name": "physician_name",
+        "label": "受访医务人员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "当前用药方案",
+        "name": "current_medication",
+        "label": "当前用药方案",
         "type": "text"
       },
       {
-        "name": "用药频次/剂量",
+        "name": "dosage_frequency",
+        "label": "用药频次/剂量",
         "type": "text"
       },
       {
-        "name": "处方习惯",
+        "name": "prescription_habit",
+        "label": "处方习惯",
         "type": "text"
       },
       {
-        "name": "替代产品使用情况",
+        "name": "alternative_usage",
+        "label": "替代产品使用情况",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2333,69 +2772,85 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "受访医务人员昵称",
+        "name": "physician_name",
+        "label": "受访医务人员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "产品认知程度",
+        "name": "awareness_level",
+        "label": "产品认知程度",
         "type": "text"
       },
       {
-        "name": "产品了解渠道",
+        "name": "awareness_channel",
+        "label": "产品了解渠道",
         "type": "text"
       },
       {
-        "name": "产品评价",
+        "name": "product_evaluation",
+        "label": "产品评价",
         "type": "text"
       },
       {
-        "name": "改进建议",
+        "name": "improvement",
+        "label": "改进建议",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2412,73 +2867,90 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "受访医务人员昵称",
+        "name": "physician_name",
+        "label": "受访医务人员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "学术需求方向",
+        "name": "academic_direction",
+        "label": "学术需求方向",
         "type": "text"
       },
       {
-        "name": "学术会议参与情况",
+        "name": "meeting_participation",
+        "label": "学术会议参与情况",
         "type": "text"
       },
       {
-        "name": "培训需求",
+        "name": "training_need",
+        "label": "培训需求",
         "type": "text"
       },
       {
-        "name": "文献需求",
+        "name": "literature_need",
+        "label": "文献需求",
         "type": "text"
       },
       {
-        "name": "学术交流意向",
+        "name": "exchange_intent",
+        "label": "学术交流意向",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2495,81 +2967,100 @@
     "required": true,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院名称",
+        "name": "hospital_name",
+        "label": "医院名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "医院等级",
+        "name": "hospital_level",
+        "label": "医院等级",
         "type": "text"
       },
       {
-        "name": "医院性质",
+        "name": "hospital_nature",
+        "label": "医院性质",
         "type": "text"
       },
       {
-        "name": "科室",
+        "name": "department",
+        "label": "科室",
         "type": "text"
       },
       {
-        "name": "受访医务人员昵称",
+        "name": "physician_name",
+        "label": "受访医务人员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "患者编号/匿名",
+        "name": "patient_no",
+        "label": "患者编号/匿名",
         "type": "text"
       },
       {
-        "name": "患者年龄段",
+        "name": "patient_age",
+        "label": "患者年龄段",
         "type": "text"
       },
       {
-        "name": "用药时长",
+        "name": "medication_duration",
+        "label": "用药时长",
         "type": "text"
       },
       {
-        "name": "用药效果评价",
+        "name": "efficacy_evaluation",
+        "label": "用药效果评价",
         "type": "text"
       },
       {
-        "name": "不良反应情况",
+        "name": "adverse_reaction",
+        "label": "不良反应情况",
         "type": "text"
       },
       {
-        "name": "用药依从性",
+        "name": "compliance",
+        "label": "用药依从性",
         "type": "text"
       },
       {
-        "name": "改进建议",
+        "name": "improvement",
+        "label": "改进建议",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2586,65 +3077,80 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "药店名称",
+        "name": "pharmacy_name",
+        "label": "药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "受访药店店员昵称",
+        "name": "pharmacist_name",
+        "label": "受访药店店员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "推荐产品排序",
+        "name": "recommend_ranking",
+        "label": "推荐产品排序",
         "type": "text"
       },
       {
-        "name": "推荐理由",
+        "name": "recommend_reason",
+        "label": "推荐理由",
         "type": "text"
       },
       {
-        "name": "推荐话术",
+        "name": "recommend_script",
+        "label": "推荐话术",
         "type": "text"
       },
       {
-        "name": "销售数据",
+        "name": "sales_data",
+        "label": "销售数据",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2661,65 +3167,80 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "药店名称",
+        "name": "pharmacy_name",
+        "label": "药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "受访药店店员昵称",
+        "name": "pharmacist_name",
+        "label": "受访药店店员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "产品认知程度",
+        "name": "awareness_level",
+        "label": "产品认知程度",
         "type": "text"
       },
       {
-        "name": "产品了解渠道",
+        "name": "awareness_channel",
+        "label": "产品了解渠道",
         "type": "text"
       },
       {
-        "name": "产品评价",
+        "name": "product_evaluation",
+        "label": "产品评价",
         "type": "text"
       },
       {
-        "name": "改进建议",
+        "name": "improvement",
+        "label": "改进建议",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2736,69 +3257,85 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "药店名称",
+        "name": "pharmacy_name",
+        "label": "药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "受访药店店员昵称",
+        "name": "pharmacist_name",
+        "label": "受访药店店员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "培训需求方向",
+        "name": "training_direction",
+        "label": "培训需求方向",
         "type": "text"
       },
       {
-        "name": "当前培训参与情况",
+        "name": "training_participation",
+        "label": "当前培训参与情况",
         "type": "text"
       },
       {
-        "name": "期望培训内容",
+        "name": "expected_content",
+        "label": "期望培训内容",
         "type": "text"
       },
       {
-        "name": "期望培训形式",
+        "name": "expected_form",
+        "label": "期望培训形式",
         "type": "text"
       },
       {
-        "name": "期望培训频次",
+        "name": "expected_frequency",
+        "label": "期望培训频次",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2815,73 +3352,90 @@
     "required": false,
     "form_schema": [
       {
-        "name": "区域",
+        "name": "region",
+        "label": "区域",
         "type": "text",
         "required": true
       },
       {
-        "name": "药店名称",
+        "name": "pharmacy_name",
+        "label": "药店名称",
         "type": "text",
         "required": true
       },
       {
-        "name": "连锁/单体",
+        "name": "chain_type",
+        "label": "连锁/单体",
         "type": "text"
       },
       {
-        "name": "所属连锁总部",
+        "name": "chain_hq",
+        "label": "所属连锁总部",
         "type": "text"
       },
       {
-        "name": "受访药店店员昵称",
+        "name": "pharmacist_name",
+        "label": "受访药店店员昵称",
         "type": "text"
       },
       {
-        "name": "采集人",
+        "name": "collector",
+        "label": "采集人",
         "type": "text"
       },
       {
-        "name": "采集月份",
+        "name": "exec_month",
+        "label": "采集月份",
         "type": "date"
       },
       {
-        "name": "产品名称",
+        "name": "product_name",
+        "label": "产品名称",
         "type": "text"
       },
       {
-        "name": "产品规格",
+        "name": "product_spec",
+        "label": "产品规格",
         "type": "text"
       },
       {
-        "name": "生产企业",
+        "name": "manufacturer",
+        "label": "生产企业",
         "type": "text"
       },
       {
-        "name": "受访顾客编号/匿名",
+        "name": "customer_no",
+        "label": "受访顾客编号/匿名",
         "type": "text"
       },
       {
-        "name": "顾客年龄段",
+        "name": "customer_age",
+        "label": "顾客年龄段",
         "type": "text"
       },
       {
-        "name": "购买决策因素",
+        "name": "decision_factor",
+        "label": "购买决策因素",
         "type": "text"
       },
       {
-        "name": "顾客满意度",
+        "name": "satisfaction",
+        "label": "顾客满意度",
         "type": "text"
       },
       {
-        "name": "复购意愿",
+        "name": "repurchase_intent",
+        "label": "复购意愿",
         "type": "text"
       },
       {
-        "name": "改进建议",
+        "name": "improvement",
+        "label": "改进建议",
         "type": "text"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2898,15 +3452,18 @@
     "required": true,
     "form_schema": [
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "服务月份",
+        "name": "service_month",
+        "label": "服务月份",
         "type": "date"
       },
       {
-        "name": "宣传类型",
+        "name": "promo_type",
+        "label": "宣传类型",
         "type": "select",
         "options": [
           {
@@ -2924,31 +3481,38 @@
         ]
       },
       {
-        "name": "宣传方式",
+        "name": "promo_method",
+        "label": "宣传方式",
         "type": "text"
       },
       {
-        "name": "宣传次数",
+        "name": "promo_count",
+        "label": "宣传次数",
         "type": "number"
       },
       {
-        "name": "资料名称",
+        "name": "material_name",
+        "label": "资料名称",
         "type": "text"
       },
       {
-        "name": "宣传目的",
+        "name": "promo_purpose",
+        "label": "宣传目的",
         "type": "textarea"
       },
       {
-        "name": "宣传资料",
+        "name": "promo_material",
+        "label": "宣传资料",
         "type": "textarea"
       },
       {
-        "name": "宣传照片",
+        "name": "promo_photo",
+        "label": "宣传照片",
         "type": "textarea"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -2965,15 +3529,18 @@
     "required": true,
     "form_schema": [
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "服务月份",
+        "name": "service_month",
+        "label": "服务月份",
         "type": "date"
       },
       {
-        "name": "宣传类型",
+        "name": "promo_type",
+        "label": "宣传类型",
         "type": "select",
         "options": [
           {
@@ -2991,31 +3558,38 @@
         ]
       },
       {
-        "name": "宣传方式",
+        "name": "promo_method",
+        "label": "宣传方式",
         "type": "text"
       },
       {
-        "name": "宣传次数",
+        "name": "promo_count",
+        "label": "宣传次数",
         "type": "number"
       },
       {
-        "name": "资料名称",
+        "name": "material_name",
+        "label": "资料名称",
         "type": "text"
       },
       {
-        "name": "宣传目的",
+        "name": "promo_purpose",
+        "label": "宣传目的",
         "type": "textarea"
       },
       {
-        "name": "宣传资料",
+        "name": "promo_material",
+        "label": "宣传资料",
         "type": "textarea"
       },
       {
-        "name": "宣传照片",
+        "name": "promo_photo",
+        "label": "宣传照片",
         "type": "textarea"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -3032,15 +3606,18 @@
     "required": true,
     "form_schema": [
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "服务月份",
+        "name": "service_month",
+        "label": "服务月份",
         "type": "date"
       },
       {
-        "name": "宣传类型",
+        "name": "promo_type",
+        "label": "宣传类型",
         "type": "select",
         "options": [
           {
@@ -3058,31 +3635,38 @@
         ]
       },
       {
-        "name": "宣传方式",
+        "name": "promo_method",
+        "label": "宣传方式",
         "type": "text"
       },
       {
-        "name": "宣传次数",
+        "name": "promo_count",
+        "label": "宣传次数",
         "type": "number"
       },
       {
-        "name": "资料名称",
+        "name": "material_name",
+        "label": "资料名称",
         "type": "text"
       },
       {
-        "name": "宣传目的",
+        "name": "promo_purpose",
+        "label": "宣传目的",
         "type": "textarea"
       },
       {
-        "name": "宣传资料",
+        "name": "promo_material",
+        "label": "宣传资料",
         "type": "textarea"
       },
       {
-        "name": "宣传照片",
+        "name": "promo_photo",
+        "label": "宣传照片",
         "type": "textarea"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -3099,15 +3683,18 @@
     "required": true,
     "form_schema": [
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "服务月份",
+        "name": "service_month",
+        "label": "服务月份",
         "type": "date"
       },
       {
-        "name": "宣传类型",
+        "name": "promo_type",
+        "label": "宣传类型",
         "type": "select",
         "options": [
           {
@@ -3125,31 +3712,38 @@
         ]
       },
       {
-        "name": "宣传方式",
+        "name": "promo_method",
+        "label": "宣传方式",
         "type": "text"
       },
       {
-        "name": "宣传次数",
+        "name": "promo_count",
+        "label": "宣传次数",
         "type": "number"
       },
       {
-        "name": "资料名称",
+        "name": "material_name",
+        "label": "资料名称",
         "type": "text"
       },
       {
-        "name": "宣传目的",
+        "name": "promo_purpose",
+        "label": "宣传目的",
         "type": "textarea"
       },
       {
-        "name": "宣传资料",
+        "name": "promo_material",
+        "label": "宣传资料",
         "type": "textarea"
       },
       {
-        "name": "宣传照片",
+        "name": "promo_photo",
+        "label": "宣传照片",
         "type": "textarea"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -3166,15 +3760,18 @@
     "required": true,
     "form_schema": [
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "服务月份",
+        "name": "service_month",
+        "label": "服务月份",
         "type": "date"
       },
       {
-        "name": "宣传类型",
+        "name": "promo_type",
+        "label": "宣传类型",
         "type": "select",
         "options": [
           {
@@ -3192,31 +3789,38 @@
         ]
       },
       {
-        "name": "宣传方式",
+        "name": "promo_method",
+        "label": "宣传方式",
         "type": "text"
       },
       {
-        "name": "宣传次数",
+        "name": "promo_count",
+        "label": "宣传次数",
         "type": "number"
       },
       {
-        "name": "资料名称",
+        "name": "material_name",
+        "label": "资料名称",
         "type": "text"
       },
       {
-        "name": "宣传目的",
+        "name": "promo_purpose",
+        "label": "宣传目的",
         "type": "textarea"
       },
       {
-        "name": "宣传资料",
+        "name": "promo_material",
+        "label": "宣传资料",
         "type": "textarea"
       },
       {
-        "name": "宣传照片",
+        "name": "promo_photo",
+        "label": "宣传照片",
         "type": "textarea"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]
@@ -3233,15 +3837,18 @@
     "required": true,
     "form_schema": [
       {
-        "name": "执行人",
+        "name": "executor",
+        "label": "执行人",
         "type": "text"
       },
       {
-        "name": "服务月份",
+        "name": "service_month",
+        "label": "服务月份",
         "type": "date"
       },
       {
-        "name": "宣传类型",
+        "name": "promo_type",
+        "label": "宣传类型",
         "type": "select",
         "options": [
           {
@@ -3259,31 +3866,38 @@
         ]
       },
       {
-        "name": "宣传方式",
+        "name": "promo_method",
+        "label": "宣传方式",
         "type": "text"
       },
       {
-        "name": "宣传次数",
+        "name": "promo_count",
+        "label": "宣传次数",
         "type": "number"
       },
       {
-        "name": "资料名称",
+        "name": "material_name",
+        "label": "资料名称",
         "type": "text"
       },
       {
-        "name": "宣传目的",
+        "name": "promo_purpose",
+        "label": "宣传目的",
         "type": "textarea"
       },
       {
-        "name": "宣传资料",
+        "name": "promo_material",
+        "label": "宣传资料",
         "type": "textarea"
       },
       {
-        "name": "宣传照片",
+        "name": "promo_photo",
+        "label": "宣传照片",
         "type": "textarea"
       },
       {
-        "name": "其他说明",
+        "name": "note",
+        "label": "其他说明",
         "type": "textarea"
       }
     ]

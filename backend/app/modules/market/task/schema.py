@@ -1,10 +1,36 @@
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
 from app.core.validator import DateTimeStr
 from app.modules.market.company.schema import CompanyOutSchema
+
+
+class FormSchemaOption(BaseModel):
+    """采集字段选项（select/radio/checkbox 的可选项）。"""
+
+    label: str = Field(description="选项显示名")
+    value: str = Field(description="选项值")
+
+
+class FormSchemaField(BaseModel):
+    """采集字段定义（驱动小程序端「提交成果」动态表单）。
+
+    每个字段对应表单上的一个输入项：
+    - name      字段唯一标识，作为表单数据的 key（建议英文/拼音，如 hospital_name，勿重复）
+    - label     字段显示名（如 医院名称）
+    - type      字段类型：text/textarea/number/date/select/radio/checkbox
+    - required  是否必填
+    - options   选项列表（仅 select/radio/checkbox 需要）
+    """
+
+    name: str = Field(min_length=1, max_length=64, description="字段唯一标识(建议英文/拼音，如 hospital_name)")
+    label: str = Field(min_length=1, max_length=128, description="字段显示名(如 医院名称)")
+    type: Literal["text", "textarea", "number", "date", "select", "radio", "checkbox"] = Field(default="text", description="字段类型")
+    required: bool = Field(default=False, description="是否必填")
+    placeholder: str | None = Field(default=None, max_length=255, description="输入占位提示")
+    options: list[FormSchemaOption] | None = Field(default=None, description="选项列表(仅 select/radio/checkbox 需要)")
 
 
 class TaskTypeOutSchema(BaseSchema, UserBySchema):
@@ -21,7 +47,7 @@ class TaskTypeOutSchema(BaseSchema, UserBySchema):
     default_price: float = Field(description="默认单价")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool = Field(default=False, description="是否必选")
-    form_schema: list[dict[str, Any]] = Field(default_factory=list, description="采集字段 JSON Schema")
+    form_schema: list[FormSchemaField] = Field(default_factory=list, description="采集字段 Schema")
 
 
 class TaskTypeCreateSchema(BaseModel):
@@ -36,7 +62,7 @@ class TaskTypeCreateSchema(BaseModel):
     default_price: float = Field(ge=0, description="默认单价")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool = Field(default=False, description="是否必选")
-    form_schema: list[dict[str, Any]] = Field(default_factory=list, description="采集字段 JSON Schema")
+    form_schema: list[FormSchemaField] = Field(default_factory=list, description="采集字段 Schema")
 
 
 class TaskTypeUpdateSchema(BaseModel):
@@ -51,7 +77,7 @@ class TaskTypeUpdateSchema(BaseModel):
     default_price: float | None = Field(default=None, ge=0, description="默认单价")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool | None = Field(default=None, description="是否必选")
-    form_schema: list[dict[str, Any]] | None = Field(default=None, description="采集字段 JSON Schema")
+    form_schema: list[FormSchemaField] | None = Field(default=None, description="采集字段 Schema")
 
 
 class TaskTypeQueryParam(BaseQueryParam, UserByQueryParam):
