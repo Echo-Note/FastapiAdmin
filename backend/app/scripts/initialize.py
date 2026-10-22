@@ -11,6 +11,7 @@ from app.config.setting import settings
 from app.core.base_model import MappedBase
 from app.core.database import async_db_session, async_engine, create_tables
 from app.core.logger import logger
+from app.modules.market.task.model import TaskTypeModel
 from app.modules.system.dept.model import DeptModel
 from app.modules.system.dict.model import DictDataModel, DictTypeModel
 from app.modules.system.menu.model import MenuModel
@@ -42,6 +43,7 @@ class InitializeData:
         VersionModel,
         NodeModel,
         StorageNodeModel,
+        TaskTypeModel,
     ]
 
     # 树形模型：JSON 含嵌套 children，需递归创建对象

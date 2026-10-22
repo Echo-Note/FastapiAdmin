@@ -1,0 +1,3291 @@
+[
+  {
+    "code": "blank_grade_hospital_dev",
+    "name": "空白等级医院开发",
+    "service_type": "终端服务",
+    "service_item": "空白市场开发",
+    "service_task": "空白等级医院开发",
+    "unit": "家",
+    "default_price": 25000,
+    "exec_standard": null,
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "产品名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产厂家",
+        "type": "text"
+      },
+      {
+        "name": "准入结果",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已入院",
+            "value": "已入院"
+          },
+          {
+            "label": "已采购",
+            "value": "已采购"
+          }
+        ]
+      },
+      {
+        "name": "通过日期",
+        "type": "date"
+      },
+      {
+        "name": "确认部门",
+        "type": "text"
+      },
+      {
+        "name": "采购状态",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已采购",
+            "value": "已采购"
+          },
+          {
+            "label": "已入库",
+            "value": "已入库"
+          }
+        ]
+      },
+      {
+        "name": "首次采购日期",
+        "type": "date"
+      },
+      {
+        "name": "供货商业",
+        "type": "text"
+      },
+      {
+        "name": "采购数量",
+        "type": "number"
+      },
+      {
+        "name": "商业合同",
+        "type": "textarea"
+      },
+      {
+        "name": "入库单",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "blank_primary_care_dev",
+    "name": "空白基层医疗进院开发",
+    "service_type": "终端服务",
+    "service_item": "空白市场开发",
+    "service_task": "空白基层医疗进院开发",
+    "unit": "家",
+    "default_price": 10000,
+    "exec_standard": null,
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "产品名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产厂家",
+        "type": "text"
+      },
+      {
+        "name": "准入结果",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已入院",
+            "value": "已入院"
+          },
+          {
+            "label": "已采购",
+            "value": "已采购"
+          }
+        ]
+      },
+      {
+        "name": "通过日期",
+        "type": "date"
+      },
+      {
+        "name": "确认部门",
+        "type": "text"
+      },
+      {
+        "name": "采购状态",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已采购",
+            "value": "已采购"
+          },
+          {
+            "label": "已入库",
+            "value": "已入库"
+          }
+        ]
+      },
+      {
+        "name": "首次采购日期",
+        "type": "date"
+      },
+      {
+        "name": "供货商业",
+        "type": "text"
+      },
+      {
+        "name": "采购数量",
+        "type": "number"
+      },
+      {
+        "name": "商业合同",
+        "type": "textarea"
+      },
+      {
+        "name": "入库单",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "blank_private_medical_dev",
+    "name": "空白民营医疗进院开发",
+    "service_type": "终端服务",
+    "service_item": "空白市场开发",
+    "service_task": "空白民营医疗进院开发",
+    "unit": "家",
+    "default_price": 10000,
+    "exec_standard": null,
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "产品名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产厂家",
+        "type": "text"
+      },
+      {
+        "name": "准入结果",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已入院",
+            "value": "已入院"
+          },
+          {
+            "label": "已采购",
+            "value": "已采购"
+          }
+        ]
+      },
+      {
+        "name": "通过日期",
+        "type": "date"
+      },
+      {
+        "name": "确认部门",
+        "type": "text"
+      },
+      {
+        "name": "采购状态",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已采购",
+            "value": "已采购"
+          },
+          {
+            "label": "已入库",
+            "value": "已入库"
+          }
+        ]
+      },
+      {
+        "name": "首次采购日期",
+        "type": "date"
+      },
+      {
+        "name": "供货商业",
+        "type": "text"
+      },
+      {
+        "name": "采购数量",
+        "type": "number"
+      },
+      {
+        "name": "商业合同",
+        "type": "textarea"
+      },
+      {
+        "name": "入库单",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "blank_retail_pharmacy_dev",
+    "name": "空白零售药店合作开发",
+    "service_type": "终端服务",
+    "service_item": "空白市场开发",
+    "service_task": "空白零售药店合作开发",
+    "unit": "家",
+    "default_price": 1000,
+    "exec_standard": null,
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "产品名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产厂家",
+        "type": "text"
+      },
+      {
+        "name": "准入结果",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已入院",
+            "value": "已入院"
+          },
+          {
+            "label": "已采购",
+            "value": "已采购"
+          }
+        ]
+      },
+      {
+        "name": "通过日期",
+        "type": "date"
+      },
+      {
+        "name": "确认部门",
+        "type": "text"
+      },
+      {
+        "name": "采购状态",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已采购",
+            "value": "已采购"
+          },
+          {
+            "label": "已入库",
+            "value": "已入库"
+          }
+        ]
+      },
+      {
+        "name": "首次采购日期",
+        "type": "date"
+      },
+      {
+        "name": "供货商业",
+        "type": "text"
+      },
+      {
+        "name": "采购数量",
+        "type": "number"
+      },
+      {
+        "name": "商业合同",
+        "type": "textarea"
+      },
+      {
+        "name": "入库单",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "grade_hospital_delivery",
+    "name": "等级医院管理-配送协调",
+    "service_type": "终端服务",
+    "service_item": "等级医院管理",
+    "service_task": "配送协调",
+    "unit": "家/月",
+    "default_price": 1000,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "配送数量",
+        "type": "number"
+      },
+      {
+        "name": "配送时间",
+        "type": "date"
+      },
+      {
+        "name": "验收情况",
+        "type": "text"
+      },
+      {
+        "name": "配送商业",
+        "type": "text"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "grade_hospital_reconcile",
+    "name": "等级医院管理-销售对账",
+    "service_type": "终端服务",
+    "service_item": "等级医院管理",
+    "service_task": "销售对账",
+    "unit": "家/月",
+    "default_price": 1000,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "销售数量",
+        "type": "number"
+      },
+      {
+        "name": "退损数量",
+        "type": "number"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "grade_hospital_inventory",
+    "name": "等级医院管理-库存盘点",
+    "service_type": "终端服务",
+    "service_item": "等级医院管理",
+    "service_task": "库存盘点",
+    "unit": "家/月",
+    "default_price": 1000,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "有效期至",
+        "type": "date"
+      },
+      {
+        "name": "实盘数量",
+        "type": "number"
+      },
+      {
+        "name": "盘点差异",
+        "type": "text"
+      },
+      {
+        "name": "说明",
+        "type": "text"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "primary_care_delivery",
+    "name": "基层医疗管理-配送协调",
+    "service_type": "终端服务",
+    "service_item": "基层医疗管理",
+    "service_task": "配送协调",
+    "unit": "家/月",
+    "default_price": 800,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "基层医疗机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构类型",
+        "type": "text"
+      },
+      {
+        "name": "上级管理主体",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "配送数量",
+        "type": "number"
+      },
+      {
+        "name": "配送时间",
+        "type": "date"
+      },
+      {
+        "name": "验收情况",
+        "type": "text"
+      },
+      {
+        "name": "配送商业",
+        "type": "text"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "primary_care_reconcile",
+    "name": "基层医疗管理-销售对账",
+    "service_type": "终端服务",
+    "service_item": "基层医疗管理",
+    "service_task": "销售对账",
+    "unit": "家/月",
+    "default_price": 800,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "基层医疗机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构类型",
+        "type": "text"
+      },
+      {
+        "name": "上级管理主体",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "销售数量",
+        "type": "number"
+      },
+      {
+        "name": "退损数量",
+        "type": "number"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "primary_care_inventory",
+    "name": "基层医疗管理-库存盘点",
+    "service_type": "终端服务",
+    "service_item": "基层医疗管理",
+    "service_task": "库存盘点",
+    "unit": "家/月",
+    "default_price": 800,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "基层医疗机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "机构类型",
+        "type": "text"
+      },
+      {
+        "name": "上级管理主体",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "有效期至",
+        "type": "date"
+      },
+      {
+        "name": "实盘数量",
+        "type": "number"
+      },
+      {
+        "name": "盘点差异",
+        "type": "text"
+      },
+      {
+        "name": "说明",
+        "type": "text"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "private_medical_delivery",
+    "name": "民营医疗管理-配送协调",
+    "service_type": "终端服务",
+    "service_item": "民营医疗管理",
+    "service_task": "配送协调",
+    "unit": "家/月",
+    "default_price": 800,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "民营医疗机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "单体/集团",
+        "type": "text"
+      },
+      {
+        "name": "所属集团",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "配送数量",
+        "type": "number"
+      },
+      {
+        "name": "配送时间",
+        "type": "date"
+      },
+      {
+        "name": "验收情况",
+        "type": "text"
+      },
+      {
+        "name": "配送商业",
+        "type": "text"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "private_medical_reconcile",
+    "name": "民营医疗管理-销售对账",
+    "service_type": "终端服务",
+    "service_item": "民营医疗管理",
+    "service_task": "销售对账",
+    "unit": "家/月",
+    "default_price": 800,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "民营医疗机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "单体/集团",
+        "type": "text"
+      },
+      {
+        "name": "所属集团",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "销售数量",
+        "type": "number"
+      },
+      {
+        "name": "退损数量",
+        "type": "number"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "private_medical_inventory",
+    "name": "民营医疗管理-库存盘点",
+    "service_type": "终端服务",
+    "service_item": "民营医疗管理",
+    "service_task": "库存盘点",
+    "unit": "家/月",
+    "default_price": 800,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "民营医疗机构名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "单体/集团",
+        "type": "text"
+      },
+      {
+        "name": "所属集团",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "有效期至",
+        "type": "date"
+      },
+      {
+        "name": "实盘数量",
+        "type": "number"
+      },
+      {
+        "name": "盘点差异",
+        "type": "text"
+      },
+      {
+        "name": "说明",
+        "type": "text"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "retail_pharmacy_delivery",
+    "name": "零售药店管理-配送协调",
+    "service_type": "终端服务",
+    "service_item": "零售药店管理",
+    "service_task": "配送协调",
+    "unit": "家/月",
+    "default_price": 500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "零售药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "配送数量",
+        "type": "number"
+      },
+      {
+        "name": "配送时间",
+        "type": "date"
+      },
+      {
+        "name": "验收情况",
+        "type": "text"
+      },
+      {
+        "name": "配送商业",
+        "type": "text"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "retail_pharmacy_reconcile",
+    "name": "零售药店管理-销售对账",
+    "service_type": "终端服务",
+    "service_item": "零售药店管理",
+    "service_task": "销售对账",
+    "unit": "家/月",
+    "default_price": 500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "零售药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "销售数量",
+        "type": "number"
+      },
+      {
+        "name": "退损数量",
+        "type": "number"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "retail_pharmacy_inventory",
+    "name": "零售药店管理-库存盘点",
+    "service_type": "终端服务",
+    "service_item": "零售药店管理",
+    "service_task": "库存盘点",
+    "unit": "家/月",
+    "default_price": 500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "零售药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "有效期至",
+        "type": "date"
+      },
+      {
+        "name": "实盘数量",
+        "type": "number"
+      },
+      {
+        "name": "盘点差异",
+        "type": "text"
+      },
+      {
+        "name": "说明",
+        "type": "text"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "retail_pharmacy_display",
+    "name": "零售药店管理-陈列优化",
+    "service_type": "终端服务",
+    "service_item": "零售药店管理",
+    "service_task": "陈列优化",
+    "unit": "家/月",
+    "default_price": 500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "零售药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "陈列产品名称",
+        "type": "text"
+      },
+      {
+        "name": "陈列位置",
+        "type": "text"
+      },
+      {
+        "name": "陈列数量",
+        "type": "number"
+      },
+      {
+        "name": "陈列照片",
+        "type": "textarea"
+      },
+      {
+        "name": "说明",
+        "type": "text"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "blank_commercial_dev",
+    "name": "商业公司合作开发",
+    "service_type": "商业服务",
+    "service_item": "空白商业开发",
+    "service_task": "商业公司合作开发",
+    "unit": "家",
+    "default_price": 5000,
+    "exec_standard": null,
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "商业公司名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "产品名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产厂家",
+        "type": "text"
+      },
+      {
+        "name": "准入结果",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已合作",
+            "value": "已合作"
+          },
+          {
+            "label": "已采购",
+            "value": "已采购"
+          }
+        ]
+      },
+      {
+        "name": "通过日期",
+        "type": "date"
+      },
+      {
+        "name": "确认部门",
+        "type": "text"
+      },
+      {
+        "name": "采购状态",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "label": "已采购",
+            "value": "已采购"
+          },
+          {
+            "label": "已入库",
+            "value": "已入库"
+          }
+        ]
+      },
+      {
+        "name": "首次采购日期",
+        "type": "date"
+      },
+      {
+        "name": "供货商业",
+        "type": "text"
+      },
+      {
+        "name": "采购数量",
+        "type": "number"
+      },
+      {
+        "name": "商业合同",
+        "type": "textarea"
+      },
+      {
+        "name": "入库单",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "commercial_sales_data",
+    "name": "商业公司管理-商业公司商销数据收集(进销存)",
+    "service_type": "商业服务",
+    "service_item": "商业公司管理",
+    "service_task": "商业公司商销数据收集(进销存)",
+    "unit": "家/月",
+    "default_price": 1500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "商业公司名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名",
+        "type": "text"
+      },
+      {
+        "name": "规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "批号",
+        "type": "text"
+      },
+      {
+        "name": "期初库存",
+        "type": "number"
+      },
+      {
+        "name": "本期购进",
+        "type": "number"
+      },
+      {
+        "name": "采购退回",
+        "type": "number"
+      },
+      {
+        "name": "期末库存",
+        "type": "number"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "票据照片",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "commercial_pure_sales_data",
+    "name": "商业公司管理-商业公司纯销数据收集(流向)",
+    "service_type": "商业服务",
+    "service_item": "商业公司管理",
+    "service_task": "商业公司纯销数据收集(流向)",
+    "unit": "家/月",
+    "default_price": 1500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "商业公司名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名",
+        "type": "text"
+      },
+      {
+        "name": "规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "终端机构",
+        "type": "text"
+      },
+      {
+        "name": "数量",
+        "type": "number"
+      },
+      {
+        "name": "备注",
+        "type": "text"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "流向证明照片",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "commercial_bill_data",
+    "name": "商业公司管理-商业票款往来数据收集",
+    "service_type": "商业服务",
+    "service_item": "商业公司管理",
+    "service_task": "商业票款往来数据收集",
+    "unit": "家/月",
+    "default_price": 1500,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "商业公司名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "执行月份",
+        "type": "date"
+      },
+      {
+        "name": "往来主体全称",
+        "type": "text"
+      },
+      {
+        "name": "账户/业务范围",
+        "type": "text"
+      },
+      {
+        "name": "本期开票",
+        "type": "number"
+      },
+      {
+        "name": "本期红冲",
+        "type": "number"
+      },
+      {
+        "name": "本期回款",
+        "type": "number"
+      },
+      {
+        "name": "本期退款",
+        "type": "number"
+      },
+      {
+        "name": "备注",
+        "type": "text"
+      },
+      {
+        "name": "异常说明",
+        "type": "textarea"
+      },
+      {
+        "name": "票款证明照片",
+        "type": "textarea"
+      },
+      {
+        "name": "打卡照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "competitor_swot",
+    "name": "竞品优劣势收集",
+    "service_type": "调研服务",
+    "service_item": "竞品信息调研",
+    "service_task": "竞品优劣势收集",
+    "unit": "份",
+    "default_price": 1200,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集日期",
+        "type": "date"
+      },
+      {
+        "name": "竞品产品名/规格",
+        "type": "text"
+      },
+      {
+        "name": "品牌/生产企业",
+        "type": "text"
+      },
+      {
+        "name": "区域",
+        "type": "text"
+      },
+      {
+        "name": "终端",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "优势",
+        "type": "textarea"
+      },
+      {
+        "name": "劣势",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "competitor_marketing_data",
+    "name": "竞品营销数据收集",
+    "service_type": "调研服务",
+    "service_item": "竞品信息调研",
+    "service_task": "竞品营销数据收集",
+    "unit": "份",
+    "default_price": 1200,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集日期",
+        "type": "date"
+      },
+      {
+        "name": "竞品产品名/规格",
+        "type": "text"
+      },
+      {
+        "name": "品牌/生产企业",
+        "type": "text"
+      },
+      {
+        "name": "区域",
+        "type": "text"
+      },
+      {
+        "name": "终端",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "营销终端",
+        "type": "text"
+      },
+      {
+        "name": "营销科室",
+        "type": "text"
+      },
+      {
+        "name": "销量",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "code": "competitor_price_data",
+    "name": "竞品价格数据收集",
+    "service_type": "调研服务",
+    "service_item": "竞品信息调研",
+    "service_task": "竞品价格数据收集",
+    "unit": "份",
+    "default_price": 1200,
+    "exec_standard": "完成任意2项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集日期",
+        "type": "date"
+      },
+      {
+        "name": "竞品产品名/规格",
+        "type": "text"
+      },
+      {
+        "name": "品牌/生产企业",
+        "type": "text"
+      },
+      {
+        "name": "区域",
+        "type": "text"
+      },
+      {
+        "name": "终端",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "价格终端",
+        "type": "text"
+      },
+      {
+        "name": "价格科室",
+        "type": "text"
+      },
+      {
+        "name": "价格",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "code": "market_share_research",
+    "name": "市场占有数据调研",
+    "service_type": "调研服务",
+    "service_item": "市场信息调研",
+    "service_task": "市场占有数据调研",
+    "unit": "份",
+    "default_price": 1500,
+    "exec_standard": "完成任意1项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集日期",
+        "type": "date"
+      },
+      {
+        "name": "产品名称/规格",
+        "type": "text"
+      },
+      {
+        "name": "品牌/生产企业",
+        "type": "text"
+      },
+      {
+        "name": "产品价格",
+        "type": "number"
+      },
+      {
+        "name": "区域",
+        "type": "text"
+      },
+      {
+        "name": "区域市场销售总量",
+        "type": "number"
+      },
+      {
+        "name": "区域市场销售占比",
+        "type": "number"
+      },
+      {
+        "name": "区域覆盖终端总量",
+        "type": "number"
+      },
+      {
+        "name": "区域覆盖终端占比",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "code": "market_potential_research",
+    "name": "市场潜力数据调研",
+    "service_type": "调研服务",
+    "service_item": "市场信息调研",
+    "service_task": "市场潜力数据调研",
+    "unit": "份",
+    "default_price": 1500,
+    "exec_standard": "完成任意1项及以上工作视为达成",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集日期",
+        "type": "date"
+      },
+      {
+        "name": "产品名称/规格",
+        "type": "text"
+      },
+      {
+        "name": "品牌/生产企业",
+        "type": "text"
+      },
+      {
+        "name": "产品价格",
+        "type": "number"
+      },
+      {
+        "name": "区域",
+        "type": "text"
+      },
+      {
+        "name": "目标终端/对象",
+        "type": "text"
+      },
+      {
+        "name": "目标终端数量",
+        "type": "number"
+      },
+      {
+        "name": "目标销售量",
+        "type": "number"
+      }
+    ]
+  },
+  {
+    "code": "terminal_grade_hospital",
+    "name": "等级医院调研信息收集",
+    "service_type": "调研服务",
+    "service_item": "终端信息调研",
+    "service_task": "等级医院调研信息收集",
+    "unit": "家/次",
+    "default_price": 800,
+    "exec_standard": "单家终端一个季度只允许调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "调研人",
+        "type": "text"
+      },
+      {
+        "name": "调研日期",
+        "type": "date"
+      },
+      {
+        "name": "医院完整名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "省/市/区及地址",
+        "type": "text"
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "重点/专长科室",
+        "type": "text"
+      },
+      {
+        "name": "科室负责人",
+        "type": "text"
+      },
+      {
+        "name": "病床规模",
+        "type": "number"
+      },
+      {
+        "name": "月门诊量",
+        "type": "number"
+      },
+      {
+        "name": "机构负责人",
+        "type": "text"
+      },
+      {
+        "name": "现有配送渠道",
+        "type": "text"
+      },
+      {
+        "name": "同类产品概况",
+        "type": "textarea"
+      },
+      {
+        "name": "总结/建议",
+        "type": "textarea"
+      },
+      {
+        "name": "照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "terminal_primary_care",
+    "name": "基层医疗调研信息收集",
+    "service_type": "调研服务",
+    "service_item": "终端信息调研",
+    "service_task": "基层医疗调研信息收集",
+    "unit": "家/次",
+    "default_price": 600,
+    "exec_standard": "单家终端一个季度只允许调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "调研人",
+        "type": "text"
+      },
+      {
+        "name": "调研日期",
+        "type": "date"
+      },
+      {
+        "name": "基层医疗完整名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "省/市/区及地址",
+        "type": "text"
+      },
+      {
+        "name": "机构类型",
+        "type": "text"
+      },
+      {
+        "name": "上级管理主体",
+        "type": "text"
+      },
+      {
+        "name": "服务辖区与人口",
+        "type": "text"
+      },
+      {
+        "name": "诊疗科目与特色",
+        "type": "text"
+      },
+      {
+        "name": "病床规模",
+        "type": "number"
+      },
+      {
+        "name": "月门诊量",
+        "type": "number"
+      },
+      {
+        "name": "机构负责人",
+        "type": "text"
+      },
+      {
+        "name": "现有配送渠道",
+        "type": "text"
+      },
+      {
+        "name": "同类产品概况",
+        "type": "textarea"
+      },
+      {
+        "name": "总结/建议",
+        "type": "textarea"
+      },
+      {
+        "name": "照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "terminal_private_medical",
+    "name": "民营医疗调研信息收集",
+    "service_type": "调研服务",
+    "service_item": "终端信息调研",
+    "service_task": "民营医疗调研信息收集",
+    "unit": "家/次",
+    "default_price": 600,
+    "exec_standard": "单家终端一个季度只允许调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "调研人",
+        "type": "text"
+      },
+      {
+        "name": "调研日期",
+        "type": "date"
+      },
+      {
+        "name": "民营医疗完整名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "省/市/区及地址",
+        "type": "text"
+      },
+      {
+        "name": "单体/集团",
+        "type": "text"
+      },
+      {
+        "name": "所属集团",
+        "type": "text"
+      },
+      {
+        "name": "服务辖区与人口",
+        "type": "text"
+      },
+      {
+        "name": "诊疗科目与特色",
+        "type": "text"
+      },
+      {
+        "name": "病床规模",
+        "type": "number"
+      },
+      {
+        "name": "月门诊量",
+        "type": "number"
+      },
+      {
+        "name": "机构负责人",
+        "type": "text"
+      },
+      {
+        "name": "现有配送渠道",
+        "type": "text"
+      },
+      {
+        "name": "同类产品概况",
+        "type": "textarea"
+      },
+      {
+        "name": "总结/建议",
+        "type": "textarea"
+      },
+      {
+        "name": "照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "terminal_retail_pharmacy",
+    "name": "零售药店调研信息收集",
+    "service_type": "调研服务",
+    "service_item": "终端信息调研",
+    "service_task": "零售药店调研信息收集",
+    "unit": "家/次",
+    "default_price": 500,
+    "exec_standard": "单家终端一个季度只允许调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "调研人",
+        "type": "text"
+      },
+      {
+        "name": "调研日期",
+        "type": "date"
+      },
+      {
+        "name": "零售药店完整名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "省/市/区及地址",
+        "type": "text"
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "营业面积",
+        "type": "number"
+      },
+      {
+        "name": "在岗店员人数",
+        "type": "number"
+      },
+      {
+        "name": "日均客流",
+        "type": "number"
+      },
+      {
+        "name": "主营药品品类",
+        "type": "text"
+      },
+      {
+        "name": "重点主推品种",
+        "type": "text"
+      },
+      {
+        "name": "合作配送商业",
+        "type": "text"
+      },
+      {
+        "name": "配送时效",
+        "type": "text"
+      },
+      {
+        "name": "补货周期",
+        "type": "text"
+      },
+      {
+        "name": "病床规模",
+        "type": "number"
+      },
+      {
+        "name": "月门诊量",
+        "type": "number"
+      },
+      {
+        "name": "机构负责人",
+        "type": "text"
+      },
+      {
+        "name": "现有配送渠道",
+        "type": "text"
+      },
+      {
+        "name": "同类产品概况",
+        "type": "textarea"
+      },
+      {
+        "name": "总结/建议",
+        "type": "textarea"
+      },
+      {
+        "name": "照片",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "physician_medication_habit",
+    "name": "临床用药习惯调研",
+    "service_type": "调研服务",
+    "service_item": "针对医务人员访谈问卷调研",
+    "service_task": "临床用药习惯调研",
+    "unit": "份",
+    "default_price": 400,
+    "exec_standard": "单个医务人员单月单项目只能调研一次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "受访医务人员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "当前用药方案",
+        "type": "text"
+      },
+      {
+        "name": "用药频次/剂量",
+        "type": "text"
+      },
+      {
+        "name": "处方习惯",
+        "type": "text"
+      },
+      {
+        "name": "替代产品使用情况",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "physician_product_awareness",
+    "name": "产品认知度调研",
+    "service_type": "调研服务",
+    "service_item": "针对医务人员访谈问卷调研",
+    "service_task": "产品认知度调研",
+    "unit": "份",
+    "default_price": 300,
+    "exec_standard": "单个医务人员单月单项目只能调研一次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "受访医务人员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "产品认知程度",
+        "type": "text"
+      },
+      {
+        "name": "产品了解渠道",
+        "type": "text"
+      },
+      {
+        "name": "产品评价",
+        "type": "text"
+      },
+      {
+        "name": "改进建议",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "physician_academic_need",
+    "name": "学术需求调研",
+    "service_type": "调研服务",
+    "service_item": "针对医务人员访谈问卷调研",
+    "service_task": "学术需求调研",
+    "unit": "份",
+    "default_price": 200,
+    "exec_standard": "单个医务人员单月单项目只能调研一次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "受访医务人员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "学术需求方向",
+        "type": "text"
+      },
+      {
+        "name": "学术会议参与情况",
+        "type": "text"
+      },
+      {
+        "name": "培训需求",
+        "type": "text"
+      },
+      {
+        "name": "文献需求",
+        "type": "text"
+      },
+      {
+        "name": "学术交流意向",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "physician_patient_feedback",
+    "name": "患者用药反馈",
+    "service_type": "调研服务",
+    "service_item": "针对医务人员访谈问卷调研",
+    "service_task": "患者用药反馈",
+    "unit": "份",
+    "default_price": 100,
+    "exec_standard": "单个患者单月只能调研一次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "医院等级",
+        "type": "text"
+      },
+      {
+        "name": "医院性质",
+        "type": "text"
+      },
+      {
+        "name": "科室",
+        "type": "text"
+      },
+      {
+        "name": "受访医务人员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "患者编号/匿名",
+        "type": "text"
+      },
+      {
+        "name": "患者年龄段",
+        "type": "text"
+      },
+      {
+        "name": "用药时长",
+        "type": "text"
+      },
+      {
+        "name": "用药效果评价",
+        "type": "text"
+      },
+      {
+        "name": "不良反应情况",
+        "type": "text"
+      },
+      {
+        "name": "用药依从性",
+        "type": "text"
+      },
+      {
+        "name": "改进建议",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "pharmacist_recommend_habit",
+    "name": "产品推荐习惯",
+    "service_type": "调研服务",
+    "service_item": "针对药店店员访谈问卷调研",
+    "service_task": "产品推荐习惯",
+    "unit": "份",
+    "default_price": 200,
+    "exec_standard": "单个药店店员单月单项目只能调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "受访药店店员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "推荐产品排序",
+        "type": "text"
+      },
+      {
+        "name": "推荐理由",
+        "type": "text"
+      },
+      {
+        "name": "推荐话术",
+        "type": "text"
+      },
+      {
+        "name": "销售数据",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "pharmacist_product_awareness",
+    "name": "产品认知度调研",
+    "service_type": "调研服务",
+    "service_item": "针对药店店员访谈问卷调研",
+    "service_task": "产品认知度调研",
+    "unit": "份",
+    "default_price": 150,
+    "exec_standard": "单个药店店员单月单项目只能调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "受访药店店员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "产品认知程度",
+        "type": "text"
+      },
+      {
+        "name": "产品了解渠道",
+        "type": "text"
+      },
+      {
+        "name": "产品评价",
+        "type": "text"
+      },
+      {
+        "name": "改进建议",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "pharmacist_training_need",
+    "name": "培训需求调研",
+    "service_type": "调研服务",
+    "service_item": "针对药店店员访谈问卷调研",
+    "service_task": "培训需求调研",
+    "unit": "份",
+    "default_price": 100,
+    "exec_standard": "单个药店店员单月单项目只能调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "受访药店店员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "培训需求方向",
+        "type": "text"
+      },
+      {
+        "name": "当前培训参与情况",
+        "type": "text"
+      },
+      {
+        "name": "期望培训内容",
+        "type": "text"
+      },
+      {
+        "name": "期望培训形式",
+        "type": "text"
+      },
+      {
+        "name": "期望培训频次",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "pharmacist_customer_feedback",
+    "name": "顾客反馈调研",
+    "service_type": "调研服务",
+    "service_item": "针对药店店员访谈问卷调研",
+    "service_task": "顾客反馈调研",
+    "unit": "份",
+    "default_price": 50,
+    "exec_standard": "单个顾客单月只能调研一次",
+    "required": false,
+    "form_schema": [
+      {
+        "name": "区域",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "药店名称",
+        "type": "text",
+        "required": true
+      },
+      {
+        "name": "连锁/单体",
+        "type": "text"
+      },
+      {
+        "name": "所属连锁总部",
+        "type": "text"
+      },
+      {
+        "name": "受访药店店员昵称",
+        "type": "text"
+      },
+      {
+        "name": "采集人",
+        "type": "text"
+      },
+      {
+        "name": "采集月份",
+        "type": "date"
+      },
+      {
+        "name": "产品名称",
+        "type": "text"
+      },
+      {
+        "name": "产品规格",
+        "type": "text"
+      },
+      {
+        "name": "生产企业",
+        "type": "text"
+      },
+      {
+        "name": "受访顾客编号/匿名",
+        "type": "text"
+      },
+      {
+        "name": "顾客年龄段",
+        "type": "text"
+      },
+      {
+        "name": "购买决策因素",
+        "type": "text"
+      },
+      {
+        "name": "顾客满意度",
+        "type": "text"
+      },
+      {
+        "name": "复购意愿",
+        "type": "text"
+      },
+      {
+        "name": "改进建议",
+        "type": "text"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "outdoor_academic_promo",
+    "name": "户外宣传-学术科普宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "户外宣传",
+    "service_task": "学术科普宣传服务",
+    "unit": "次",
+    "default_price": 500,
+    "exec_standard": "1.摆展/智慧屏等\n2.每个月不超过20次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "服务月份",
+        "type": "date"
+      },
+      {
+        "name": "宣传类型",
+        "type": "select",
+        "options": [
+          {
+            "label": "学术科普",
+            "value": "学术科普"
+          },
+          {
+            "label": "产品品牌",
+            "value": "产品品牌"
+          },
+          {
+            "label": "产品海报",
+            "value": "产品海报"
+          }
+        ]
+      },
+      {
+        "name": "宣传方式",
+        "type": "text"
+      },
+      {
+        "name": "宣传次数",
+        "type": "number"
+      },
+      {
+        "name": "资料名称",
+        "type": "text"
+      },
+      {
+        "name": "宣传目的",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传资料",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传照片",
+        "type": "textarea"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "outdoor_brand_promo",
+    "name": "户外宣传-产品品牌宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "户外宣传",
+    "service_task": "产品品牌宣传服务",
+    "unit": "次",
+    "default_price": 500,
+    "exec_standard": "1.摆展/智慧屏等\n2.每个月不超过20次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "服务月份",
+        "type": "date"
+      },
+      {
+        "name": "宣传类型",
+        "type": "select",
+        "options": [
+          {
+            "label": "学术科普",
+            "value": "学术科普"
+          },
+          {
+            "label": "产品品牌",
+            "value": "产品品牌"
+          },
+          {
+            "label": "产品海报",
+            "value": "产品海报"
+          }
+        ]
+      },
+      {
+        "name": "宣传方式",
+        "type": "text"
+      },
+      {
+        "name": "宣传次数",
+        "type": "number"
+      },
+      {
+        "name": "资料名称",
+        "type": "text"
+      },
+      {
+        "name": "宣传目的",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传资料",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传照片",
+        "type": "textarea"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "outdoor_poster_promo",
+    "name": "户外宣传-产品海报宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "户外宣传",
+    "service_task": "产品海报宣传服务",
+    "unit": "次",
+    "default_price": 500,
+    "exec_standard": "1.摆展/智慧屏等\n2.每个月不超过20次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "服务月份",
+        "type": "date"
+      },
+      {
+        "name": "宣传类型",
+        "type": "select",
+        "options": [
+          {
+            "label": "学术科普",
+            "value": "学术科普"
+          },
+          {
+            "label": "产品品牌",
+            "value": "产品品牌"
+          },
+          {
+            "label": "产品海报",
+            "value": "产品海报"
+          }
+        ]
+      },
+      {
+        "name": "宣传方式",
+        "type": "text"
+      },
+      {
+        "name": "宣传次数",
+        "type": "number"
+      },
+      {
+        "name": "资料名称",
+        "type": "text"
+      },
+      {
+        "name": "宣传目的",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传资料",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传照片",
+        "type": "textarea"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "online_academic_promo",
+    "name": "互联网宣传-学术科普宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "互联网宣传",
+    "service_task": "学术科普宣传服务",
+    "unit": "次",
+    "default_price": 300,
+    "exec_standard": "1.门户网站/自媒体等\n2.每个月不超过30次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "服务月份",
+        "type": "date"
+      },
+      {
+        "name": "宣传类型",
+        "type": "select",
+        "options": [
+          {
+            "label": "学术科普",
+            "value": "学术科普"
+          },
+          {
+            "label": "产品品牌",
+            "value": "产品品牌"
+          },
+          {
+            "label": "产品海报",
+            "value": "产品海报"
+          }
+        ]
+      },
+      {
+        "name": "宣传方式",
+        "type": "text"
+      },
+      {
+        "name": "宣传次数",
+        "type": "number"
+      },
+      {
+        "name": "资料名称",
+        "type": "text"
+      },
+      {
+        "name": "宣传目的",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传资料",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传照片",
+        "type": "textarea"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "online_brand_promo",
+    "name": "互联网宣传-产品品牌宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "互联网宣传",
+    "service_task": "产品品牌宣传服务",
+    "unit": "次",
+    "default_price": 300,
+    "exec_standard": "1.门户网站/自媒体等\n2.每个月不超过30次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "服务月份",
+        "type": "date"
+      },
+      {
+        "name": "宣传类型",
+        "type": "select",
+        "options": [
+          {
+            "label": "学术科普",
+            "value": "学术科普"
+          },
+          {
+            "label": "产品品牌",
+            "value": "产品品牌"
+          },
+          {
+            "label": "产品海报",
+            "value": "产品海报"
+          }
+        ]
+      },
+      {
+        "name": "宣传方式",
+        "type": "text"
+      },
+      {
+        "name": "宣传次数",
+        "type": "number"
+      },
+      {
+        "name": "资料名称",
+        "type": "text"
+      },
+      {
+        "name": "宣传目的",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传资料",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传照片",
+        "type": "textarea"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  },
+  {
+    "code": "online_poster_promo",
+    "name": "互联网宣传-产品海报宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "互联网宣传",
+    "service_task": "产品海报宣传服务",
+    "unit": "次",
+    "default_price": 300,
+    "exec_standard": "1.门户网站/自媒体等\n2.每个月不超过30次",
+    "required": true,
+    "form_schema": [
+      {
+        "name": "执行人",
+        "type": "text"
+      },
+      {
+        "name": "服务月份",
+        "type": "date"
+      },
+      {
+        "name": "宣传类型",
+        "type": "select",
+        "options": [
+          {
+            "label": "学术科普",
+            "value": "学术科普"
+          },
+          {
+            "label": "产品品牌",
+            "value": "产品品牌"
+          },
+          {
+            "label": "产品海报",
+            "value": "产品海报"
+          }
+        ]
+      },
+      {
+        "name": "宣传方式",
+        "type": "text"
+      },
+      {
+        "name": "宣传次数",
+        "type": "number"
+      },
+      {
+        "name": "资料名称",
+        "type": "text"
+      },
+      {
+        "name": "宣传目的",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传资料",
+        "type": "textarea"
+      },
+      {
+        "name": "宣传照片",
+        "type": "textarea"
+      },
+      {
+        "name": "其他说明",
+        "type": "textarea"
+      }
+    ]
+  }
+]
