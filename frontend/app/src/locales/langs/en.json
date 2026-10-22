@@ -373,5 +373,34 @@
       "purple": "Violet",
       "red": "Vermilion Red"
     }
+  },
+  "market": {
+    "title": "Market Tasks",
+    "taskHall": "Task Hall",
+    "myTask": "My Tasks",
+    "myEarnings": "My Earnings",
+    "submitResult": "Submit Result",
+    "accept": "Accept",
+    "receiveConfirm": "Accept this task?",
+    "period": "Period",
+    "unitPrice": "Unit Price",
+    "execQty": "Quantity",
+    "amount": "Amount",
+    "deadline": "Deadline",
+    "status": "Status",
+    "institution": "Institution",
+    "region": "Region",
+    "archiveNo": "Archive No.",
+    "selectInstitution": "Select institution",
+    "emptyTaskHall": "No tasks to accept",
+    "emptyMyTask": "No tasks",
+    "quotaAmount": "Quota",
+    "receivedAmount": "Received",
+    "payableAmount": "Payable",
+    "overAmount": "Over Amount",
+    "carryover": "Carryover",
+    "noLimit": "Unlimited",
+    "saveDraft": "Save Draft",
+    "submit": "Submit"
   }
 }

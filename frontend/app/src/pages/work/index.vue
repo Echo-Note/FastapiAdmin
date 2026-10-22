@@ -44,6 +44,16 @@ const groups = [
     ],
   },
   {
+    titleKey: 'market.title',
+    color: 'var(--wot-green-6)',
+    bg: 'wot-bg-green-1',
+    items: [
+      { icon: 'task', titleKey: 'market.taskHall', name: 'market-task-hall' },
+      { icon: 'order', titleKey: 'market.myTask', name: 'market-my-task' },
+      { icon: 'wallet', titleKey: 'market.myEarnings', name: 'market-my-earnings' },
+    ],
+  },
+  {
     titleKey: 'work.devTools',
     color: 'var(--wot-purple-6)',
     bg: 'wot-bg-purple-1',

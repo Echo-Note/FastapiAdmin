@@ -8,23 +8,10 @@
     "backgroundColorTop": "@bgColorTop",
     "backgroundColorBottom": "@bgColorBottom",
     "enablePullDownRefresh": false,
-    "onReachBottomDistance": 50,
-    "animationType": "pop-in",
-    "animationDuration": 300
+    "onReachBottomDistance": 50
   },
   "pages": [
-    // #ifdef APP
-    {
-      "path": "pages/index/index",
-      "type": "home",
-      "name": "home",
-      "layout": "tabbar",
-      "style": {
-        "navigationBarTitleText": "首页"
-      }
-    },
-    // #endif
-    // #ifdef H5 || MP-WEIXIN
+    // #ifdef APP || H5 || MP-WEIXIN
     {
       "path": "pages/index/index",
       "type": "home",
@@ -32,17 +19,6 @@
       "layout": "tabbar",
       "style": {
         "navigationBarTitleText": "工作台概览"
-      }
-    },
-    // #endif
-    // #ifdef APP
-    {
-      "path": "pages/about/index",
-      "type": "page",
-      "name": "about",
-      "layout": "tabbar",
-      "style": {
-        "navigationBarTitleText": "关于"
       }
     },
     // #endif
@@ -93,7 +69,7 @@
     {
       "root": "subPages",
       "pages": [
-        // #ifdef H5 || MP-WEIXIN
+        // #ifdef APP || H5 || MP-WEIXIN
         {
           "path": "about/index",
           "type": "page",
@@ -103,7 +79,7 @@
           }
         },
         // #endif
-        // #ifdef H5 || MP-WEIXIN
+        // #ifdef APP || H5 || MP-WEIXIN
         {
           "path": "setting/index",
           "type": "page",
@@ -114,7 +90,7 @@
           }
         },
         // #endif
-        // #ifdef H5 || MP-WEIXIN
+        // #ifdef APP || H5 || MP-WEIXIN
         {
           "path": "module_ai/chat/index",
           "type": "page",
@@ -124,7 +100,7 @@
           }
         },
         // #endif
-        // #ifdef H5 || MP-WEIXIN
+        // #ifdef APP || H5 || MP-WEIXIN
         {
           "path": "module_system/profile/index",
           "type": "page",
@@ -141,6 +117,40 @@
           "name": "work-ai-models",
           "style": {
             "navigationBarTitleText": "AI 模型配置",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
+          "path": "module_market/my-earnings/index",
+          "type": "page",
+          "name": "market-my-earnings",
+          "style": {
+            "navigationBarTitleText": "我的额度"
+          }
+        },
+        {
+          "path": "module_market/my-task/index",
+          "type": "page",
+          "name": "market-my-task",
+          "style": {
+            "navigationBarTitleText": "我的任务",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
+          "path": "module_market/submission-form/index",
+          "type": "page",
+          "name": "market-submission-form",
+          "style": {
+            "navigationBarTitleText": "提交成果"
+          }
+        },
+        {
+          "path": "module_market/task-hall/index",
+          "type": "page",
+          "name": "market-task-hall",
+          "style": {
+            "navigationBarTitleText": "任务大厅",
             "enablePullDownRefresh": true
           }
         },
@@ -185,11 +195,6 @@
       // #ifdef APP || H5 || MP-WEIXIN
       {
         "pagePath": "pages/index/index"
-      },
-      // #endif
-      // #ifdef APP
-      {
-        "pagePath": "pages/about/index"
       },
       // #endif
       {

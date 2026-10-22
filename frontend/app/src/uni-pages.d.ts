@@ -14,6 +14,10 @@ type _LocationUrl =
   "/subPages/setting/index" |
   "/subPages/module_ai/ai-models/index" |
   "/subPages/module_ai/chat/index" |
+  "/subPages/module_market/my-earnings/index" |
+  "/subPages/module_market/my-task/index" |
+  "/subPages/module_market/submission-form/index" |
+  "/subPages/module_market/task-hall/index" |
   "/subPages/module_system/notices/index" |
   "/subPages/module_system/profile/index" |
   "/subPages/module_system/ticket-detail/index" |
