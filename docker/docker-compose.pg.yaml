@@ -25,7 +25,8 @@ services:
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - ./pg_data:/var/lib/postgresql/data
+      # PostgreSQL 18+ 数据挂载到 /var/lib/postgresql（18+ 用 major-version 子目录，如 /var/lib/postgresql/18）
+      - ./pg_data:/var/lib/postgresql
       - /etc/localtime:/etc/localtime:ro
     networks:
       - app_network
