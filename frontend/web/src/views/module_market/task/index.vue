@@ -77,7 +77,7 @@
 import TaskAPI, { type TaskForm, type TaskTable } from "@/api/module_market/task";
 import TaskTypeAPI from "@/api/module_market/task-type";
 import CompanyAPI from "@/api/module_market/company";
-import { TASK_STATUS_MAP } from "@/api/module_market/constants";
+import { ASSIGN_MODE_MAP, ASSIGN_MODE_OPTIONS, TASK_STATUS_MAP } from "@/api/module_market/constants";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
@@ -142,6 +142,8 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "period", label: "周期", width: 90 },
         { prop: "unit_price", label: "单价", width: 90, align: "right" },
         { prop: "exec_qty", label: "执行数量", width: 90, align: "right" },
+        { prop: "assign_mode", label: "分配方式", width: 100, status: ASSIGN_MODE_MAP },
+        { prop: "assign_limit", label: "接单人数", width: 90, align: "right" },
         { prop: "status", label: "状态", width: 92, status: TASK_STATUS_MAP },
         { prop: "deadline_at", label: "截止时间", width: 168, showOverflowTooltip: true },
         { prop: "operation", label: "操作", width: 220, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
@@ -157,18 +159,20 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "周期", prop: "period" },
   { label: "本期单价", prop: "unit_price" },
   { label: "执行数量", prop: "exec_qty" },
+  { label: "分配方式", prop: "assign_mode", tag: { map: ASSIGN_MODE_MAP } },
+  { label: "最大接单人数", prop: "assign_limit" },
   { label: "状态", prop: "status", tag: { map: TASK_STATUS_MAP } },
   { label: "发布时间", prop: "published_at" },
   { label: "截止时间", prop: "deadline_at" },
   { label: "创建人", prop: "created_by.name" },
 ];
 
-const formData = ref<TaskForm>({ id: undefined, task_no: undefined, task_type_id: undefined, company_id: undefined, period: undefined, unit_price: undefined, exec_qty: undefined, deadline_at: undefined });
+const formData = ref<TaskForm>({ id: undefined, task_no: undefined, task_type_id: undefined, company_id: undefined, period: undefined, unit_price: undefined, exec_qty: undefined, assign_mode: "direct", assign_limit: undefined, deadline_at: undefined });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: TaskForm = { id: undefined, task_no: undefined, task_type_id: undefined, company_id: undefined, period: undefined, unit_price: undefined, exec_qty: undefined, deadline_at: undefined };
+const initialFormData: TaskForm = { id: undefined, task_no: undefined, task_type_id: undefined, company_id: undefined, period: undefined, unit_price: undefined, exec_qty: undefined, assign_mode: "direct", assign_limit: undefined, deadline_at: undefined };
 
 const rules = reactive({
   task_no: [{ required: true, message: "请输入任务号", trigger: "blur" }],
@@ -185,6 +189,8 @@ const formItems = computed<FormItem[]>(() => [
   { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "自然月，如 2026-10", maxlength: 16 } },
   { label: "本期单价", key: "unit_price", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right", placeholder: "缺省取模板默认单价" } },
   { label: "执行数量", key: "exec_qty", type: "number", span: 24, props: { min: 1, controlsPosition: "right" } },
+  { label: "分配方式", key: "assign_mode", type: "select", span: 24, props: { placeholder: "请选择分配方式", options: ASSIGN_MODE_OPTIONS } },
+  { label: "最大接单人数", key: "assign_limit", type: "number", span: 24, props: { min: 1, controlsPosition: "right", placeholder: "公开大厅任务必填，先到先得、抢完即止" } },
   { label: "截止时间", key: "deadline_at", type: "datetime", span: 24, props: { placeholder: "请选择截止时间" } },
 ]);
 
@@ -258,7 +264,7 @@ async function handleBatchDelete() {
 
 async function publishRow(id: number, taskNo: string) {
   try {
-    await ElMessageBox.confirm(`确定发布任务「${taskNo}」吗？发布后任务进入任务大厅，被分派用户即可接收。`, "发布任务", { type: "warning" });
+    await ElMessageBox.confirm(`确定发布任务「${taskNo}」吗？`, "发布任务", { type: "warning" });
     await TaskAPI.publishTask(id);
     await refreshData();
   } catch {

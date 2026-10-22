@@ -2,11 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Security, status
 from fastapi.responses import JSONResponse
+from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.response import ResponseSchema, SuccessResponse
 from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam
-from app.core.dependencies import AuthPermission, db_getter
+from app.core.dependencies import AuthPermission, db_getter, redis_getter
 from app.core.router_class import OperationLogRoute
 
 from .schema import InstitutionCreateSchema, InstitutionOutSchema, InstitutionQueryParam, InstitutionUpdateSchema
@@ -40,9 +41,10 @@ async def get_institution_detail_controller(
 async def create_institution_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:institution:create"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     data: Annotated[InstitutionCreateSchema, Body(description="创建机构参数")],
 ) -> JSONResponse:
-    result = await InstitutionService(auth, db).create(data=data)
+    result = await InstitutionService(auth, db).create(redis=redis, data=data)
     return SuccessResponse(data=result, msg="创建机构成功")
 
 
@@ -50,10 +52,11 @@ async def create_institution_controller(
 async def update_institution_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:institution:update"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     id: Annotated[int, Path(description="机构ID", ge=1)],
     data: Annotated[InstitutionUpdateSchema, Body(description="修改机构参数")],
 ) -> JSONResponse:
-    result = await InstitutionService(auth, db).update(id=id, data=data)
+    result = await InstitutionService(auth, db).update(redis=redis, id=id, data=data)
     return SuccessResponse(data=result, msg="修改机构成功")
 
 
@@ -61,7 +64,8 @@ async def update_institution_controller(
 async def delete_institution_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:institution:delete"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     ids: Annotated[list[int], Body(description="ID列表")],
 ) -> JSONResponse:
-    await InstitutionService(auth, db).delete(ids=ids)
+    await InstitutionService(auth, db).delete(redis=redis, ids=ids)
     return SuccessResponse(msg="删除机构成功")

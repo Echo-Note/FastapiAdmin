@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssignmentItem } from '@/api/module_market'
+import type { TaskItem } from '@/api/module_market'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
@@ -10,43 +10,51 @@ definePage({ name: 'market-task-hall', style: { navigationBarTitleText: '任务�
 const { t } = useI18n()
 const toast = useToast()
 
-const { list, total, loading, loadData, refreshData, reload, loadNext } = useMarketListPage<AssignmentItem>({
+const { list, total, loading, loadData, refreshData, reload, loadNext } = useMarketListPage<TaskItem>({
   fetcher: p => MarketAPI.getTaskHall({ ...p }),
   onError: () => toast.error(t('common.loadFailed')),
 })
 
-const acceptingId = ref<number>()
+const claimingId = ref<number>()
 
-function amountText(item: AssignmentItem) {
-  return `¥${Number(item.assign_amount ?? 0).toFixed(2)}`
+function amountText(item: TaskItem) {
+  return `¥${Number((item.unit_price ?? 0) * (item.exec_qty ?? 0)).toFixed(2)}`
 }
 
-function deadlineText(item: AssignmentItem) {
-  return (item.task?.deadline_at || '').slice(0, 16)
+function deadlineText(item: TaskItem) {
+  return (item.deadline_at || '').slice(0, 16)
 }
 
-async function handleAccept(item: AssignmentItem) {
+function remainText(item: TaskItem) {
+  const limit = item.assign_limit
+  if (limit == null)
+    return ''
+  const remain = limit - (item.claimed_count ?? 0)
+  return remain > 0 ? `${t('market.remain')} ${remain}` : t('market.claimedFull')
+}
+
+async function handleClaim(item: TaskItem) {
   const confirmed = await new Promise<boolean>((resolve) => {
     uni.showModal({
       title: t('common.title'),
-      content: `${t('market.receiveConfirm')}\n${item.task?.task_no ?? ''} · ${t('market.amount')} ${amountText(item)}`,
+      content: `${t('market.claimConfirm')}\n${item.task_no ?? ''} · ${t('market.amount')} ${amountText(item)}`,
       success: res => resolve(res.confirm),
       fail: () => resolve(false),
     })
   })
   if (!confirmed)
     return
-  acceptingId.value = item.id
+  claimingId.value = item.id
   try {
-    await MarketAPI.acceptAssignment(item.id!)
-    toast.success(t('market.receiveConfirm'))
+    await MarketAPI.claimTask(item.id!)
+    toast.success(t('market.claimSuccess'))
     reload()
   }
   catch {
     toast.error(t('common.operationFailed'))
   }
   finally {
-    acceptingId.value = undefined
+    claimingId.value = undefined
   }
 }
 
@@ -80,16 +88,17 @@ onLoad(() => loadData())
             <view class="flex items-start justify-between gap-2">
               <view class="min-w-0 flex-1">
                 <view class="flex items-center gap-2">
-                  <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task?.task_no ?? ''" />
-                  <wd-tag v-if="item.task?.company?.name" type="primary" plain :title="item.task.company.name" />
+                  <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task_no ?? ''" />
+                  <wd-tag v-if="item.company?.name" type="primary" plain :title="item.company.name" />
                 </view>
                 <view class="mt-1 flex items-center gap-3">
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.task?.period ?? '-'}`" />
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.unitPrice')} ¥${Number(item.task?.unit_price ?? 0).toFixed(2)}`" />
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.execQty')} ${item.task?.exec_qty ?? 0}`" />
+                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.period ?? '-'}`" />
+                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.unitPrice')} ¥${Number(item.unit_price ?? 0).toFixed(2)}`" />
+                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.execQty')} ${item.exec_qty ?? 0}`" />
                 </view>
-                <view class="mt-1">
+                <view class="mt-1 flex items-center gap-3">
                   <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${deadlineText(item)}`" />
+                  <wd-text v-if="remainText(item)" class="wot-text-text-auxiliary text-2.5" :text="remainText(item)" />
                 </view>
               </view>
               <view class="flex flex-col items-end gap-2">
@@ -97,10 +106,10 @@ onLoad(() => loadData())
                 <wd-button
                   type="primary"
                   size="small"
-                  :loading="acceptingId === item.id"
-                  @click="handleAccept(item)"
+                  :loading="claimingId === item.id"
+                  @click="handleClaim(item)"
                 >
-                  {{ t('market.accept') }}
+                  {{ t('market.claim') }}
                 </wd-button>
               </view>
             </view>

@@ -84,3 +84,6 @@ AGENTS.md
 backend/*.sql
 backend/sql/**/*.sql
 *.dump
+
+# 个人离职交接资料，与本项目无关，不入库
+/离职事宜/

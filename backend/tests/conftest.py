@@ -165,6 +165,33 @@ def _redis_dbsize() -> int:
     return len(_mock_redis_store)
 
 
+async def _redis_mget(*keys: str) -> list:
+    return [_mock_redis_store.get(k) for k in keys]
+
+
+async def _redis_incr(name: str) -> int:
+    current = int(_mock_redis_store.get(name) or 0)
+    _mock_redis_store[name] = str(current + 1)
+    return current + 1
+
+
+async def _redis_decr(name: str) -> int:
+    current = int(_mock_redis_store.get(name) or 0)
+    _mock_redis_store[name] = str(current - 1)
+    return current - 1
+
+
+async def _redis_eval(script: str, numkeys: int, *args) -> int:
+    """模拟 incr_with_limit 的 Lua 脚本：已达上限返回 -1，否则 INCR 返回新值。"""
+    key = args[0]
+    limit = int(args[1])
+    count = int(_mock_redis_store.get(key) or 0)
+    if count >= limit:
+        return -1
+    _mock_redis_store[key] = str(count + 1)
+    return count + 1
+
+
 _mock_redis = AsyncMock()
 _mock_redis.ping = AsyncMock(return_value=True)
 _mock_redis.get = AsyncMock(side_effect=_redis_get)
@@ -184,11 +211,17 @@ _mock_redis.hgetall = AsyncMock(side_effect=_redis_hgetall)
 _mock_redis.hdel = AsyncMock(side_effect=_redis_hdel)
 _mock_redis.info = AsyncMock(side_effect=_redis_info)
 _mock_redis.dbsize = AsyncMock(side_effect=_redis_dbsize)
+_mock_redis.mget = AsyncMock(side_effect=_redis_mget)
+_mock_redis.incr = AsyncMock(side_effect=_redis_incr)
+_mock_redis.decr = AsyncMock(side_effect=_redis_decr)
+_mock_redis.eval = AsyncMock(side_effect=_redis_eval)
 
 patch("redis.asyncio.Redis.from_url", return_value=_mock_redis).start()
 # slowapi 限流器由中间件处理，测试中无需 mock
 patch("app.core.ap_scheduler.SchedulerUtil.init_scheduler", new=AsyncMock()).start()
 patch("app.core.ap_scheduler.SchedulerUtil.shutdown", new=AsyncMock()).start()
+# 登录限流依赖 Redis 计数器，测试中禁用避免多次登录触发限流
+patch("app.modules.system.auth.service.LoginService._check_login_rate_limit", new=AsyncMock()).start()
 
 # slowapi 通过中间件限流，测试无需 mock
 

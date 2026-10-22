@@ -47,6 +47,7 @@ export interface AssignmentPageQuery extends PageQuery, UserByQueryParams {
 export interface AssignmentTable extends BaseType {
   task_id?: number;
   user_id?: number;
+  source?: string;
   assign_amount?: number;
   status?: string;
   accepted_at?: string | null;

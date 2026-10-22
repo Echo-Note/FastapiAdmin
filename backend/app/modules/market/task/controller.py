@@ -2,11 +2,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Security, status
 from fastapi.responses import JSONResponse
+from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.response import ResponseSchema, SuccessResponse
 from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam
-from app.core.dependencies import AuthPermission, db_getter
+from app.core.dependencies import AuthPermission, db_getter, redis_getter
 from app.core.router_class import OperationLogRoute
 
 from ..settlement.schema import SettlementOutSchema
@@ -126,10 +127,11 @@ async def delete_task_controller(
 async def publish_task_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:publish"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
     data: Annotated[TaskPublishSchema | None, Body(description="发布参数")] = None,
 ) -> JSONResponse:
-    result = await TaskService(auth, db).publish(id=id, data=data)
+    result = await TaskService(auth, db).publish(redis=redis, id=id, data=data)
     return SuccessResponse(data=result, msg="发布任务成功")
 
 

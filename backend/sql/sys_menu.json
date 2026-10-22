@@ -4518,7 +4518,7 @@
                 "permission": "module_market:tasktype:query",
                 "route_name": "MarketTaskType",
                 "route_path": "task-type",
-                "component_path": "module_market/tasktype/index",
+                "component_path": "module_market/task-type/index",
                 "status": 0,
                 "keep_alive": true,
                 "hidden": false,

@@ -9,6 +9,16 @@ def _login_user(client: TestClient) -> dict:
     return {"Authorization": f"Bearer {resp.json()['data']['access_token']}"}
 
 
+def _create_and_login_user(client: TestClient, admin_headers: dict, username: str) -> tuple[dict, int]:
+    """创建并登录一个 C 端用户，返回 (认证头, 用户ID)。"""
+    resp = client.post("/system/user/create", json={"username": username, "password": "123456", "status": 0}, headers=admin_headers)
+    assert resp.json()["success"] is True, resp.text
+    uid = resp.json()["data"]["id"]
+    login = client.post("/system/auth/login", data={"username": username, "password": "123456"})
+    assert login.status_code == 200, login.text
+    return {"Authorization": f"Bearer {login.json()['data']['access_token']}"}, uid
+
+
 def _get_user_id(client: TestClient, headers: dict) -> int:
     resp = client.get("/system/user/list", params={"username": "user"}, headers=headers)
     return resp.json()["data"]["items"][0]["id"]
@@ -28,8 +38,11 @@ def _create_task_type(client: TestClient, headers: dict, code: str) -> int:
     return client.get("/market/task-types/list", params={"code": code}, headers=headers).json()["data"]["items"][0]["id"]
 
 
-def _create_published_task(client: TestClient, headers: dict, task_no: str, tt_id: int, company_id: int, period: str = "2026-10", exec_qty: int = 1) -> int:
-    client.post("/market/tasks/create", json={"task_no": task_no, "task_type_id": tt_id, "company_id": company_id, "period": period, "exec_qty": exec_qty}, headers=headers)
+def _create_published_task(client: TestClient, headers: dict, task_no: str, tt_id: int, company_id: int, period: str = "2026-10", exec_qty: int = 1, assign_mode: str = "direct", assign_limit: int | None = None) -> int:
+    payload = {"task_no": task_no, "task_type_id": tt_id, "company_id": company_id, "period": period, "exec_qty": exec_qty, "assign_mode": assign_mode}
+    if assign_limit is not None:
+        payload["assign_limit"] = assign_limit
+    client.post("/market/tasks/create", json=payload, headers=headers)
     task_id = client.get("/market/tasks/list", params={"task_no": task_no}, headers=headers).json()["data"]["items"][0]["id"]
     client.post(f"/market/tasks/publish/{task_id}", json={}, headers=headers)
     return task_id
@@ -312,3 +325,90 @@ class TestMiniInstitution:
         assert resp.json()["success"] is True
         names = [item["name"] for item in resp.json()["data"]["items"]]
         assert "小程序停用机构" not in names
+
+
+class TestOpenTaskClaim:
+    """公开大厅自行接单流程（定向分派 + 大厅接单两种模式并存）。"""
+
+    PERIOD = "2026-12"  # 独立周期，避免与其它用例的累计金额相互污染
+
+    def _setup_quota(self, test_client: TestClient, auth_headers: dict) -> None:
+        """为测试用户配置足额限额，确保大厅接单可通过限额校验。"""
+        uid = _get_user_id(test_client, auth_headers)
+        test_client.post("/market/quota/save", json={"user_id": uid, "period": self.PERIOD, "quota_amount": 100000}, headers=auth_headers)
+
+    def test_open_task_visible_and_claim(self, test_client: TestClient, auth_headers: dict) -> None:
+        """公开任务对 C 端用户可见，可自行接单（source=claimed，直接已接收）。"""
+        self._setup_quota(test_client, auth_headers)
+        cid = _create_company(test_client, auth_headers, "流程公司12", "FLOW-12")
+        ttid = _create_task_type(test_client, auth_headers, "flow_tt_12")
+        tid = _create_published_task(test_client, auth_headers, "FLOW-TASK-13", ttid, cid, period=self.PERIOD, assign_mode="open", assign_limit=5)
+        user_h = _login_user(test_client)
+
+        # 任务大厅应包含该公开任务（返回 TaskOutSchema，字段为 task_no 而非嵌套 task）
+        resp = test_client.get("/market/mini/tasks", params={"page_no": 1, "page_size": 100}, headers=user_h)
+        assert resp.json()["success"] is True
+        task_nos = [t["task_no"] for t in resp.json()["data"]["items"]]
+        assert "FLOW-TASK-13" in task_nos
+
+        # 接单成功，直接进入已接收状态，来源标记为大厅接单
+        resp = test_client.post(f"/market/mini/tasks/{tid}/claim", headers=user_h)
+        assert resp.json()["success"] is True
+        assert resp.json()["data"]["status"] == "ACCEPTED"
+        assert resp.json()["data"]["source"] == "claimed"
+
+    def test_direct_task_not_in_hall(self, test_client: TestClient, auth_headers: dict) -> None:
+        """定向分派任务不出现在任务大厅。"""
+        cid = _create_company(test_client, auth_headers, "流程公司13", "FLOW-13")
+        ttid = _create_task_type(test_client, auth_headers, "flow_tt_13")
+        _create_published_task(test_client, auth_headers, "FLOW-TASK-14", ttid, cid, period=self.PERIOD, assign_mode="direct")
+        user_h = _login_user(test_client)
+
+        resp = test_client.get("/market/mini/tasks", params={"page_no": 1, "page_size": 100}, headers=user_h)
+        assert resp.json()["success"] is True
+        task_nos = [t["task_no"] for t in resp.json()["data"]["items"]]
+        assert "FLOW-TASK-14" not in task_nos
+
+    def test_claim_duplicate_fails(self, test_client: TestClient, auth_headers: dict) -> None:
+        """同一用户对同一公开任务仅可接单一次。"""
+        self._setup_quota(test_client, auth_headers)
+        cid = _create_company(test_client, auth_headers, "流程公司14", "FLOW-14")
+        ttid = _create_task_type(test_client, auth_headers, "flow_tt_14")
+        tid = _create_published_task(test_client, auth_headers, "FLOW-TASK-15", ttid, cid, period=self.PERIOD, assign_mode="open", assign_limit=5)
+        user_h = _login_user(test_client)
+
+        assert test_client.post(f"/market/mini/tasks/{tid}/claim", headers=user_h).json()["success"] is True
+        resp = test_client.post(f"/market/mini/tasks/{tid}/claim", headers=user_h)
+        assert resp.json()["success"] is False
+
+    def test_open_task_cannot_be_assigned(self, test_client: TestClient, auth_headers: dict) -> None:
+        """公开大厅任务不支持运营端定向分派。"""
+        cid = _create_company(test_client, auth_headers, "流程公司15", "FLOW-15")
+        ttid = _create_task_type(test_client, auth_headers, "flow_tt_15")
+        tid = _create_published_task(test_client, auth_headers, "FLOW-TASK-16", ttid, cid, period=self.PERIOD, assign_mode="open", assign_limit=5)
+        uid = _get_user_id(test_client, auth_headers)
+
+        resp = test_client.post("/market/assignments/create", json={"task_id": tid, "user_ids": [uid]}, headers=auth_headers)
+        assert resp.json()["success"] is False
+
+    def test_claim_full_stops(self, test_client: TestClient, auth_headers: dict) -> None:
+        """抢完即止：名额满后其它用户接单被拒，任务从大厅消失。"""
+        self._setup_quota(test_client, auth_headers)
+        cid = _create_company(test_client, auth_headers, "流程公司16", "FLOW-16")
+        ttid = _create_task_type(test_client, auth_headers, "flow_tt_16")
+        tid = _create_published_task(test_client, auth_headers, "FLOW-TASK-17", ttid, cid, period=self.PERIOD, assign_mode="open", assign_limit=1)
+        user_h = _login_user(test_client)
+
+        # 名额 1：user 接单成功（占满名额）
+        assert test_client.post(f"/market/mini/tasks/{tid}/claim", headers=user_h).json()["success"] is True
+
+        # 名额已满：第二个用户接单被拒
+        user2_h, uid2 = _create_and_login_user(test_client, auth_headers, "flow_user2")
+        test_client.post("/market/quota/save", json={"user_id": uid2, "period": self.PERIOD, "quota_amount": 100000}, headers=auth_headers)
+        resp = test_client.post(f"/market/mini/tasks/{tid}/claim", headers=user2_h)
+        assert resp.json()["success"] is False
+
+        # 抢满后任务从大厅消失
+        hall = test_client.get("/market/mini/tasks", params={"page_no": 1, "page_size": 100}, headers=user2_h)
+        task_nos = [t["task_no"] for t in hall.json()["data"]["items"]]
+        assert "FLOW-TASK-17" not in task_nos

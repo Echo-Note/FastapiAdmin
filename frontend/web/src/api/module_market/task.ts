@@ -65,6 +65,7 @@ export interface TaskPageQuery extends PageQuery, UserByQueryParams {
   task_type_id?: number;
   company_id?: number;
   period?: string;
+  assign_mode?: string;
   status?: string;
 }
 
@@ -110,6 +111,8 @@ export interface TaskTable extends BaseType {
   period?: string;
   unit_price?: number;
   exec_qty?: number;
+  assign_mode?: string;
+  assign_limit?: number | null;
   status?: string;
   publisher_id?: number | null;
   published_at?: string | null;
@@ -123,5 +126,7 @@ export interface TaskForm extends BaseFormType {
   period?: string;
   unit_price?: number;
   exec_qty?: number;
+  assign_mode?: string;
+  assign_limit?: number | null;
   deadline_at?: string;
 }

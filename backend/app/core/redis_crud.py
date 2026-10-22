@@ -306,6 +306,38 @@ class RedisCURD:
             logger.error(f"获取缓存过期时间失败: {e!s}")
             return -1
 
+    async def incr_with_limit(self, key: str, limit: int) -> int:
+        """原子递增并判断上限（Lua 脚本，防并发超卖）。
+
+        参数:
+        - key (str): 计数器键名
+        - limit (int): 上限值
+
+        返回:
+        - int: 返回 -1 表示已达上限（未递增）；否则返回递增后的计数值。
+
+        异常:
+        - 连接/执行失败时抛出异常（fail-fast，静默降级会导致超卖）。
+        """
+        script = """
+        local count = tonumber(redis.call('get', KEYS[1]) or '0')
+        if count >= tonumber(ARGV[1]) then
+            return -1
+        end
+        redis.call('incr', KEYS[1])
+        return count + 1
+        """
+        result = await self.redis.eval(script, 1, key, limit)  # pyright: ignore[reportGeneralTypeIssues]
+        return int(result)
+
+    async def incr(self, key: str) -> int:
+        """原子递增，返回递增后的值。"""
+        return int(await self.redis.incr(key))
+
+    async def decr(self, key: str) -> int:
+        """原子递减，返回递减后的值。"""
+        return int(await self.redis.decr(key))
+
     async def renew_lock(self, key: str, expire: int, value: str) -> bool:
         """续约分布式锁
 

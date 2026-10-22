@@ -53,6 +53,8 @@ class TaskModel(ModelMixin, UserMixin):
     period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="周期(如 2026-10，默认自然月)")
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, comment="本期单价(可覆盖模板默认)")
     exec_qty: Mapped[int] = mapped_column(Integer, nullable=False, comment="执行数量")
+    assign_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="direct", index=True, comment="分配方式(direct 定向分派/open 公开大厅)")
+    assign_limit: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="最大接单人数(公开大厅任务必填，先到先得、抢完即止)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="任务状态")
     publisher_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, index=True, comment="发布人ID")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="发布时间")

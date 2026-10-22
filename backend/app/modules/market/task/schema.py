@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -74,6 +74,9 @@ class TaskOutSchema(BaseSchema, UserBySchema):
     period: str = Field(description="周期(如 2026-10)")
     unit_price: float = Field(description="本期单价")
     exec_qty: int = Field(description="执行数量")
+    assign_mode: str = Field(description="分配方式(direct 定向分派/open 公开大厅)")
+    assign_limit: int | None = Field(default=None, description="最大接单人数(公开大厅任务)")
+    claimed_count: int = Field(default=0, description="已接单人数(公开大厅，动态计算)")
     status: str = Field(description="任务状态")
     publisher_id: int | None = Field(default=None, description="发布人ID")
     published_at: DateTimeStr | None = Field(default=None, description="发布时间")
@@ -89,6 +92,8 @@ class TaskCreateSchema(BaseModel):
     period: str = Field(min_length=1, max_length=16, description="周期(如 2026-10)")
     unit_price: float | None = Field(default=None, ge=0, description="本期单价(缺省取模板默认)")
     exec_qty: int = Field(gt=0, description="执行数量")
+    assign_mode: Literal["direct", "open"] = Field(default="direct", description="分配方式(direct 定向分派/open 公开大厅)")
+    assign_limit: int | None = Field(default=None, ge=1, description="最大接单人数(公开大厅任务必填)")
     deadline_at: DateTimeStr | None = Field(default=None, description="截止时间")
 
 
@@ -99,6 +104,8 @@ class TaskUpdateSchema(BaseModel):
     period: str | None = Field(default=None, min_length=1, max_length=16, description="周期")
     unit_price: float | None = Field(default=None, ge=0, description="本期单价")
     exec_qty: int | None = Field(default=None, gt=0, description="执行数量")
+    assign_mode: Literal["direct", "open"] | None = Field(default=None, description="分配方式(direct 定向分派/open 公开大厅)")
+    assign_limit: int | None = Field(default=None, ge=1, description="最大接单人数(公开大厅任务必填)")
     deadline_at: DateTimeStr | None = Field(default=None, description="截止时间")
 
 
@@ -115,4 +122,5 @@ class TaskQueryParam(BaseQueryParam, UserByQueryParam):
     task_type_id: int | None = Field(default=None, description="任务类型模板ID", json_schema_extra={"q": "eq"})
     company_id: int | None = Field(default=None, description="委托医药公司ID", json_schema_extra={"q": "eq"})
     period: str | None = Field(default=None, description="周期", json_schema_extra={"q": "eq"})
+    assign_mode: str | None = Field(default=None, description="分配方式", json_schema_extra={"q": "eq"})
     status: str | None = Field(default=None, description="任务状态", json_schema_extra={"q": "eq"})

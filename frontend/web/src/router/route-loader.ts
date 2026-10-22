@@ -48,7 +48,7 @@ export class ComponentLoader {
       ? normalizedPath.slice(0, -6)
       : `${normalizedPath}/index`;
     const mod = pageComponents[`/src/views/${fallbackPath}.vue`];
-    return mod ? (mod as any).default || mod : this.createErrorComponent(path);
+    return mod ? (mod as any).default || mod : this.createErrorComponent(normalizedPath);
   }
 
   /** Layout 框架组件 */

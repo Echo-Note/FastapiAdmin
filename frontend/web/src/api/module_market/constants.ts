@@ -73,3 +73,20 @@ export const ENABLE_STATUS_MAP: Record<number, { type: "success" | "danger"; tex
   0: { type: "success", text: "启用" },
   1: { type: "danger", text: "停用" },
 };
+
+/** 任务分配方式 */
+export const ASSIGN_MODE_MAP: Record<string, { type: "primary" | "success" | "warning" | "info" | "danger"; text: string }> = {
+  direct: { type: "info", text: "定向分派" },
+  open: { type: "success", text: "公开大厅" },
+};
+
+/** 任务分配方式下拉选项 */
+export const ASSIGN_MODE_OPTIONS: { label: string; value: string }[] = Object.entries(
+  ASSIGN_MODE_MAP,
+).map(([value, v]) => ({ value, label: v.text }));
+
+/** 任务实例来源 */
+export const ASSIGNMENT_SOURCE_MAP: Record<string, { type: "primary" | "success" | "warning" | "info" | "danger"; text: string }> = {
+  assigned: { type: "info", text: "运营分派" },
+  claimed: { type: "primary", text: "大厅接单" },
+};

@@ -74,3 +74,17 @@ class InstitutionType(StrEnum):
     PRIVATE_MEDICAL = "private_medical"  # 民营医疗
     RETAIL_PHARMACY = "retail_pharmacy"  # 零售药店
     COMMERCIAL = "commercial"  # 商业公司
+
+
+class AssignMode(StrEnum):
+    """任务分配方式：定向分派 / 公开大厅。"""
+
+    DIRECT = "direct"  # 定向分派（运营指定用户）
+    OPEN = "open"  # 公开大厅（用户自行接单）
+
+
+class AssignmentSource(StrEnum):
+    """任务实例来源：运营分派 / 大厅接单。"""
+
+    ASSIGNED = "assigned"  # 运营定向分派生成
+    CLAIMED = "claimed"  # 用户大厅接单生成

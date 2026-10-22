@@ -8,33 +8,36 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Security
 from fastapi.responses import JSONResponse
+from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.response import ResponseSchema, SuccessResponse
 from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam
-from app.core.dependencies import db_getter, get_current_user
+from app.core.dependencies import db_getter, get_current_user, redis_getter
 from app.core.router_class import OperationLogRoute
 
 from .assignment.schema import AssignmentOutSchema, AssignmentQueryParam
 from .assignment.service import AssignmentService
-from .institution.schema import InstitutionOutSchema, InstitutionQueryParam
+from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
 from .quota.service import QuotaService
 from .submission.schema import SubmissionCreateSchema, SubmissionOutSchema, SubmissionQueryParam, SubmissionUpdateSchema
 from .submission.service import SubmissionService
+from .task.schema import TaskOutSchema
+from .task.service import TaskService
 
 MiniRouter = APIRouter(route_class=OperationLogRoute, prefix="/mini", tags=["市场-小程序"])
 
 
-@MiniRouter.get("/tasks", summary="任务大厅(待接收任务)", response_model=ResponseSchema[PageResultSchema[AssignmentOutSchema]])
+@MiniRouter.get("/tasks", summary="任务大厅(公开接单任务)", response_model=ResponseSchema[PageResultSchema[TaskOutSchema]])
 async def mini_task_hall_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
 ) -> JSONResponse:
-    """任务大厅：分派给当前用户、待接收的任务。"""
-    search = AssignmentQueryParam(status="PENDING")
-    result = await AssignmentService(auth, db).my_assignments(page_no=page.page_no, page_size=page.page_size, search=search)
+    """任务大厅：公开接单任务列表（定向分派任务不在此展示，走「我的任务」）。"""
+    result = await TaskService(auth, db).hall_tasks(redis=redis, page_no=page.page_no, page_size=page.page_size)
     return SuccessResponse(data=result, msg="获取任务大厅成功")
 
 
@@ -57,6 +60,17 @@ async def mini_accept_assignment_controller(
 ) -> JSONResponse:
     result = await AssignmentService(auth, db).accept(id=id)
     return SuccessResponse(data=result, msg="接收任务成功")
+
+
+@MiniRouter.post("/tasks/{id}/claim", summary="大厅接单", response_model=ResponseSchema[AssignmentOutSchema])
+async def mini_claim_task_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
+    id: Annotated[int, Path(description="任务ID", ge=1)],
+) -> JSONResponse:
+    result = await AssignmentService(auth, db).claim(redis=redis, task_id=id)
+    return SuccessResponse(data=result, msg="接单成功")
 
 
 @MiniRouter.post("/submissions", summary="提交成果", response_model=ResponseSchema[SubmissionOutSchema])
@@ -105,13 +119,23 @@ async def mini_my_quota_controller(
 async def mini_institution_list_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
 ) -> JSONResponse:
     """机构列表：供 C 端（小程序）用户提交成果时选择对象机构。
 
-    复用运营端 InstitutionService 分页查询，仅返回启用机构（status=0）；
-    认证使用 get_current_user（登录用户），不要求运营端 RBAC 权限码。
+    从 Redis 缓存读取启用机构全量列表后内存分页；认证使用 get_current_user，
+    不要求运营端 RBAC 权限码。
     """
-    search = InstitutionQueryParam(status=0)
-    result = await InstitutionService(auth, db).page(page_no=page.page_no, page_size=page.page_size, search=search, order_by=page.order_by)
+    items = await InstitutionService(auth, db).enabled_list(redis=redis)
+    total = len(items)
+    start = (page.page_no - 1) * page.page_size
+    page_items = items[start : start + page.page_size]
+    result = PageResultSchema(
+        page_no=page.page_no,
+        page_size=page.page_size,
+        total=total,
+        has_next=start + page.page_size < total,
+        items=page_items,
+    )
     return SuccessResponse(data=result, msg="获取机构列表成功")

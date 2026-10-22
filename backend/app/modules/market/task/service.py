@@ -1,14 +1,17 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.enums import RedisInitKeyConfig
 from app.core.base_schema import AuthSchema, PageResultSchema
 from app.core.exceptions import CustomException
+from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
 from ..company.crud import CompanyCRUD
-from ..enums import TaskStatus
+from ..enums import AssignMode, TaskStatus
 from .crud import TaskCRUD, TaskTypeCRUD
 from .schema import (
     TaskCreateSchema,
@@ -123,6 +126,8 @@ class TaskService:
         await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
         if data.unit_price is None:
             data.unit_price = float(task_type.default_price)
+        if data.assign_mode == AssignMode.OPEN.value and (data.assign_limit is None or data.assign_limit <= 0):
+            raise CustomException(msg="公开大厅任务必须设置最大接单人数")
         task = await TaskCRUD(self.auth, self.db).create(data=data)
         return await self.detail(id=task.id)
 
@@ -133,6 +138,10 @@ class TaskService:
             raise CustomException(msg="仅草稿状态的任务可修改")
         if data.task_no and (exist := await TaskCRUD(self.auth, self.db).get(task_no=data.task_no)) and exist.id != id:
             raise CustomException(msg="已存在相同任务号的任务")
+        effective_mode = data.assign_mode if data.assign_mode is not None else task.assign_mode
+        effective_limit = data.assign_limit if data.assign_limit is not None else task.assign_limit
+        if effective_mode == AssignMode.OPEN.value and (effective_limit is None or effective_limit <= 0):
+            raise CustomException(msg="公开大厅任务必须设置最大接单人数")
         await TaskCRUD(self.auth, self.db).update(id=id, data=data)
         return await self.detail(id=id)
 
@@ -146,13 +155,43 @@ class TaskService:
                 raise CustomException(msg=f"任务[{task.task_no}]非草稿状态，不能删除")
         await TaskCRUD(self.auth, self.db).delete(ids=ids)
 
-    async def publish(self, id: int, data: TaskPublishSchema | None = None) -> TaskOutSchema:
+    async def publish(self, redis: Redis, id: int, data: TaskPublishSchema | None = None) -> TaskOutSchema:
         """发布任务：DRAFT → PUBLISHED。"""
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status != TaskStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的任务可发布")
+        # 公开大厅任务发布时校验名额并初始化 Redis 计数
+        if task.assign_mode == AssignMode.OPEN.value:
+            if task.assign_limit is None or task.assign_limit <= 0:
+                raise CustomException(msg="公开大厅任务必须设置最大接单人数")
+            claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{id}"
+            await RedisCURD(redis).set(key=claim_key, value="0", expire=None)
         update_data: dict[str, Any] = {"status": TaskStatus.PUBLISHED.value, "published_at": datetime.now(UTC)}
         if data and data.deadline_at:
             update_data["deadline_at"] = data.deadline_at
         await TaskCRUD(self.auth, self.db).update(id=id, data=update_data)
         return await self.detail(id=id)
+
+    async def hall_tasks(self, redis: Redis, page_no: int, page_size: int) -> PageResultSchema[TaskOutSchema]:
+        """任务大厅：公开接单任务列表（过滤已抢完，返回剩余名额）。"""
+        # 公开任务量通常不大，一次取全量后按 Redis 计数过滤已抢完任务，再内存分页
+        objs, _ = await TaskCRUD(self.auth, self.db).hall_page(offset=0, limit=10000, preload=_TASK_PRELOAD)
+        claim_keys = [f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{obj.id}" for obj in objs]
+        raw_counts = await RedisCURD(redis).mget(claim_keys)
+        avail: list[TaskOutSchema] = []
+        for obj, raw in zip(objs, raw_counts, strict=False):
+            claimed = int(raw) if raw else 0
+            if obj.assign_limit and claimed >= obj.assign_limit:
+                continue  # 已抢完，从大厅剔除
+            out = TaskOutSchema.model_validate(obj).model_copy(update={"claimed_count": claimed})
+            avail.append(out)
+        total = len(avail)
+        start = (page_no - 1) * page_size
+        items = avail[start : start + page_size]
+        return PageResultSchema(
+            page_no=page_no,
+            page_size=page_size,
+            total=total,
+            has_next=start + page_size < total,
+            items=items,
+        )

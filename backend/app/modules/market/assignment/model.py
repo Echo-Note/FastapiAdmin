@@ -22,6 +22,7 @@ class AssignmentModel(ModelMixin, UserMixin):
 
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_task.id", ondelete="RESTRICT"), nullable=False, index=True, comment="任务ID")
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("sys_user.id", ondelete="RESTRICT"), nullable=False, index=True, comment="C端用户ID")
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="assigned", index=True, comment="来源(assigned 运营分派/claimed 大厅接单)")
     assign_amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, comment="本单接收金额(=单价×数量)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING", index=True, comment="分派状态")
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="接收时间")

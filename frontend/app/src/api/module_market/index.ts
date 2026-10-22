@@ -16,11 +16,31 @@ export interface MarketPageResult<T> {
   has_next?: boolean
 }
 
-/** 任务分派/接收（小程序端任务大厅与我的任务共用） */
+/** 公开任务（任务大厅展示，对应后端 TaskOutSchema） */
+export interface TaskItem {
+  id?: number
+  task_no?: string
+  task_type_id?: number
+  task_type?: { id?: number, name?: string, unit?: string, form_schema?: FormSchemaField[] } | null
+  company_id?: number
+  company?: { id?: number, name?: string } | null
+  period?: string
+  unit_price?: number
+  exec_qty?: number
+  assign_mode?: string
+  assign_limit?: number | null
+  claimed_count?: number
+  status?: string
+  published_at?: string | null
+  deadline_at?: string | null
+}
+
+/** 任务分派/接收（我的任务） */
 export interface AssignmentItem {
   id?: number
   task_id?: number
   user_id?: number
+  source?: string
   assign_amount?: number
   status?: string
   accepted_at?: string | null
@@ -97,9 +117,14 @@ export interface QuotaSummary {
 }
 
 export const MarketAPI = {
-  /** 任务大厅：当前用户待接收的任务分派 */
+  /** 任务大厅：公开接单任务列表 */
   getTaskHall(params?: Record<string, any>) {
-    return http.Get<MarketPageResult<AssignmentItem>>(`${MARKET_BASE}/mini/tasks`, params)
+    return http.Get<MarketPageResult<TaskItem>>(`${MARKET_BASE}/mini/tasks`, params)
+  },
+
+  /** 大厅接单：公开任务由用户自行接单 */
+  claimTask(taskId: number): Promise<AssignmentItem> {
+    return http.Post(`${MARKET_BASE}/mini/tasks/${taskId}/claim`)
   },
 
   /** 我的任务：当前用户的全部任务分派 */
@@ -107,7 +132,7 @@ export const MarketAPI = {
     return http.Get<MarketPageResult<AssignmentItem>>(`${MARKET_BASE}/mini/assignments`, params)
   },
 
-  /** 接收任务 */
+  /** 接收任务（定向分派） */
   acceptAssignment(id: number): Promise<AssignmentItem> {
     return http.Post(`${MARKET_BASE}/mini/assignments/${id}/accept`)
   },
