@@ -7,7 +7,6 @@
 
 import os
 import sys
-import tempfile
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -20,15 +19,39 @@ import pytest
 from fastapi.testclient import TestClient
 
 # ============================================================
-# 测试环境变量
+# 测试环境变量（PostgreSQL，与 docker/docker-compose.pg.yaml 对齐）
 # ============================================================
 
-_TEST_DB_PATH = tempfile.NamedTemporaryFile(suffix=".db", delete=False).name
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-os.environ["DATABASE_TYPE"] = "sqlite"
-os.environ["DATABASE_NAME"] = _TEST_DB_PATH
-os.environ["POOL_SIZE"] = "1"
-os.environ["MAX_OVERFLOW"] = "1"
+
+def _read_docker_env() -> dict[str, str]:
+    """读取 docker/.env 作为本地开发兜底（环境变量优先，避免把密码硬编码进仓库）。"""
+    env_path = _PROJECT_ROOT / "docker" / ".env"
+    result: dict[str, str] = {}
+    if not env_path.exists():
+        return result
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, _, value = line.partition("=")
+            result[key.strip()] = value.strip()
+    return result
+
+
+_docker_env = _read_docker_env()
+
+# 测试专用数据库名，每次 session 重建，避免污染开发库 fastapiadmin
+_TEST_DB_NAME = os.getenv("TEST_DB_NAME", "fastapiadmin_test")
+
+os.environ["DATABASE_TYPE"] = "postgres"
+os.environ["DATABASE_HOST"] = os.getenv("TEST_DB_HOST", "127.0.0.1")
+os.environ["DATABASE_PORT"] = os.getenv("TEST_DB_PORT", "5432")
+os.environ["DATABASE_USER"] = os.getenv("TEST_DB_USER", _docker_env.get("POSTGRES_USER", "fastapiadmin"))
+os.environ["DATABASE_PASSWORD"] = os.getenv("TEST_DB_PASSWORD", _docker_env.get("POSTGRES_PASSWORD", "fastapiadmin"))
+os.environ["DATABASE_NAME"] = _TEST_DB_NAME
+os.environ["POOL_SIZE"] = "5"
+os.environ["MAX_OVERFLOW"] = "10"
 os.environ["SECRET_KEY"] = "unit-test-secret-key-not-a-real-secret"  # Settings 必填项，固定注入保证测试确定性
 
 # 迁移守卫快照：conftest import 时刻早于任何布局（init_db），供 test_migrations.py
@@ -39,10 +62,14 @@ _versions_before_layout: frozenset[str] = frozenset(p.name for p in ALEMBIC_VERS
 
 from app.config.setting import settings
 
-settings.DATABASE_TYPE = "sqlite"
-settings.DATABASE_NAME = _TEST_DB_PATH
-settings.POOL_SIZE = 1
-settings.MAX_OVERFLOW = 1
+settings.DATABASE_TYPE = "postgres"
+settings.DATABASE_HOST = os.environ["DATABASE_HOST"]
+settings.DATABASE_PORT = int(os.environ["DATABASE_PORT"])
+settings.DATABASE_USER = os.environ["DATABASE_USER"]
+settings.DATABASE_PASSWORD = os.environ["DATABASE_PASSWORD"]
+settings.DATABASE_NAME = _TEST_DB_NAME
+settings.POOL_SIZE = 5
+settings.MAX_OVERFLOW = 10
 settings.CAPTCHA_ENABLE = False  # 测试环境关闭验证码
 
 # ============================================================
@@ -166,18 +193,43 @@ patch("app.core.ap_scheduler.SchedulerUtil.shutdown", new=AsyncMock()).start()
 # slowapi 通过中间件限流，测试无需 mock
 
 # ============================================================
-# 精简 lifespan — 仅做数据库初始化
+# 精简 lifespan — 重建测试库 + 数据库初始化
 # ============================================================
+
+
+async def _ensure_test_database() -> None:
+    """重建独立测试库（drop + create），保证每次 session 从干净状态开始。
+
+    连接到 PostgreSQL 管理库 ``postgres`` 执行 DDL（测试用户为超级用户），
+    避免与开发库 ``fastapiadmin`` 互相污染。
+    """
+    import asyncpg
+
+    from app.config.setting import settings
+
+    conn = await asyncpg.connect(
+        host=settings.DATABASE_HOST,
+        port=settings.DATABASE_PORT,
+        user=settings.DATABASE_USER,
+        password=settings.DATABASE_PASSWORD,
+        database="postgres",
+    )
+    try:
+        await conn.execute(f'DROP DATABASE IF EXISTS "{settings.DATABASE_NAME}" WITH (FORCE)')
+        await conn.execute(f'CREATE DATABASE "{settings.DATABASE_NAME}"')
+    finally:
+        await conn.close()
 
 
 @asynccontextmanager
 async def _test_lifespan(app) -> AsyncGenerator[Any, None]:
     from app.scripts.initialize import InitializeData
 
+    await _ensure_test_database()
     await InitializeData().init_db()
     app.state.redis = _mock_redis
 
-    # 将 admin 密码重置为已知密码 "admin123"
+    # 将 admin / user 密码重置为已知密码，供认证 fixture 与 C 端流程用例复用
     from sqlalchemy import update
 
     from app.core.database import async_db_session
@@ -186,6 +238,8 @@ async def _test_lifespan(app) -> AsyncGenerator[Any, None]:
 
     async with async_db_session() as db:
         await db.execute(update(UserModel).where(UserModel.username == "admin").values(password=PwdUtil.hash_password("admin123")))
+        # C 端（小程序）流程用例以普通用户 user 登录，需重置为已知密码
+        await db.execute(update(UserModel).where(UserModel.username == "user").values(password=PwdUtil.hash_password("123456")))
         await db.commit()
 
     yield

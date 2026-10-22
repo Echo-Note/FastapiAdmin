@@ -449,12 +449,14 @@ class CRUDBase[ModelType: ModelMixin, CreateSchemaType, UpdateSchemaType]:
                         prop = current_mapper.relationships.get(part)
                         if prop is None:
                             break  # 非关系属性中断链
-                        loader = selectinload(attr) if prop.uselist else joinedload(attr)
-                        # 嵌套加载通过 .options() 链式组合
+                        # 用 .joinedload()/.selectinload() 链式累积路径，支持任意深度的嵌套预加载；
+                        # 之前的 .options() 写法只能支持两层，三层（如 a.b.c）会把叶子挂错层级
                         if current_option is None:
-                            current_option = loader
+                            current_option = selectinload(attr) if prop.uselist else joinedload(attr)
+                        elif prop.uselist:
+                            current_option = current_option.selectinload(attr)
                         else:
-                            current_option = current_option.options(loader)
+                            current_option = current_option.joinedload(attr)
                         current_model = prop.mapper.class_
                         current_mapper = sa_inspect(current_model)
                     if current_option is not None:

@@ -1,0 +1,105 @@
+from decimal import Decimal
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.base_schema import AuthSchema, PageResultSchema
+from app.core.exceptions import CustomException
+from app.utils.common_util import search_to_dict
+
+from ..assignment.crud import AssignmentCRUD
+from ..enums import AssignmentStatus, SettlementStatus, SubmissionStatus, TaskStatus
+from ..quota.service import QuotaService
+from ..submission.crud import SubmissionCRUD
+from ..task.crud import TaskCRUD
+from .crud import SettlementCRUD, SettlementItemCRUD
+from .schema import SettlementOutSchema, SettlementQueryParam
+
+
+class SettlementService:
+    """归集结算服务"""
+
+    def __init__(self, auth: AuthSchema, db: AsyncSession) -> None:
+        self.auth = auth
+        self.db = db
+
+    async def detail(self, id: int) -> SettlementOutSchema:
+        """查询结算单详情。"""
+        settlement = await SettlementCRUD(self.auth, self.db).get_or_404(id=id, preload=["items"])
+        return SettlementOutSchema.model_validate(settlement)
+
+    async def page(
+        self,
+        page_no: int,
+        page_size: int,
+        search: SettlementQueryParam | None = None,
+        order_by: list[dict[str, str]] | None = None,
+    ) -> PageResultSchema[SettlementOutSchema]:
+        """分页查询结算单。"""
+        offset = (page_no - 1) * page_size
+        return await SettlementCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=order_by or [{"id": "desc"}],
+            search=search_to_dict(search),
+            out_schema=SettlementOutSchema,
+            preload=["items"],
+        )
+
+    async def settle(self, task_id: int) -> list[SettlementOutSchema]:
+        """触发归集结算：汇总任务下所有审核通过的成果，按「用户 × 任务」生成结算单。
+
+        规则（设计文档 §6）：
+        - 应发金额 payable = 单价 × 通过成果数量。
+        - 发放封顶 + 顺延：调用限额服务计算实际可发与顺延金额。
+        """
+        task = await TaskCRUD(self.auth, self.db).get_or_404(id=task_id, preload=["task_type"])
+        if task.status in {TaskStatus.DRAFT.value, TaskStatus.SETTLING.value, TaskStatus.SETTLED.value, TaskStatus.ARCHIVED.value}:
+            raise CustomException(msg="当前任务状态不可归集结算")
+
+        assignments = await AssignmentCRUD(self.auth, self.db).get_list(search={"task_id": task_id})
+        quota_service = QuotaService(self.auth, self.db)
+        results: list[SettlementOutSchema] = []
+
+        for assignment in assignments:
+            approved_qty = await SubmissionCRUD(self.auth, self.db).count(
+                assignment_id=assignment.id, status=SubmissionStatus.APPROVED.value
+            )
+            if approved_qty == 0:
+                continue
+
+            unit_price = Decimal(task.unit_price)
+            payable = unit_price * approved_qty
+
+            # 结算单头
+            settlement = await SettlementCRUD(self.auth, self.db).create(
+                data={
+                    "task_id": task_id,
+                    "user_id": assignment.user_id,
+                    "qty": approved_qty,
+                    "payable_amount": payable,
+                    "status": SettlementStatus.CALCULATED.value,
+                }
+            )
+            # 结算明细（对应附件结算单行）
+            await SettlementItemCRUD(self.auth, self.db).create(
+                data={
+                    "settlement_id": settlement.id,
+                    "service_type": task.task_type.service_type,
+                    "service_item": task.task_type.service_item,
+                    "service_task": task.task_type.service_task,
+                    "unit": task.task_type.unit,
+                    "price": unit_price,
+                    "qty": approved_qty,
+                    "amount": payable,
+                }
+            )
+            # 限额封顶 + 顺延
+            await quota_service.settle_payable(user_id=assignment.user_id, period=task.period, payable=payable)
+            # 分派流转为已结算
+            await AssignmentCRUD(self.auth, self.db).update(id=assignment.id, data={"status": AssignmentStatus.SETTLED.value})
+
+            detail = await self.detail(id=settlement.id)
+            results.append(detail)
+
+        await TaskCRUD(self.auth, self.db).update(id=task_id, data={"status": TaskStatus.SETTLED.value})
+        return results

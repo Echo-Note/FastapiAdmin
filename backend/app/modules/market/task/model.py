@@ -1,0 +1,63 @@
+from datetime import datetime
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.base_model import JSONType, ModelMixin, UserMixin
+
+if TYPE_CHECKING:
+    from app.modules.market.assignment.model import AssignmentModel
+    from app.modules.market.company.model import CompanyModel
+
+
+class TaskTypeModel(ModelMixin, UserMixin):
+    """任务类型模板
+
+    任务的采集字段高度异构（医院开发 vs 调研问卷 vs 宣传服务字段完全不同），
+    因此任务必须绑定一个「模板」，由 form_schema 驱动小程序端动态表单与运营端审核视图。
+
+    结算单三级结构：service_type / service_item / service_task。
+    """
+
+    __tablename__: str = "market_task_type"
+    __table_args__: dict[str, str] = {"comment": "任务类型模板表"}
+
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="唯一编码(如 hospital_manage)")
+    name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, comment="任务类型名")
+    service_type: Mapped[str] = mapped_column(String(64), nullable=False, comment="结算单三级-类型(如 医院管理)")
+    service_item: Mapped[str] = mapped_column(String(64), nullable=False, comment="结算单三级-项目(如 等级医院)")
+    service_task: Mapped[str] = mapped_column(String(64), nullable=False, comment="结算单三级-任务(如 等级医院管理)")
+    unit: Mapped[str] = mapped_column(String(32), nullable=False, comment="计价单位(家/月、份、次)")
+    default_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, comment="默认单价")
+    exec_standard: Mapped[str | None] = mapped_column(Text, nullable=True, comment="执行标准")
+    required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="是否必选")
+    form_schema: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, nullable=False, comment="采集字段 JSON Schema(驱动动态表单)")
+
+    tasks: Mapped[list["TaskModel"]] = relationship(back_populates="task_type")
+
+
+class TaskModel(ModelMixin, UserMixin):
+    """任务
+
+    运营端创建并发布，分派给 C 端用户执行。状态机见 TaskStatus。
+    """
+
+    __tablename__: str = "market_task"
+    __table_args__: dict[str, str] = {"comment": "任务表"}
+
+    task_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True, comment="任务号(对应附件 1-4、5-17…)")
+    task_type_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_task_type.id", ondelete="RESTRICT"), nullable=False, index=True, comment="任务类型模板ID")
+    company_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_company.id", ondelete="RESTRICT"), nullable=False, index=True, comment="委托医药公司ID")
+    period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="周期(如 2026-10，默认自然月)")
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, comment="本期单价(可覆盖模板默认)")
+    exec_qty: Mapped[int] = mapped_column(Integer, nullable=False, comment="执行数量")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="任务状态")
+    publisher_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, index=True, comment="发布人ID")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="发布时间")
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True, comment="截止时间")
+
+    task_type: Mapped["TaskTypeModel"] = relationship(back_populates="tasks")
+    company: Mapped["CompanyModel"] = relationship()
+    assignments: Mapped[list["AssignmentModel"]] = relationship(back_populates="task")
