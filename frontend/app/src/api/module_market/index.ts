@@ -16,12 +16,32 @@ export interface MarketPageResult<T> {
   has_next?: boolean
 }
 
+/** 任务类型模板摘要（对应后端 TaskTypeOutSchema） */
+export interface TaskTypeItem {
+  id?: number
+  name?: string
+  task_no?: number
+  template_id?: number
+  template?: { form_schema?: FormSchemaField[] } | null
+  unit?: string
+  service_type?: string
+  service_item?: string
+  service_task?: string
+  default_price?: number
+  default_kind?: string
+  exec_standard?: string
+  required?: boolean
+  min_qty?: number | null
+  max_per_period?: number | null
+  dedup_rule?: string | null
+}
+
 /** 公开任务（任务大厅展示，对应后端 TaskOutSchema） */
 export interface TaskItem {
   id?: number
   task_no?: string
   task_type_id?: number
-  task_type?: { id?: number, name?: string, unit?: string, form_schema?: FormSchemaField[] } | null
+  task_type?: TaskTypeItem | null
   task_kind?: string
   period?: string
   exec_time_start?: string | null
@@ -52,23 +72,20 @@ export interface AssignmentItem {
     exec_qty?: number
     status?: string
     exec_time_end?: string | null
-    task_type?: {
-      id?: number
-      name?: string
-      unit?: string
-      form_schema?: FormSchemaField[]
-    } | null
+    task_type?: TaskTypeItem | null
   } | null
 }
 
-/** 动态表单字段定义（来自任务类型模板的 form_schema） */
+/** 动态表单字段定义（来自采集模板的 form_schema） */
 export interface FormSchemaField {
-  name: string
+  name?: string | null
   label?: string
-  type?: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file'
+  type?: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file' | 'table' | 'section'
+  section?: string | null
   required?: boolean
   placeholder?: string
   options?: { label: string, value: string | number }[]
+  columns?: FormSchemaField[] | null
 }
 
 /** 成果提交 */
@@ -76,8 +93,10 @@ export interface SubmissionItem {
   id?: number
   assignment_id?: number
   user_id?: number
-  institution_id?: number
+  subject_type?: string
+  institution_id?: number | null
   institution?: { id?: number, name?: string, type?: string } | null
+  subject_name?: string | null
   region?: string | null
   archive_no?: string | null
   form_data?: Record<string, unknown>

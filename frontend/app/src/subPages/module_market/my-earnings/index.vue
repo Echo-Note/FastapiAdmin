@@ -4,8 +4,9 @@ import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
+import { ALLOWANCE_STATUS_MAP, statusMeta } from '@/constants'
 
-definePage({ name: 'market-my-earnings', style: { navigationBarTitleText: '我的发放' } })
+definePage({ name: 'market-my-earnings', style: { navigationBarTitleText: '我的收益' } })
 
 const { t } = useI18n()
 const toast = useToast()
@@ -18,6 +19,7 @@ function currentMonth() {
 const period = ref(currentMonth())
 const payout = ref<PayoutSummary | null>(null)
 const loading = ref(false)
+const loadFailed = ref(false)
 
 const payoutLimitText = computed(() => {
   if (payout.value?.payout_limit === null || payout.value?.payout_limit === undefined)
@@ -27,8 +29,8 @@ const payoutLimitText = computed(() => {
 
 const allowanceBalance = computed(() => Number(payout.value?.allowance_balance ?? 0))
 
-function allowanceStatusText(status?: string) {
-  return status === 'PAID' ? '已发放' : '待发放'
+function allowanceStatusInfo(status?: string) {
+  return statusMeta(ALLOWANCE_STATUS_MAP, status)
 }
 
 function shiftMonth(delta: number) {
@@ -40,12 +42,13 @@ function shiftMonth(delta: number) {
 
 async function loadPayout() {
   loading.value = true
+  loadFailed.value = false
   try {
     payout.value = await MarketAPI.getMyPayout(period.value)
   }
   catch {
     payout.value = null
-    toast.error(t('common.loadFailed'))
+    loadFailed.value = true
   }
   finally {
     loading.value = false
@@ -69,7 +72,7 @@ onLoad(() => loadPayout())
         </view>
       </view>
 
-      <!-- 发放概览 -->
+      <!-- 发放概览：每月发放额度 + 津贴余额 + 顺延提示 -->
       <view class="mt-3 rounded-2 bg-white p-4">
         <wd-loading v-if="loading" class="my-4 block" />
         <template v-else-if="payout">
@@ -80,8 +83,19 @@ onLoad(() => loadPayout())
           <wd-cell-group border custom-class="mt-2!">
             <wd-cell :title="t('market.allowanceBalance')" :value="`¥${allowanceBalance.toFixed(2)}`" :value-class="allowanceBalance > 0 ? 'wot-text-error-main!' : ''" />
           </wd-cell-group>
+          <!-- 津贴顺延提示（就近提示，非顶部横幅） -->
+          <view v-if="allowanceBalance > 0" class="mt-2 rounded-2 bg-orange-50 px-3 py-2">
+            <wd-text class="wot-text-warning-main text-2.5" :text="t('market.allowanceCarryover')" />
+          </view>
         </template>
-        <wd-empty v-else :tip="t('common.loadFailed')" />
+        <template v-else>
+          <view class="flex flex-col items-center py-6">
+            <wd-text class="wot-text-text-auxiliary text-3" :text="loadFailed ? t('common.loadFailed') : t('market.allowanceBalance')" />
+            <wd-button v-if="loadFailed" type="primary" size="small" class="mt-4" @click="loadPayout">
+              {{ t('common.retry') }}
+            </wd-button>
+          </view>
+        </template>
       </view>
 
       <!-- 津贴明细 -->
@@ -93,7 +107,7 @@ onLoad(() => loadPayout())
             :key="item.id"
             :title="item.from_period ?? '-'"
             :value="`¥${Number(item.amount ?? 0).toFixed(2)}`"
-            :label="allowanceStatusText(item.status)"
+            :label="allowanceStatusInfo(item.status).label"
           />
         </wd-cell-group>
       </view>

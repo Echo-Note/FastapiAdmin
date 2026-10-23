@@ -127,7 +127,7 @@
           "type": "page",
           "name": "market-my-earnings",
           "style": {
-            "navigationBarTitleText": "我的额度"
+            "navigationBarTitleText": "我的收益"
           }
         },
         {
@@ -153,6 +153,15 @@
           "name": "market-task-hall",
           "style": {
             "navigationBarTitleText": "任务大厅",
+            "enablePullDownRefresh": true
+          }
+        },
+        {
+          "path": "module_market/task-detail/index",
+          "type": "page",
+          "name": "market-task-detail",
+          "style": {
+            "navigationBarTitleText": "任务详情",
             "enablePullDownRefresh": true
           }
         },

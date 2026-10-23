@@ -3,19 +3,19 @@ import type { TaskItem } from '@/api/module_market'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
+import { TASK_KIND_MAP, statusMeta } from '@/constants'
 import { useMarketListPage } from '@/composables/useMarketListPage'
 
 definePage({ name: 'market-task-hall', style: { navigationBarTitleText: '任务大厅', enablePullDownRefresh: true } })
 
 const { t } = useI18n()
 const toast = useToast()
+const router = useRouter()
 
-const { list, total, loading, loadData, refreshData, reload, loadNext } = useMarketListPage<TaskItem>({
+const { list, total, loading, loadData, refreshData, loadNext } = useMarketListPage<TaskItem>({
   fetcher: p => MarketAPI.getTaskHall({ ...p }),
   onError: () => toast.error(t('common.loadFailed')),
 })
-
-const claimingId = ref<number>()
 
 function amountText(item: TaskItem) {
   return `¥${Number((item.unit_price ?? 0) * (item.exec_qty ?? 0)).toFixed(2)}`
@@ -23,6 +23,10 @@ function amountText(item: TaskItem) {
 
 function deadlineText(item: TaskItem) {
   return (item.exec_time_end || '').slice(0, 16)
+}
+
+function kindInfo(item: TaskItem) {
+  return statusMeta(TASK_KIND_MAP, item.task_kind)
 }
 
 function remainText(item: TaskItem) {
@@ -36,29 +40,12 @@ function remainText(item: TaskItem) {
   return remain > 0 ? `${t('market.remain')} ${remain}` : t('market.claimedFull')
 }
 
-async function handleClaim(item: TaskItem) {
-  const confirmed = await new Promise<boolean>((resolve) => {
-    uni.showModal({
-      title: t('common.title'),
-      content: `${t('market.claimConfirm')}\n${item.task_no ?? ''} · ${t('market.amount')} ${amountText(item)}`,
-      success: res => resolve(res.confirm),
-      fail: () => resolve(false),
-    })
+/** 卡片点击统一跳任务详情页（详情页内完成接单） */
+function goDetail(item: TaskItem) {
+  router.push({
+    name: 'market-task-detail',
+    query: { task_id: String(item.id) },
   })
-  if (!confirmed)
-    return
-  claimingId.value = item.id
-  try {
-    await MarketAPI.claimTask(item.id!)
-    toast.success(t('market.claimSuccess'))
-    reload()
-  }
-  catch {
-    toast.error(t('common.operationFailed'))
-  }
-  finally {
-    claimingId.value = undefined
-  }
 }
 
 onReachBottom(() => {
@@ -87,12 +74,13 @@ onLoad(() => loadData())
             v-for="item in list"
             :key="item.id"
             class="border-b border-gray-100 bg-white px-4 py-3 last:border-b-0"
+            @click="goDetail(item)"
           >
             <view class="flex items-start justify-between gap-2">
               <view class="min-w-0 flex-1">
                 <view class="flex items-center gap-2">
                   <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task_no ?? ''" />
-                  <wd-tag type="primary" plain :title="item.task_kind === 'quota' ? '定额' : '周期性'" />
+                  <wd-tag :type="kindInfo(item).type" plain :title="kindInfo(item).label" />
                 </view>
                 <view class="mt-1 flex items-center gap-3">
                   <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.period ?? '-'}`" />
@@ -101,19 +89,12 @@ onLoad(() => loadData())
                 </view>
                 <view class="mt-1 flex items-center gap-3">
                   <wd-text v-if="item.exec_time_end" class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${deadlineText(item)}`" />
-                  <wd-text v-if="remainText(item)" class="wot-text-text-auxiliary text-2.5" :text="remainText(item)" />
+                  <wd-text v-if="remainText(item)" class="wot-text-warning-main text-2.5" :text="remainText(item)" />
                 </view>
               </view>
               <view class="flex flex-col items-end gap-2">
                 <wd-text class="wot-text-error-main text-4 font-semibold" :text="amountText(item)" />
-                <wd-button
-                  type="primary"
-                  size="small"
-                  :loading="claimingId === item.id"
-                  @click="handleClaim(item)"
-                >
-                  {{ t('market.claim') }}
-                </wd-button>
+                <wd-icon name="arrow-right" size="18px" custom-class="wot-text-text-secondary" />
               </view>
             </view>
           </view>

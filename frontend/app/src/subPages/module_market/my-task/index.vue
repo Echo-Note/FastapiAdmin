@@ -4,32 +4,24 @@ import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
+import { ASSIGNMENT_STATUS_MAP, taskKindText, statusMeta } from '@/constants'
 import { useMarketListPage } from '@/composables/useMarketListPage'
 
 definePage({ name: 'market-my-task', style: { navigationBarTitleText: '我的任务', enablePullDownRefresh: true } })
 
 const { t } = useI18n()
-const router = useRouter()
 const toast = useToast()
+const router = useRouter()
 
-/** 分派状态（C 端视角）→ 展示标签与色型 */
-const ASSIGN_STATUS: Record<string, { label: string, type: 'primary' | 'success' | 'warning' | 'danger' | 'info' }> = {
-  PENDING: { label: '待接收', type: 'info' },
-  ACCEPTED: { label: '已接收', type: 'primary' },
-  SUBMITTING: { label: '进行中', type: 'warning' },
-  SUBMITTED: { label: '已提交', type: 'warning' },
-  REVIEWED: { label: '已审核', type: 'success' },
-  SETTLED: { label: '已结算', type: 'success' },
-}
-
-/** 顶部状态筛选 Tab */
+/** 顶部状态筛选 Tab：与后端 AssignmentStatus 六档一致（进行中 = SUBMITTING） */
 const TAB_OPTIONS = [
   { label: '全部', value: undefined },
-  { label: '待接收', value: 'PENDING' },
-  { label: '进行中', value: 'ACCEPTED' },
-  { label: '已提交', value: 'SUBMITTED' },
-  { label: '已审核', value: 'REVIEWED' },
-  { label: '已结算', value: 'SETTLED' },
+  { label: statusMeta(ASSIGNMENT_STATUS_MAP, 'PENDING').label, value: 'PENDING' },
+  { label: statusMeta(ASSIGNMENT_STATUS_MAP, 'ACCEPTED').label, value: 'ACCEPTED' },
+  { label: statusMeta(ASSIGNMENT_STATUS_MAP, 'SUBMITTING').label, value: 'SUBMITTING' },
+  { label: statusMeta(ASSIGNMENT_STATUS_MAP, 'SUBMITTED').label, value: 'SUBMITTED' },
+  { label: statusMeta(ASSIGNMENT_STATUS_MAP, 'REVIEWED').label, value: 'REVIEWED' },
+  { label: statusMeta(ASSIGNMENT_STATUS_MAP, 'SETTLED').label, value: 'SETTLED' },
 ]
 const activeTab = ref(0)
 const activeStatus = ref<string | undefined>()
@@ -43,16 +35,11 @@ const { list, total, loading, loadData, refreshData, loadNext, toFirst } = useMa
 })
 
 function statusInfo(status?: string) {
-  return ASSIGN_STATUS[status ?? ''] ?? { label: status || '-', type: 'info' as const }
+  return statusMeta(ASSIGNMENT_STATUS_MAP, status)
 }
 
 function amountText(item: AssignmentItem) {
   return `¥${Number(item.task?.unit_price ?? 0).toFixed(2)}`
-}
-
-/** 可提交成果的状态：已接收 / 进行中 / 已提交（驳回可重提）/ 已审核 */
-function canSubmit(status?: string) {
-  return status === 'ACCEPTED' || status === 'SUBMITTING' || status === 'SUBMITTED' || status === 'REVIEWED'
 }
 
 function handleTabChange(e: { index: number }) {
@@ -60,15 +47,11 @@ function handleTabChange(e: { index: number }) {
   toFirst()
 }
 
-function goSubmit(item: AssignmentItem) {
-  const formSchema = item.task?.task_type?.form_schema ?? []
+/** 卡片点击统一跳任务详情页（详情页内完成接收 / 去提交） */
+function goDetail(item: AssignmentItem) {
   router.push({
-    name: 'market-submission-form',
-    query: {
-      assignment_id: String(item.id),
-      task_no: item.task?.task_no ?? '',
-      form_schema: encodeURIComponent(JSON.stringify(formSchema)),
-    },
+    name: 'market-task-detail',
+    query: { assignment_id: String(item.id) },
   })
 }
 
@@ -102,13 +85,14 @@ onLoad(() => loadData())
             v-for="item in list"
             :key="item.id"
             class="rounded-2 bg-white p-4 shadow-sm"
+            @click="goDetail(item)"
           >
             <view class="flex items-center justify-between">
               <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task?.task_no ?? ''" />
               <wd-tag :type="statusInfo(item.status).type" plain :title="statusInfo(item.status).label" />
             </view>
             <view class="mt-2 flex items-center gap-3">
-              <wd-text class="wot-text-text-auxiliary text-2.5" :text="item.task?.task_kind === 'quota' ? '定额' : '周期性'" />
+              <wd-text class="wot-text-text-auxiliary text-2.5" :text="taskKindText(item.task?.task_kind)" />
               <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.task?.period ?? '-'}`" />
               <wd-text v-if="item.task?.exec_time_end" class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${(item.task?.exec_time_end || '').slice(0, 10)}`" />
             </view>
@@ -117,9 +101,7 @@ onLoad(() => loadData())
                 <wd-text class="wot-text-text-auxiliary text-2.5" :text="t('market.amount')" />
                 <wd-text class="wot-text-error-main text-4 font-semibold" :text="amountText(item)" />
               </view>
-              <wd-button v-if="canSubmit(item.status)" type="primary" size="small" @click="goSubmit(item)">
-                {{ t('market.submitResult') }}
-              </wd-button>
+              <wd-icon name="arrow-right" size="18px" custom-class="wot-text-text-secondary" />
             </view>
           </view>
         </view>
