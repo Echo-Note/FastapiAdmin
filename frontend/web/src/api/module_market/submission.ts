@@ -39,8 +39,10 @@ export interface SubmissionPageQuery extends PageQuery, UserByQueryParams {
 export interface SubmissionTable extends BaseType {
   assignment_id?: number;
   user_id?: number;
-  institution_id?: number;
+  subject_type?: string;
+  institution_id?: number | null;
   institution?: { id?: number; name?: string; type?: string } | null;
+  subject_name?: string | null;
   region?: string | null;
   archive_no?: string | null;
   form_data?: Record<string, unknown>;

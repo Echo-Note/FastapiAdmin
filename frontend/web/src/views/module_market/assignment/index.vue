@@ -75,6 +75,8 @@ import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, 
 
 defineOptions({ name: "MarketAssignment", inheritAttrs: false });
 
+const route = useRoute();
+
 const searchForm = ref<{ task_id?: number; user_id?: number; status?: string }>({ task_id: undefined, user_id: undefined, status: undefined });
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
@@ -151,7 +153,16 @@ async function loadOptions() {
   userMap.value = Object.fromEntries(userRes.data.data.items.map((u) => [u.id!, u.name ?? u.username ?? ""]));
 }
 
-onMounted(loadOptions);
+onMounted(() => {
+  loadOptions();
+  // 从任务页跳转而来：透传 task_id 预填筛选
+  const taskId = route.query.task_id;
+  if (taskId) {
+    searchForm.value.task_id = Number(taskId);
+    replaceSearchParams(cleanEmptyArrayParams({ ...searchForm.value }) as Record<string, unknown>);
+    getData();
+  }
+});
 
 function openAssignDialog() {
   assignDialogVisible.value = true;

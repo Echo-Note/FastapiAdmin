@@ -18,7 +18,7 @@ const ReportAPI = {
     });
   },
 
-  generateReport(body: { company_id: number; period: string }) {
+  generateReport(body: { company_id: number; period: string; service_item_id?: number; task_type_id?: number }) {
     return request<ApiResponse<ReportTable>>({
       url: `${API_PATH}/generate`,
       method: "post",
@@ -31,6 +31,8 @@ export default ReportAPI;
 
 export interface ReportPageQuery extends PageQuery, UserByQueryParams {
   company_id?: number;
+  service_item_id?: number;
+  task_type_id?: number;
   period?: string;
   status?: string;
 }
@@ -38,6 +40,8 @@ export interface ReportPageQuery extends PageQuery, UserByQueryParams {
 export interface ReportTable extends BaseType {
   company_id?: number;
   company?: { id?: number; name?: string } | null;
+  service_item_id?: number | null;
+  task_type_id?: number | null;
   period?: string;
   summary?: Record<string, unknown>;
   attachment?: string | null;

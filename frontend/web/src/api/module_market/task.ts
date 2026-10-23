@@ -88,6 +88,9 @@ export interface TaskTypeBrief {
   id?: number;
   code?: string;
   name?: string;
+  task_no?: number;
+  template_id?: number;
+  template?: { id?: number; code?: string; name?: string; form_schema?: Record<string, unknown>[] } | null;
   service_type?: string;
   service_item?: string;
   service_task?: string;
@@ -96,7 +99,9 @@ export interface TaskTypeBrief {
   default_kind?: string;
   exec_standard?: string | null;
   required?: boolean;
-  form_schema?: Record<string, unknown>[];
+  min_qty?: number | null;
+  max_per_period?: number | null;
+  dedup_rule?: string | null;
 }
 
 export interface TaskTable extends BaseType {

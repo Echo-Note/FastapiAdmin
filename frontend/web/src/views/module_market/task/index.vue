@@ -1,6 +1,16 @@
 <!-- 任务管理：CRUD + 发布 + 判定完成 + 归集结算 -->
 <template>
   <div class="fa-full-height">
+    <!-- 流程轻提示：让运营知道发布后的下一步去向 -->
+    <ElAlert
+      class="market-flow-hint"
+      type="info"
+      :closable="false"
+      show-icon
+      title="任务流转提示"
+      description="发布任务后：定向分派请在「分派」页指派用户，公开大厅则用户自行接单；成果在「成果审核」页处理，完成后可「判定完成 → 归集结算」。"
+    />
+
     <FaSearchBar
       v-show="showSearchBar"
       ref="searchBarRef"
@@ -108,6 +118,8 @@ const searchItems = computed<SearchFormItem[]>(() => [
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
 const { selectedRows, selectedIds, batchDeleting, onTableSelectionChange } = useTableSelection<TaskTable>();
 
+const router = useRouter();
+
 const opCtx = {
   onDetail: (id: number) => void handleOpenDialog("detail", id),
   onEdit: (id: number) => void handleOpenDialog("update", id),
@@ -115,6 +127,9 @@ const opCtx = {
   onPublish: publishRow,
   onComplete: completeRow,
   onSettle: settleRow,
+  // 跨页跳转：任务 → 分派页 / 结算页（透传 task_id 预填筛选）
+  onAssign: (id: number) => void router.push({ name: "MarketAssignment", query: { task_id: String(id) } }),
+  onSettlement: (id: number) => void router.push({ name: "MarketSettlement", query: { task_id: String(id) } }),
 };
 
 function buildRowActions(row: TaskTable): TableOperationAction[] {
@@ -126,9 +141,13 @@ function buildRowActions(row: TaskTable): TableOperationAction[] {
     actions.push({ key: "publish", label: "发布", artType: "edit", perm: "module_market:task:publish", run: () => opCtx.onPublish(row.id!, row.task_no ?? "") });
     actions.push({ key: "delete", label: "删除", artType: "delete", perm: "module_market:task:delete", run: () => opCtx.onDelete(row.id!, row.task_no ?? "") });
   } else if (row.status === "PUBLISHED" || row.status === "IN_PROGRESS") {
+    actions.push({ key: "assign", label: "分派", artType: "view", perm: "module_market:assignment:assign", run: () => opCtx.onAssign(row.id!) });
     actions.push({ key: "complete", label: "判定完成", artType: "edit", perm: "module_market:task:complete", run: () => opCtx.onComplete(row.id!, row.task_no ?? "") });
   } else if (row.status === "COMPLETED") {
     actions.push({ key: "settle", label: "归集结算", artType: "edit", perm: "module_market:settlement:run", run: () => opCtx.onSettle(row.id!, row.task_no ?? "") });
+  }
+  if (row.status === "SETTLING" || row.status === "SETTLED") {
+    actions.push({ key: "settlement", label: "结算单", artType: "view", perm: "module_market:settlement:query", run: () => opCtx.onSettlement(row.id!) });
   }
   return actions;
 }
@@ -150,7 +169,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "assign_mode", label: "分配方式", width: 100, status: ASSIGN_MODE_MAP },
         { prop: "claimed_count", label: "已接单数", width: 90, align: "right" },
         { prop: "status", label: "状态", width: 92, status: TASK_STATUS_MAP },
-        { prop: "operation", label: "操作", width: 240, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
+        { prop: "operation", label: "操作", width: 270, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ]),
     },
   });
@@ -303,3 +322,9 @@ async function settleRow(id: number, taskNo: string) {
   }
 }
 </script>
+
+<style scoped>
+.market-flow-hint {
+  margin-bottom: 12px;
+}
+</style>
