@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
 from app.core.validator import DateTimeStr
-from app.modules.market.company.schema import CompanyOutSchema
 
 
 class FormSchemaOption(BaseModel):
@@ -46,6 +45,7 @@ class TaskTypeOutSchema(BaseSchema, UserBySchema):
     service_task: str = Field(description="结算单三级-任务")
     unit: str = Field(description="计价单位(家/月、份、次)")
     default_price: float = Field(description="默认单价")
+    default_kind: str = Field(default="periodic", description="默认任务分类(periodic 周期性/quota 定额)")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool = Field(default=False, description="是否必选")
     form_schema: list[FormSchemaField] = Field(default_factory=list, description="采集字段 Schema")
@@ -61,6 +61,7 @@ class TaskTypeCreateSchema(BaseModel):
     service_task: str = Field(min_length=1, max_length=64, description="结算单三级-任务")
     unit: str = Field(min_length=1, max_length=32, description="计价单位")
     default_price: float = Field(ge=0, description="默认单价")
+    default_kind: Literal["periodic", "quota"] = Field(default="periodic", description="默认任务分类(periodic 周期性/quota 定额)")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool = Field(default=False, description="是否必选")
     form_schema: list[FormSchemaField] = Field(default_factory=list, description="采集字段 Schema")
@@ -76,6 +77,7 @@ class TaskTypeUpdateSchema(BaseModel):
     service_task: str | None = Field(default=None, min_length=1, max_length=64, description="结算单三级-任务")
     unit: str | None = Field(default=None, min_length=1, max_length=32, description="计价单位")
     default_price: float | None = Field(default=None, ge=0, description="默认单价")
+    default_kind: Literal["periodic", "quota"] | None = Field(default=None, description="默认任务分类(periodic 周期性/quota 定额)")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool | None = Field(default=None, description="是否必选")
     form_schema: list[FormSchemaField] | None = Field(default=None, description="采集字段 Schema")
@@ -96,18 +98,19 @@ class TaskOutSchema(BaseSchema, UserBySchema):
     task_no: str = Field(description="任务号")
     task_type_id: int = Field(description="任务类型模板ID")
     task_type: TaskTypeOutSchema | None = Field(default=None, description="任务类型模板")
-    company_id: int = Field(description="委托医药公司ID")
-    company: CompanyOutSchema | None = Field(default=None, description="委托医药公司")
+    task_kind: str = Field(description="任务分类(periodic 周期性/quota 定额)")
     period: str = Field(description="周期(如 2026-10)")
+    exec_time_start: DateTimeStr | None = Field(default=None, description="定额任务限定时间-开始")
+    exec_time_end: DateTimeStr | None = Field(default=None, description="定额任务限定时间-结束")
     unit_price: float = Field(description="本期单价")
-    exec_qty: int = Field(description="执行数量")
+    exec_qty: int = Field(description="执行数量(定额任务为总份数限量)")
     assign_mode: str = Field(description="分配方式(direct 定向分派/open 公开大厅)")
-    assign_limit: int | None = Field(default=None, description="最大接单人数(公开大厅任务)")
-    claimed_count: int = Field(default=0, description="已接单人数(公开大厅，动态计算)")
+    claimed_count: int = Field(default=0, description="已接单数(公开大厅，动态计算)")
     status: str = Field(description="任务状态")
+    completed_at: DateTimeStr | None = Field(default=None, description="完成判定时间")
     publisher_id: int | None = Field(default=None, description="发布人ID")
     published_at: DateTimeStr | None = Field(default=None, description="发布时间")
-    deadline_at: DateTimeStr | None = Field(default=None, description="截止时间")
+    project_ids: list[int] = Field(default_factory=list, description="归集到的项目ID列表(多对多)")
 
 
 class TaskCreateSchema(BaseModel):
@@ -115,31 +118,28 @@ class TaskCreateSchema(BaseModel):
 
     task_no: str = Field(min_length=1, max_length=32, description="任务号(对应附件 1-4、5-17…)")
     task_type_id: int = Field(gt=0, description="任务类型模板ID")
-    company_id: int = Field(gt=0, description="委托医药公司ID")
+    task_kind: Literal["periodic", "quota"] | None = Field(default=None, description="任务分类(缺省取模板默认)")
     period: str = Field(min_length=1, max_length=16, description="周期(如 2026-10)")
+    exec_time_start: DateTimeStr | None = Field(default=None, description="定额任务限定时间-开始")
+    exec_time_end: DateTimeStr | None = Field(default=None, description="定额任务限定时间-结束")
     unit_price: float | None = Field(default=None, ge=0, description="本期单价(缺省取模板默认)")
-    exec_qty: int = Field(gt=0, description="执行数量")
+    exec_qty: int = Field(gt=0, description="执行数量(定额任务为总份数限量)")
     assign_mode: Literal["direct", "open"] = Field(default="direct", description="分配方式(direct 定向分派/open 公开大厅)")
-    assign_limit: int | None = Field(default=None, ge=1, description="最大接单人数(公开大厅任务必填)")
-    deadline_at: DateTimeStr | None = Field(default=None, description="截止时间")
+    project_ids: list[int] = Field(default_factory=list, description="归集到的项目ID列表(可为空)")
 
 
 class TaskUpdateSchema(BaseModel):
     """更新任务"""
 
     task_no: str | None = Field(default=None, min_length=1, max_length=32, description="任务号")
+    task_kind: Literal["periodic", "quota"] | None = Field(default=None, description="任务分类")
     period: str | None = Field(default=None, min_length=1, max_length=16, description="周期")
+    exec_time_start: DateTimeStr | None = Field(default=None, description="定额任务限定时间-开始")
+    exec_time_end: DateTimeStr | None = Field(default=None, description="定额任务限定时间-结束")
     unit_price: float | None = Field(default=None, ge=0, description="本期单价")
     exec_qty: int | None = Field(default=None, gt=0, description="执行数量")
     assign_mode: Literal["direct", "open"] | None = Field(default=None, description="分配方式(direct 定向分派/open 公开大厅)")
-    assign_limit: int | None = Field(default=None, ge=1, description="最大接单人数(公开大厅任务必填)")
-    deadline_at: DateTimeStr | None = Field(default=None, description="截止时间")
-
-
-class TaskPublishSchema(BaseModel):
-    """发布任务"""
-
-    deadline_at: DateTimeStr | None = Field(default=None, description="截止时间(缺省不修改)")
+    project_ids: list[int] | None = Field(default=None, description="归集到的项目ID列表(缺省不修改)")
 
 
 class TaskQueryParam(BaseQueryParam, UserByQueryParam):
@@ -147,7 +147,7 @@ class TaskQueryParam(BaseQueryParam, UserByQueryParam):
 
     task_no: str | None = Field(default=None, description="任务号", json_schema_extra={"q": "like"})
     task_type_id: int | None = Field(default=None, description="任务类型模板ID", json_schema_extra={"q": "eq"})
-    company_id: int | None = Field(default=None, description="委托医药公司ID", json_schema_extra={"q": "eq"})
+    task_kind: str | None = Field(default=None, description="任务分类", json_schema_extra={"q": "eq"})
     period: str | None = Field(default=None, description="周期", json_schema_extra={"q": "eq"})
     assign_mode: str | None = Field(default=None, description="分配方式", json_schema_extra={"q": "eq"})
     status: str | None = Field(default=None, description="任务状态", json_schema_extra={"q": "eq"})

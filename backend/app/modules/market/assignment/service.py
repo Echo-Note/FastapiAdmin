@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from decimal import Decimal
 
 from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,13 +10,12 @@ from app.core.redis_crud import RedisCURD
 from app.modules.system.user.crud import UserCRUD
 from app.utils.common_util import search_to_dict
 
-from ..enums import AssignmentSource, AssignmentStatus, AssignMode, TaskStatus
-from ..quota.service import QuotaService
+from ..enums import AssignmentSource, AssignmentStatus, AssignMode, TaskKind, TaskStatus
 from ..task.crud import TaskCRUD
 from .crud import AssignmentCRUD
 from .schema import AssignmentCreateSchema, AssignmentOutSchema, AssignmentQueryParam
 
-# task 为 TaskOutSchema（含 company/task_type 等 UserBySchema 嵌套），须完整预加载各层审计关系，
+# task 为 TaskOutSchema（含 task_type 等 UserBySchema 嵌套），须完整预加载各层审计关系，
 # 避免 detail()/page()/accept() 序列化时在异步环境下触发懒加载 MissingGreenlet
 _ASSIGNMENT_PRELOAD = [
     "task",
@@ -26,9 +24,7 @@ _ASSIGNMENT_PRELOAD = [
     "task.task_type",
     "task.task_type.created_by",
     "task.task_type.updated_by",
-    "task.company",
-    "task.company.created_by",
-    "task.company.updated_by",
+    "task.project_links",
 ]
 
 
@@ -75,7 +71,6 @@ class AssignmentService:
             missing = sorted(set(data.user_ids) - {u.id for u in users})
             raise CustomException(msg=f"用户不存在: {missing}")
 
-        assign_amount = Decimal(task.unit_price) * task.exec_qty
         assignment_ids: list[int] = []
         for user_id in data.user_ids:
             if await AssignmentCRUD(self.auth, self.db).get(task_id=data.task_id, user_id=user_id):
@@ -85,7 +80,6 @@ class AssignmentService:
                     "task_id": data.task_id,
                     "user_id": user_id,
                     "source": AssignmentSource.ASSIGNED.value,
-                    "assign_amount": assign_amount,
                     "status": AssignmentStatus.PENDING.value,
                 }
             )
@@ -104,21 +98,12 @@ class AssignmentService:
         await AssignmentCRUD(self.auth, self.db).delete(ids=ids)
 
     async def accept(self, id: int) -> AssignmentOutSchema:
-        """接收任务：PENDING → ACCEPTED，触发限额累计（接收时拦截）。"""
+        """接收任务：PENDING → ACCEPTED。不限额、不限单量。"""
         assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(id=id, preload=_ASSIGNMENT_PRELOAD)
         if assignment.status != AssignmentStatus.PENDING.value:
             raise CustomException(msg="该任务不可接收（已接收或已处理）")
         if assignment.user_id != self.auth.user.id:
             raise CustomException(msg="无权接收该任务")
-
-        quota_service = QuotaService(self.auth, self.db)
-        allowed = await quota_service.check_and_accumulate_receive(
-            user_id=assignment.user_id,
-            period=assignment.task.period,
-            assign_amount=Decimal(assignment.assign_amount),
-        )
-        if not allowed:
-            raise CustomException(msg="本月限额已满，无法继续接收任务")
 
         await AssignmentCRUD(self.auth, self.db).update(
             id=id,
@@ -129,42 +114,30 @@ class AssignmentService:
             await TaskCRUD(self.auth, self.db).update(id=assignment.task.id, data={"status": TaskStatus.IN_PROGRESS.value})
         return await self.detail(id=id)
 
-    async def claim(self, redis: Redis, task_id: int) -> AssignmentOutSchema:
+    async def claim(self, task_id: int, redis: Redis) -> AssignmentOutSchema:
         """大厅接单：公开任务由当前用户自行接单，直接形成「已接收」的任务实例。
 
-        名额通过 Redis 计数器原子扣减（``incr_with_limit`` Lua 脚本）防并发超卖，
-        落库失败时回滚计数，保证 Redis 计数与 DB 最终一致。
+        不限制接单数量与金额；定额任务受执行数量限量约束（接单即占名额，先到先得），
+        名额接满后拒绝接单，任务随之从大厅消失。同一用户同一任务仅可接单一次。
         """
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=task_id, msg="任务不存在")
         if task.assign_mode != AssignMode.OPEN.value:
             raise CustomException(msg="该任务为定向分派任务，不支持大厅接单")
         if task.status not in {TaskStatus.PUBLISHED.value, TaskStatus.IN_PROGRESS.value}:
             raise CustomException(msg="该任务暂不可接单")
-        if task.deadline_at is not None and task.deadline_at <= datetime.now(UTC):
-            raise CustomException(msg="该任务已截止，不可接单")
-
-        limit = task.assign_limit
-        if limit is None or limit <= 0:
-            raise CustomException(msg="该任务未设置接单名额，无法接单")
+        if task.exec_time_end is not None and task.exec_time_end <= datetime.now(UTC):
+            raise CustomException(msg="该任务已超出限定时间范围，不可接单")
 
         # 同一用户对同一任务仅可接单一次（幂等防重）
         if await AssignmentCRUD(self.auth, self.db).get(task_id=task_id, user_id=self.auth.user.id):
             raise CustomException(msg="您已接取该任务，请勿重复接单")
 
-        assign_amount = Decimal(task.unit_price) * task.exec_qty
-        allowed = await QuotaService(self.auth, self.db).check_and_accumulate_receive(
-            user_id=self.auth.user.id,
-            period=task.period,
-            assign_amount=assign_amount,
-        )
-        if not allowed:
-            raise CustomException(msg="本月限额已满，无法继续接收任务")
-
-        # Redis 原子扣减名额（防超卖）：返回 -1 表示已抢完
-        claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{task_id}"
-        new_count = await RedisCURD(redis).incr_with_limit(key=claim_key, limit=limit)
-        if new_count < 0:
-            raise CustomException(msg="该任务已被抢完")
+        # 定额任务：接单占用一个名额（Redis 原子计数防超卖），名额接满即拒绝
+        if task.task_kind == TaskKind.QUOTA.value:
+            claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{task_id}"
+            new_count = await RedisCURD(redis).incr_with_limit(key=claim_key, limit=task.exec_qty)
+            if new_count < 0:
+                raise CustomException(msg="该任务名额已满，无法接单")
 
         try:
             assignment = await AssignmentCRUD(self.auth, self.db).create(
@@ -172,17 +145,19 @@ class AssignmentService:
                     "task_id": task_id,
                     "user_id": self.auth.user.id,
                     "source": AssignmentSource.CLAIMED.value,
-                    "assign_amount": assign_amount,
                     "status": AssignmentStatus.ACCEPTED.value,
                     "accepted_at": datetime.now(UTC),
                 }
             )
-            if task.status == TaskStatus.PUBLISHED.value:
-                await TaskCRUD(self.auth, self.db).update(id=task_id, data={"status": TaskStatus.IN_PROGRESS.value})
         except Exception:
-            # 名额已扣减但落库失败，回滚计数
-            await RedisCURD(redis).decr(key=claim_key)
+            # 定额任务名额已占用但落库失败，回滚计数
+            if task.task_kind == TaskKind.QUOTA.value:
+                claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{task_id}"
+                await RedisCURD(redis).decr(key=claim_key)
             raise
+
+        if task.status == TaskStatus.PUBLISHED.value:
+            await TaskCRUD(self.auth, self.db).update(id=task_id, data={"status": TaskStatus.IN_PROGRESS.value})
         return await self.detail(id=assignment.id)
 
     async def my_assignments(

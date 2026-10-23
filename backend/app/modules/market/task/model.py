@@ -9,7 +9,7 @@ from app.core.base_model import JSONType, ModelMixin, UserMixin
 
 if TYPE_CHECKING:
     from app.modules.market.assignment.model import AssignmentModel
-    from app.modules.market.company.model import CompanyModel
+    from app.modules.market.project.model import ProjectTaskModel
 
 
 class TaskTypeModel(ModelMixin, UserMixin):
@@ -33,15 +33,16 @@ class TaskTypeModel(ModelMixin, UserMixin):
     default_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, comment="默认单价")
     exec_standard: Mapped[str | None] = mapped_column(Text, nullable=True, comment="执行标准")
     required: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="是否必选")
+    default_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="periodic", comment="默认任务分类(periodic 周期性/quota 定额)")
     form_schema: Mapped[list[dict[str, Any]]] = mapped_column(JSONType, nullable=False, comment="采集字段 JSON Schema(驱动动态表单)")
 
     tasks: Mapped[list["TaskModel"]] = relationship(back_populates="task_type")
 
 
 class TaskModel(ModelMixin, UserMixin):
-    """任务
+    """任务（对内）
 
-    运营端创建并发布，分派给 C 端用户执行。状态机见 TaskStatus。
+    运营端创建并发布，分派给 C 端用户执行，可归集到多个项目。状态机见 TaskStatus。
     """
 
     __tablename__: str = "market_task"
@@ -49,17 +50,24 @@ class TaskModel(ModelMixin, UserMixin):
 
     task_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True, comment="任务号(对应附件 1-4、5-17…)")
     task_type_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_task_type.id", ondelete="RESTRICT"), nullable=False, index=True, comment="任务类型模板ID")
-    company_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_company.id", ondelete="RESTRICT"), nullable=False, index=True, comment="委托医药公司ID")
+    task_kind: Mapped[str] = mapped_column(String(16), nullable=False, default="periodic", index=True, comment="任务分类(periodic 周期性/quota 定额)")
     period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="周期(如 2026-10，默认自然月)")
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, comment="本期单价(可覆盖模板默认)")
-    exec_qty: Mapped[int] = mapped_column(Integer, nullable=False, comment="执行数量")
+    exec_time_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="定额任务限定时间-开始(周期任务可空)")
+    exec_time_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="定额任务限定时间-结束(周期任务可空)")
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, comment="本期单价(可覆盖模板默认)；任务金额仅对内")
+    exec_qty: Mapped[int] = mapped_column(Integer, nullable=False, comment="执行数量(定额任务为总份数限量；周期任务不限)")
     assign_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="direct", index=True, comment="分配方式(direct 定向分派/open 公开大厅)")
-    assign_limit: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="最大接单人数(公开大厅任务必填，先到先得、抢完即止)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="任务状态")
+    completed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, comment="完成判定人ID(运营)")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="完成判定时间")
     publisher_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, index=True, comment="发布人ID")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="发布时间")
-    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True, comment="截止时间")
 
     task_type: Mapped["TaskTypeModel"] = relationship(back_populates="tasks")
-    company: Mapped["CompanyModel"] = relationship()
     assignments: Mapped[list["AssignmentModel"]] = relationship(back_populates="task")
+    project_links: Mapped[list["ProjectTaskModel"]] = relationship(back_populates="task")
+
+    @property
+    def project_ids(self) -> list[int]:
+        """归集到的项目ID列表（需预加载 ``project_links``，否则异步环境会触发懒加载）。"""
+        return [link.project_id for link in self.project_links]

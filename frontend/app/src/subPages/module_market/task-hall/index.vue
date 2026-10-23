@@ -22,11 +22,14 @@ function amountText(item: TaskItem) {
 }
 
 function deadlineText(item: TaskItem) {
-  return (item.deadline_at || '').slice(0, 16)
+  return (item.exec_time_end || '').slice(0, 16)
 }
 
 function remainText(item: TaskItem) {
-  const limit = item.assign_limit
+  // 仅定额任务按总份数限量展示剩余份数；周期性任务不限总份数
+  if (item.task_kind !== 'quota')
+    return ''
+  const limit = item.exec_qty
   if (limit == null)
     return ''
   const remain = limit - (item.claimed_count ?? 0)
@@ -89,7 +92,7 @@ onLoad(() => loadData())
               <view class="min-w-0 flex-1">
                 <view class="flex items-center gap-2">
                   <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task_no ?? ''" />
-                  <wd-tag v-if="item.company?.name" type="primary" plain :title="item.company.name" />
+                  <wd-tag type="primary" plain :title="item.task_kind === 'quota' ? '定额' : '周期性'" />
                 </view>
                 <view class="mt-1 flex items-center gap-3">
                   <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.period ?? '-'}`" />
@@ -97,7 +100,7 @@ onLoad(() => loadData())
                   <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.execQty')} ${item.exec_qty ?? 0}`" />
                 </view>
                 <view class="mt-1 flex items-center gap-3">
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${deadlineText(item)}`" />
+                  <wd-text v-if="item.exec_time_end" class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${deadlineText(item)}`" />
                   <wd-text v-if="remainText(item)" class="wot-text-text-auxiliary text-2.5" :text="remainText(item)" />
                 </view>
               </view>

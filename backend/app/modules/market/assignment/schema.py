@@ -13,7 +13,6 @@ class AssignmentOutSchema(BaseSchema, UserBySchema):
     task_id: int = Field(description="任务ID")
     user_id: int = Field(description="C端用户ID")
     source: str = Field(description="来源(assigned 运营分派/claimed 大厅接单)")
-    assign_amount: float = Field(description="本单接收金额(=单价×数量)")
     status: str = Field(description="分派状态")
     accepted_at: DateTimeStr | None = Field(default=None, description="接收时间")
     submitted_at: DateTimeStr | None = Field(default=None, description="首次提交时间")

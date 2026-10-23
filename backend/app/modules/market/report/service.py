@@ -9,6 +9,7 @@ from app.utils.common_util import search_to_dict
 
 from ..company.crud import CompanyCRUD
 from ..enums import ReportStatus, SettlementStatus
+from ..project.crud import ProjectCRUD, ProjectTaskCRUD
 from ..settlement.crud import SettlementCRUD
 from ..task.crud import TaskCRUD
 from .crud import ReportCRUD
@@ -50,16 +51,24 @@ class ReportService:
         )
 
     async def generate(self, data: ReportCreateSchema) -> ReportOutSchema:
-        """生成报告：按医药公司 × 周期汇总各任务完成量与结算金额。"""
+        """生成报告：按医药公司 × 周期汇总各项目下任务的完成量与结算金额。"""
         await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
 
-        # 该周期下该医药公司的所有任务
-        tasks = await TaskCRUD(self.auth, self.db).get_list(
-            search={"company_id": data.company_id, "period": data.period},
-            preload=["task_type"],
+        # 该周期下该医药公司的所有项目
+        projects = await ProjectCRUD(self.auth, self.db).get_list(
+            search={"company_id": data.company_id, "period": data.period}
         )
-        if not tasks:
+        if not projects:
+            raise CustomException(msg="该周期下该医药公司无项目数据")
+
+        # 这些项目归集的所有任务（跨项目去重）
+        project_ids = [p.id for p in projects]
+        links = await ProjectTaskCRUD(self.auth, self.db).get_list(search={"project_id": ("in", project_ids)})
+        task_ids = list({link.task_id for link in links})
+        if not task_ids:
             raise CustomException(msg="该周期下该医药公司无任务数据")
+
+        tasks = await TaskCRUD(self.auth, self.db).get_list(search={"id": ("in", task_ids)}, preload=["task_type"])
 
         task_summary: list[dict[str, Any]] = []
         total_qty = 0

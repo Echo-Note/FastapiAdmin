@@ -32,7 +32,7 @@ class TaskCRUD(MarketCRUDBase[TaskModel, TaskCreateSchema, TaskUpdateSchema]):
     async def hall_page(self, offset: int, limit: int, preload: list[str] | None = None) -> tuple[list[TaskModel], int]:
         """公开大厅任务分页查询。
 
-        条件：assign_mode=open + 状态 in (已发布, 进行中) + 未截止（deadline_at 为空或未来）。
+        条件：assign_mode=open + 状态 in (已发布, 进行中) + 未超出限定时间范围（exec_time_end 为空或未来）。
         返回 ``(任务列表, 总条数)``，由 Service 层组装 ``PageResultSchema``。
         """
         now = datetime.now(UTC)
@@ -40,7 +40,7 @@ class TaskCRUD(MarketCRUDBase[TaskModel, TaskCreateSchema, TaskUpdateSchema]):
             TaskModel.assign_mode == AssignMode.OPEN.value,
             TaskModel.status.in_([TaskStatus.PUBLISHED.value, TaskStatus.IN_PROGRESS.value]),
             TaskModel.is_deleted == false(),
-            or_(TaskModel.deadline_at.is_(None), TaskModel.deadline_at > now),
+            or_(TaskModel.exec_time_end.is_(None), TaskModel.exec_time_end > now),
         ]
         data_sql = select(TaskModel).where(*conditions)
         for opt in self._loader_options(preload):

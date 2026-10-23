@@ -1,6 +1,6 @@
 name = "market"
 title = "市场管理"
 version = "1.0.0"
-description = "医药市场管理服务平台（任务发布/分派/接收/成果提交/审核/归集结算/报告/限额）"
+description = "医药市场管理服务平台（项目/任务/分派/接收/成果提交/审核/归集结算/报告/发放额度与津贴）"
 optional = true
-tags = ["market", "task", "settlement", "quota"]
+tags = ["market", "project", "task", "settlement", "payout"]

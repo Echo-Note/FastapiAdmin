@@ -41,6 +41,7 @@ export default AssignmentAPI;
 export interface AssignmentPageQuery extends PageQuery, UserByQueryParams {
   task_id?: number;
   user_id?: number;
+  source?: string;
   status?: string;
 }
 
@@ -48,15 +49,16 @@ export interface AssignmentTable extends BaseType {
   task_id?: number;
   user_id?: number;
   source?: string;
-  assign_amount?: number;
   status?: string;
   accepted_at?: string | null;
   submitted_at?: string | null;
   task?: {
     id?: number;
     task_no?: string;
+    task_kind?: string;
     period?: string;
+    unit_price?: number;
     status?: string;
-    company?: { id?: number; name?: string };
+    task_type?: { id?: number; name?: string; unit?: string } | null;
   } | null;
 }

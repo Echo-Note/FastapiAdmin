@@ -8,7 +8,7 @@ from app.core.exceptions import CustomException
 from app.utils.common_util import search_to_dict
 
 from ..assignment.crud import AssignmentCRUD
-from ..enums import AssignmentStatus, SubmissionStatus
+from ..enums import AssignmentStatus, SubmissionStatus, TaskKind
 from ..institution.crud import InstitutionCRUD
 from .crud import SubmissionCRUD
 from .schema import (
@@ -71,7 +71,12 @@ class SubmissionService:
         )
 
     async def create(self, data: SubmissionCreateSchema) -> SubmissionOutSchema:
-        """提交成果（草稿或正式提交）。"""
+        """提交成果（草稿或正式提交）。
+
+        分类提交约束：
+        - 周期性任务：单用户单月仅一次正式提交；
+        - 定额任务：单用户单月可重复提交，不限次（名额限量已在接单环节占用）。
+        """
         assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(
             id=data.assignment_id, msg="任务实例不存在", preload=["task", "task.task_type"]
         )
@@ -81,12 +86,23 @@ class SubmissionService:
             raise CustomException(msg="任务尚未接收或已结束，无法提交成果")
         await InstitutionCRUD(self.auth, self.db).get_or_404(id=data.institution_id, msg="机构不存在")
 
-        # 正式提交时执行规则校验；草稿不校验
+        task = assignment.task
+        period = task.period
+
+        # 正式提交时执行规则校验与分类提交约束；草稿不校验
         if data.status == SubmissionStatus.PENDING.value:
-            _validate_form(assignment.task.task_type.form_schema, data.form_data)
+            _validate_form(task.task_type.form_schema, data.form_data)
+            if task.task_kind == TaskKind.PERIODIC.value:
+                # 周期任务：单用户单月仅一次正式提交
+                existed = await SubmissionCRUD(self.auth, self.db).get_list(
+                    search={"assignment_id": assignment.id, "period": period}
+                )
+                if any(s.status != SubmissionStatus.DRAFT.value for s in existed):
+                    raise CustomException(msg="本月已提交，周期性任务单月仅可提交一次")
+            # 定额任务：单用户单月可重复提交，不限次（名额限量已在接单环节占用）
 
         submission = await SubmissionCRUD(self.auth, self.db).create(
-            data={**data.model_dump(), "user_id": self.auth.user.id}
+            data={**data.model_dump(), "user_id": self.auth.user.id, "period": period}
         )
 
         # 驱动分派状态流转：草稿 → 进行中，正式提交 → 已提交

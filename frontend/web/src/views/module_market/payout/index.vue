@@ -1,4 +1,4 @@
-<!-- 限额配置：列表 + 配置限额（upsert）+ 用量查询 -->
+<!-- 发放额度配置：列表 + 配置每月发放额度（upsert）+ 发放情况查询 -->
 <template>
   <div class="fa-full-height">
     <FaSearchBar
@@ -17,7 +17,7 @@
     <ElCard class="fa-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
       <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
         <template #left>
-          <FaTableHeaderLeft :perm-create="['module_market:quota:edit']" create-text="配置限额" @add="openSaveDialog" />
+          <FaTableHeaderLeft :perm-create="['module_market:payout:edit']" create-text="配置发放额度" @add="openSaveDialog" />
         </template>
       </FaTableHeader>
 
@@ -32,7 +32,7 @@
       />
     </ElCard>
 
-    <!-- 配置限额对话框 -->
+    <!-- 配置发放额度对话框 -->
     <ElDialog v-model="saveVisible" :title="saveTitle" width="520px" :close-on-click-modal="false" @closed="resetSaveForm">
       <FaForm
         ref="saveFormRef"
@@ -51,17 +51,16 @@
       </template>
     </ElDialog>
 
-    <!-- 用量查询对话框 -->
-    <ElDialog v-model="usageVisible" title="限额用量详情" width="640px">
+    <!-- 发放情况查询对话框 -->
+    <ElDialog v-model="usageVisible" title="发放情况详情" width="640px">
       <FaDescriptions :column="4" :data="usageData" :items="usageItems">
         <template #userName="{ row }">{{ resolveUserName(row) }}</template>
       </FaDescriptions>
-      <ElDivider content-position="left">结转明细</ElDivider>
-      <ElTable :data="usageData.carryover_items ?? []" size="small" border max-height="260px">
+      <ElDivider content-position="left">津贴明细（未发放，滚入下月）</ElDivider>
+      <ElTable :data="usageData.allowance_items ?? []" size="small" border max-height="260px">
         <ElTableColumn type="index" label="#" width="48" />
-        <ElTableColumn prop="from_period" label="来源周期" width="110" />
-        <ElTableColumn prop="to_period" label="结转周期" width="110" />
-        <ElTableColumn prop="amount" label="结转金额" align="right" />
+        <ElTableColumn prop="from_period" label="来源周期" width="120" />
+        <ElTableColumn prop="amount" label="未发放金额" align="right" />
         <ElTableColumn prop="status" label="状态" width="100" />
       </ElTable>
     </ElDialog>
@@ -69,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import QuotaAPI, { type QuotaConfigTable, type QuotaUsageDetail } from "@/api/module_market/quota";
+import PayoutAPI, { type PayoutConfigTable, type PayoutUsageDetail } from "@/api/module_market/payout";
 import UserAPI from "@/api/module_system/user";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
@@ -77,7 +76,7 @@ import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
 
-defineOptions({ name: "MarketQuota", inheritAttrs: false });
+defineOptions({ name: "MarketPayout", inheritAttrs: false });
 
 const searchForm = ref<{ user_id?: number; period?: string }>({ user_id: undefined, period: undefined });
 const showSearchBar = ref(true);
@@ -94,66 +93,66 @@ const searchItems = computed<SearchFormItem[]>(() => [
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
 
 const opCtx = {
-  onUsage: (row: QuotaConfigTable) => void openUsage(row),
-  onEdit: (row: QuotaConfigTable) => void openSaveDialog(row),
+  onUsage: (row: PayoutConfigTable) => void openUsage(row),
+  onEdit: (row: PayoutConfigTable) => void openSaveDialog(row),
 };
 
-function buildRowActions(row: QuotaConfigTable): TableOperationAction[] {
+function buildRowActions(row: PayoutConfigTable): TableOperationAction[] {
   return [
-    { key: "usage", label: "用量", artType: "view", perm: "module_market:quota:query", run: () => opCtx.onUsage(row) },
-    { key: "edit", label: "编辑", artType: "edit", perm: "module_market:quota:edit", run: () => opCtx.onEdit(row) },
+    { key: "usage", label: "发放情况", artType: "view", perm: "module_market:payout:query", run: () => opCtx.onUsage(row) },
+    { key: "edit", label: "编辑", artType: "edit", perm: "module_market:payout:edit", run: () => opCtx.onEdit(row) },
   ];
 }
 
 const { columns, columnChecks, data, loading, pagination, getData, replaceSearchParams, resetSearchParams, handleSizeChange, handleCurrentChange, refreshData } =
   useTable({
     core: {
-      apiFn: QuotaAPI.listQuota,
+      apiFn: PayoutAPI.listPayout,
       apiParams: { page_no: 1, page_size: 10 },
-      columnsFactory: resolveStatusColumns<QuotaConfigTable>(() => [
+      columnsFactory: resolveStatusColumns<PayoutConfigTable>(() => [
         { type: "globalIndex", width: 56, label: "序号" },
-        { prop: "user_id", label: "用户", minWidth: 140, formatter: (row: QuotaConfigTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
+        { prop: "user_id", label: "用户", minWidth: 140, formatter: (row: PayoutConfigTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
         { prop: "period", label: "周期", width: 100 },
-        { prop: "quota_amount", label: "限额金额", width: 110, align: "right" },
-        { prop: "enabled", label: "启用", width: 80, align: "center", formatter: (row: QuotaConfigTable) => (row.enabled ? "是" : "否") },
+        { prop: "payout_limit", label: "每月发放额度", width: 130, align: "right" },
+        { prop: "enabled", label: "启用", width: 80, align: "center", formatter: (row: PayoutConfigTable) => (row.enabled ? "是" : "否") },
         { prop: "created_time", label: "配置时间", width: 168, showOverflowTooltip: true },
-        { prop: "operation", label: "操作", width: 140, fixed: "right", align: "center", formatter: (row: QuotaConfigTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
+        { prop: "operation", label: "操作", width: 170, fixed: "right", align: "center", formatter: (row: PayoutConfigTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ]),
     },
   });
 
-// ── 配置限额 ──
+// ── 配置发放额度 ──
 const saveVisible = ref(false);
 const saveSubmitting = ref(false);
 const saveFormRef = ref<InstanceType<typeof FaForm> | null>(null);
-const saveForm = ref<{ user_id?: number; period?: string; quota_amount?: number; enabled: boolean }>({ user_id: undefined, period: undefined, quota_amount: undefined, enabled: true });
+const saveForm = ref<{ user_id?: number; period?: string; payout_limit?: number; enabled: boolean }>({ user_id: undefined, period: undefined, payout_limit: undefined, enabled: true });
 
-const saveTitle = computed(() => (saveForm.value.user_id ? "修改限额配置" : "新增限额配置"));
+const saveTitle = computed(() => (saveForm.value.user_id ? "修改发放额度" : "配置发放额度"));
 
 const saveFormItems = computed<FormItem[]>(() => [
   { label: "用户", key: "user_id", type: "select", span: 24, props: { placeholder: "请选择 C 端用户", options: userOptions.value, filterable: true } },
   { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "自然月，如 2026-10", maxlength: 16 } },
-  { label: "限额金额", key: "quota_amount", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right" } },
+  { label: "发放额度", key: "payout_limit", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right", placeholder: "默认 20000，可调 10000/20000" } },
   { label: "是否启用", key: "enabled", type: "switch", span: 24 },
 ]);
 
 const saveRules = reactive({
   user_id: [{ required: true, message: "请选择用户", trigger: "change" }],
   period: [{ required: true, message: "请输入周期", trigger: "blur" }],
-  quota_amount: [{ required: true, message: "请输入限额金额", trigger: "blur" }],
+  payout_limit: [{ required: true, message: "请输入发放额度", trigger: "blur" }],
 });
 
-function openSaveDialog(row?: QuotaConfigTable) {
+function openSaveDialog(row?: PayoutConfigTable) {
   if (row) {
-    saveForm.value = { user_id: row.user_id, period: row.period, quota_amount: row.quota_amount, enabled: row.enabled ?? true };
+    saveForm.value = { user_id: row.user_id, period: row.period, payout_limit: row.payout_limit, enabled: row.enabled ?? true };
   } else {
-    saveForm.value = { user_id: undefined, period: undefined, quota_amount: undefined, enabled: true };
+    saveForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
   }
   saveVisible.value = true;
 }
 
 function resetSaveForm() {
-  saveForm.value = { user_id: undefined, period: undefined, quota_amount: undefined, enabled: true };
+  saveForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
 }
 
 async function handleSaveSubmit() {
@@ -163,10 +162,10 @@ async function handleSaveSubmit() {
   } catch {
     return;
   }
-  if (!saveForm.value.user_id || !saveForm.value.period || saveForm.value.quota_amount === undefined) return;
+  if (!saveForm.value.user_id || !saveForm.value.period || saveForm.value.payout_limit === undefined) return;
   saveSubmitting.value = true;
   try {
-    await QuotaAPI.saveQuota({ user_id: saveForm.value.user_id, period: saveForm.value.period, quota_amount: saveForm.value.quota_amount, enabled: saveForm.value.enabled });
+    await PayoutAPI.savePayout({ user_id: saveForm.value.user_id, period: saveForm.value.period, payout_limit: saveForm.value.payout_limit, enabled: saveForm.value.enabled });
     saveVisible.value = false;
     await refreshData();
   } catch {
@@ -176,20 +175,18 @@ async function handleSaveSubmit() {
   }
 }
 
-// ── 用量查询 ──
+// ── 发放情况查询 ──
 const usageVisible = ref(false);
-const usageData = ref<Partial<QuotaUsageDetail>>({});
+const usageData = ref<Partial<PayoutUsageDetail>>({});
 const usageItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
   { label: "用户", prop: "user_id", slot: "userName" },
   { label: "周期", prop: "period" },
-  { label: "限额金额", prop: "quota_amount" },
-  { label: "已接收金额", prop: "received_amount" },
-  { label: "应付金额", prop: "payable_amount" },
-  { label: "超额金额", prop: "over_amount" },
+  { label: "每月发放额度", prop: "payout_limit" },
+  { label: "津贴余额", prop: "allowance_balance" },
 ];
 
-async function openUsage(row: QuotaConfigTable) {
-  const res = await QuotaAPI.usageQuota({ user_id: row.user_id!, period: row.period! });
+async function openUsage(row: PayoutConfigTable) {
+  const res = await PayoutAPI.usagePayout({ user_id: row.user_id!, period: row.period! });
   usageData.value = res.data.data;
   usageVisible.value = true;
 }

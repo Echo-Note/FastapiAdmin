@@ -10,15 +10,22 @@ from enum import StrEnum
 
 
 class TaskStatus(StrEnum):
-    """任务状态机：草稿 → 发布 → 进行中 → 截止 → 归集中 → 已结算 → 归档。"""
+    """任务状态机：草稿 → 发布 → 进行中 → 已完成(运营判定) → 归集中 → 已结算 → 归档。"""
 
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
     IN_PROGRESS = "IN_PROGRESS"
-    DEADLINE = "DEADLINE"
+    COMPLETED = "COMPLETED"
     SETTLING = "SETTLING"
     SETTLED = "SETTLED"
     ARCHIVED = "ARCHIVED"
+
+
+class TaskKind(StrEnum):
+    """任务分类：周期性（单用户单月一次）/ 定额（限时限量，单月可重复提交）。"""
+
+    PERIODIC = "periodic"  # 周期性任务（如巡店、管理采集）
+    QUOTA = "quota"  # 定额任务（如问卷/访谈调研）
 
 
 class AssignmentStatus(StrEnum):
@@ -59,11 +66,20 @@ class ReportStatus(StrEnum):
     SUBMITTED = "SUBMITTED"
 
 
-class CarryoverStatus(StrEnum):
-    """顺延金额状态：待结算（滚入下一周期）→ 已结算（被下一周期消费）。"""
+class AllowanceStatus(StrEnum):
+    """个人任务津贴明细状态：待发（未发放，滚入下月）→ 已发（被下月发放消费）。"""
 
     PENDING = "PENDING"
-    SETTLED = "SETTLED"
+    PAID = "PAID"
+
+
+class ProjectStatus(StrEnum):
+    """项目状态机：草稿 → 进行中 → 已完成 → 已关闭。"""
+
+    DRAFT = "DRAFT"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    CLOSED = "CLOSED"
 
 
 class InstitutionType(StrEnum):

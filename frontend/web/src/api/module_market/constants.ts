@@ -9,11 +9,35 @@ export const TASK_STATUS_MAP: Record<string, { type: "primary" | "success" | "wa
   DRAFT: { type: "info", text: "草稿" },
   PUBLISHED: { type: "primary", text: "已发布" },
   IN_PROGRESS: { type: "warning", text: "进行中" },
-  DEADLINE: { type: "danger", text: "已截止" },
+  COMPLETED: { type: "primary", text: "已完成" },
   SETTLING: { type: "warning", text: "归集中" },
   SETTLED: { type: "success", text: "已结算" },
   ARCHIVED: { type: "info", text: "已归档" },
 };
+
+/** 任务分类（task_kind：周期性 / 定额） */
+export const TASK_KIND_MAP: Record<string, { type: "primary" | "success" | "warning" | "info" | "danger"; text: string }> = {
+  periodic: { type: "info", text: "周期性" },
+  quota: { type: "warning", text: "定额" },
+};
+
+/** 任务分类下拉选项 */
+export const TASK_KIND_OPTIONS: { label: string; value: string }[] = Object.entries(
+  TASK_KIND_MAP,
+).map(([value, v]) => ({ value, label: v.text }));
+
+/** 项目状态机 */
+export const PROJECT_STATUS_MAP: Record<string, { type: "primary" | "success" | "warning" | "info" | "danger"; text: string }> = {
+  DRAFT: { type: "info", text: "草稿" },
+  IN_PROGRESS: { type: "warning", text: "进行中" },
+  COMPLETED: { type: "success", text: "已完成" },
+  CLOSED: { type: "info", text: "已关闭" },
+};
+
+/** 项目状态下拉选项（状态流转可选目标） */
+export const PROJECT_STATUS_OPTIONS: { label: string; value: string }[] = Object.entries(
+  PROJECT_STATUS_MAP,
+).map(([value, v]) => ({ value, label: v.text }));
 
 /** 分派/接收状态机 */
 export const ASSIGNMENT_STATUS_MAP: Record<string, { type: "primary" | "success" | "warning" | "info" | "danger"; text: string }> = {

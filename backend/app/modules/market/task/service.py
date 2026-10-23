@@ -10,13 +10,12 @@ from app.core.exceptions import CustomException
 from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
-from ..company.crud import CompanyCRUD
-from ..enums import AssignMode, TaskStatus
+from ..enums import TaskKind, TaskStatus
+from ..project.crud import ProjectCRUD, ProjectTaskCRUD
 from .crud import TaskCRUD, TaskTypeCRUD
 from .schema import (
     TaskCreateSchema,
     TaskOutSchema,
-    TaskPublishSchema,
     TaskQueryParam,
     TaskTypeCreateSchema,
     TaskTypeOutSchema,
@@ -25,15 +24,13 @@ from .schema import (
     TaskUpdateSchema,
 )
 
-# task_type / company 均为 UserBySchema（含 created_by/updated_by），必须嵌套预加载其审计关系，
+# task_type 为 UserBySchema（含 created_by/updated_by），必须嵌套预加载其审计关系，
 # 避免 detail()/page() 序列化时在异步环境下触发懒加载 MissingGreenlet
 _TASK_PRELOAD = [
     "task_type",
     "task_type.created_by",
     "task_type.updated_by",
-    "company",
-    "company.created_by",
-    "company.updated_by",
+    "project_links",
 ]
 
 
@@ -119,16 +116,24 @@ class TaskService:
         )
 
     async def create(self, data: TaskCreateSchema) -> TaskOutSchema:
-        """创建任务（草稿状态）。"""
+        """创建任务（草稿状态），并归集到指定项目。"""
         if await TaskCRUD(self.auth, self.db).get(task_no=data.task_no):
             raise CustomException(msg="已存在相同任务号的任务")
         task_type = await TaskTypeCRUD(self.auth, self.db).get_or_404(id=data.task_type_id, msg="任务类型模板不存在")
-        await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
-        if data.unit_price is None:
-            data.unit_price = float(task_type.default_price)
-        if data.assign_mode == AssignMode.OPEN.value and (data.assign_limit is None or data.assign_limit <= 0):
-            raise CustomException(msg="公开大厅任务必须设置最大接单人数")
-        task = await TaskCRUD(self.auth, self.db).create(data=data)
+
+        # 任务分类缺省取模板默认；定额任务必须限定时间范围
+        task_kind = data.task_kind or task_type.default_kind
+        if task_kind == TaskKind.QUOTA.value and (data.exec_time_start is None or data.exec_time_end is None):
+            raise CustomException(msg="定额任务必须设置限定时间范围")
+
+        create_data = data.model_dump(exclude={"project_ids"})
+        create_data["task_kind"] = task_kind
+        if create_data.get("unit_price") is None:
+            create_data["unit_price"] = float(task_type.default_price)
+        task = await TaskCRUD(self.auth, self.db).create(data=create_data)
+
+        # 任务归集到多个项目
+        await self._sync_project_links(task.id, data.project_ids)
         return await self.detail(id=task.id)
 
     async def update(self, id: int, data: TaskUpdateSchema) -> TaskOutSchema:
@@ -138,11 +143,11 @@ class TaskService:
             raise CustomException(msg="仅草稿状态的任务可修改")
         if data.task_no and (exist := await TaskCRUD(self.auth, self.db).get(task_no=data.task_no)) and exist.id != id:
             raise CustomException(msg="已存在相同任务号的任务")
-        effective_mode = data.assign_mode if data.assign_mode is not None else task.assign_mode
-        effective_limit = data.assign_limit if data.assign_limit is not None else task.assign_limit
-        if effective_mode == AssignMode.OPEN.value and (effective_limit is None or effective_limit <= 0):
-            raise CustomException(msg="公开大厅任务必须设置最大接单人数")
-        await TaskCRUD(self.auth, self.db).update(id=id, data=data)
+        update_data = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"project_ids"})
+        await TaskCRUD(self.auth, self.db).update(id=id, data=update_data)
+        # 若提供了 project_ids，则全量替换归集关系
+        if data.project_ids is not None:
+            await self._sync_project_links(id, data.project_ids)
         return await self.detail(id=id)
 
     async def delete(self, ids: list[int]) -> None:
@@ -155,34 +160,52 @@ class TaskService:
                 raise CustomException(msg=f"任务[{task.task_no}]非草稿状态，不能删除")
         await TaskCRUD(self.auth, self.db).delete(ids=ids)
 
-    async def publish(self, redis: Redis, id: int, data: TaskPublishSchema | None = None) -> TaskOutSchema:
+    async def publish(self, redis: Redis, id: int) -> TaskOutSchema:
         """发布任务：DRAFT → PUBLISHED。"""
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status != TaskStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的任务可发布")
-        # 公开大厅任务发布时校验名额并初始化 Redis 计数
-        if task.assign_mode == AssignMode.OPEN.value:
-            if task.assign_limit is None or task.assign_limit <= 0:
-                raise CustomException(msg="公开大厅任务必须设置最大接单人数")
+        # 定额任务发布时初始化 Redis 已接单数计数（防超卖）
+        if task.task_kind == TaskKind.QUOTA.value:
             claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{id}"
             await RedisCURD(redis).set(key=claim_key, value="0", expire=None)
         update_data: dict[str, Any] = {"status": TaskStatus.PUBLISHED.value, "published_at": datetime.now(UTC)}
-        if data and data.deadline_at:
-            update_data["deadline_at"] = data.deadline_at
         await TaskCRUD(self.auth, self.db).update(id=id, data=update_data)
         return await self.detail(id=id)
 
+    async def complete(self, id: int) -> TaskOutSchema:
+        """判定任务完成（运营手动）：PUBLISHED / IN_PROGRESS → COMPLETED。"""
+        task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
+        if task.status not in {TaskStatus.PUBLISHED.value, TaskStatus.IN_PROGRESS.value}:
+            raise CustomException(msg="仅已发布/进行中的任务可判定完成")
+        await TaskCRUD(self.auth, self.db).update(
+            id=id,
+            data={"status": TaskStatus.COMPLETED.value, "completed_by": self.auth.user.id, "completed_at": datetime.now(UTC)},
+        )
+        return await self.detail(id=id)
+
+    async def _sync_project_links(self, task_id: int, project_ids: list[int]) -> None:
+        """同步任务-项目归集关系（全量替换为传入的项目列表）。"""
+        unique_ids = list(dict.fromkeys(project_ids))  # 去重并保持顺序
+        for pid in unique_ids:
+            await ProjectCRUD(self.auth, self.db).get_or_404(id=pid, msg=f"项目[{pid}]不存在")
+        existing = await ProjectTaskCRUD(self.auth, self.db).get_list(search={"task_id": task_id})
+        if existing:
+            await ProjectTaskCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
+        for pid in unique_ids:
+            await ProjectTaskCRUD(self.auth, self.db).create(data={"project_id": pid, "task_id": task_id})
+
     async def hall_tasks(self, redis: Redis, page_no: int, page_size: int) -> PageResultSchema[TaskOutSchema]:
-        """任务大厅：公开接单任务列表（过滤已抢完，返回剩余名额）。"""
-        # 公开任务量通常不大，一次取全量后按 Redis 计数过滤已抢完任务，再内存分页
+        """任务大厅：公开接单任务列表（定额任务过滤已满份数，返回剩余份数）。"""
+        # 公开任务量通常不大，一次取全量后按 Redis 计数过滤已满任务，再内存分页
         objs, _ = await TaskCRUD(self.auth, self.db).hall_page(offset=0, limit=10000, preload=_TASK_PRELOAD)
         claim_keys = [f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{obj.id}" for obj in objs]
         raw_counts = await RedisCURD(redis).mget(claim_keys)
         avail: list[TaskOutSchema] = []
         for obj, raw in zip(objs, raw_counts, strict=False):
             claimed = int(raw) if raw else 0
-            if obj.assign_limit and claimed >= obj.assign_limit:
-                continue  # 已抢完，从大厅剔除
+            if obj.task_kind == TaskKind.QUOTA.value and claimed >= obj.exec_qty:
+                continue  # 定额任务名额已接满，从大厅剔除
             out = TaskOutSchema.model_validate(obj).model_copy(update={"claimed_count": claimed})
             avail.append(out)
         total = len(avail)

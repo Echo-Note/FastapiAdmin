@@ -4,15 +4,16 @@ import pytest
 
 from app.core.exceptions import CustomException
 from app.modules.market.enums import (
+    AllowanceStatus,
     AssignmentStatus,
-    CarryoverStatus,
     InstitutionType,
+    ProjectStatus,
     ReportStatus,
     SettlementStatus,
     SubmissionStatus,
+    TaskKind,
     TaskStatus,
 )
-from app.modules.market.quota.service import _next_period
 from app.modules.market.submission.service import _validate_form
 
 
@@ -23,10 +24,20 @@ class TestEnums:
         assert TaskStatus.DRAFT.value == "DRAFT"
         assert TaskStatus.PUBLISHED.value == "PUBLISHED"
         assert TaskStatus.IN_PROGRESS.value == "IN_PROGRESS"
-        assert TaskStatus.DEADLINE.value == "DEADLINE"
+        assert TaskStatus.COMPLETED.value == "COMPLETED"
         assert TaskStatus.SETTLING.value == "SETTLING"
         assert TaskStatus.SETTLED.value == "SETTLED"
         assert TaskStatus.ARCHIVED.value == "ARCHIVED"
+
+    def test_task_kind_values(self) -> None:
+        assert TaskKind.PERIODIC.value == "periodic"
+        assert TaskKind.QUOTA.value == "quota"
+
+    def test_project_status_values(self) -> None:
+        assert ProjectStatus.DRAFT.value == "DRAFT"
+        assert ProjectStatus.IN_PROGRESS.value == "IN_PROGRESS"
+        assert ProjectStatus.COMPLETED.value == "COMPLETED"
+        assert ProjectStatus.CLOSED.value == "CLOSED"
 
     def test_assignment_status_values(self) -> None:
         assert AssignmentStatus.PENDING.value == "PENDING"
@@ -54,9 +65,9 @@ class TestEnums:
         assert ReportStatus.GENERATED.value == "GENERATED"
         assert ReportStatus.SUBMITTED.value == "SUBMITTED"
 
-    def test_carryover_status_values(self) -> None:
-        assert CarryoverStatus.PENDING.value == "PENDING"
-        assert CarryoverStatus.SETTLED.value == "SETTLED"
+    def test_allowance_status_values(self) -> None:
+        assert AllowanceStatus.PENDING.value == "PENDING"
+        assert AllowanceStatus.PAID.value == "PAID"
 
     def test_institution_type_values(self) -> None:
         assert InstitutionType.GRADE_HOSPITAL.value == "grade_hospital"
@@ -64,21 +75,6 @@ class TestEnums:
         assert InstitutionType.PRIVATE_MEDICAL.value == "private_medical"
         assert InstitutionType.RETAIL_PHARMACY.value == "retail_pharmacy"
         assert InstitutionType.COMMERCIAL.value == "commercial"
-
-
-class TestNextPeriod:
-    """周期推进函数测试。"""
-
-    def test_normal_month(self) -> None:
-        assert _next_period("2026-10") == "2026-11"
-        assert _next_period("2026-01") == "2026-02"
-
-    def test_year_rollover(self) -> None:
-        assert _next_period("2026-12") == "2027-01"
-        assert _next_period("1999-12") == "2000-01"
-
-    def test_month_padding(self) -> None:
-        assert _next_period("2026-09") == "2026-10"
 
 
 class TestValidateForm:

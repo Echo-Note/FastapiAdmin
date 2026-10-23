@@ -20,7 +20,7 @@ from .assignment.schema import AssignmentOutSchema, AssignmentQueryParam
 from .assignment.service import AssignmentService
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
-from .quota.service import QuotaService
+from .payout.service import PayoutService
 from .submission.schema import SubmissionCreateSchema, SubmissionOutSchema, SubmissionQueryParam, SubmissionUpdateSchema
 from .submission.service import SubmissionService
 from .task.schema import TaskOutSchema
@@ -69,7 +69,7 @@ async def mini_claim_task_controller(
     redis: Annotated[Redis, Depends(redis_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
 ) -> JSONResponse:
-    result = await AssignmentService(auth, db).claim(redis=redis, task_id=id)
+    result = await AssignmentService(auth, db).claim(task_id=id, redis=redis)
     return SuccessResponse(data=result, msg="接单成功")
 
 
@@ -105,14 +105,14 @@ async def mini_my_submissions_controller(
     return SuccessResponse(data=result, msg="获取我的成果成功")
 
 
-@MiniRouter.get("/quota", summary="我的额度/收益", response_model=ResponseSchema[dict])
-async def mini_my_quota_controller(
+@MiniRouter.get("/payout", summary="我的发放/津贴", response_model=ResponseSchema[dict])
+async def mini_my_payout_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     period: Annotated[str, Query(description="周期(如 2026-10)")],
 ) -> JSONResponse:
-    result = await QuotaService(auth, db).my_quota(user_id=auth.user.id, period=period)
-    return SuccessResponse(data=result, msg="获取我的额度成功")
+    result = await PayoutService(auth, db).my_payout(user_id=auth.user.id, period=period)
+    return SuccessResponse(data=result, msg="获取我的发放信息成功")
 
 
 @MiniRouter.get("/institutions", summary="机构列表(提交成果选择)", response_model=ResponseSchema[PageResultSchema[InstitutionOutSchema]])

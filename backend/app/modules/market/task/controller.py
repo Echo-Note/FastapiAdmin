@@ -15,7 +15,6 @@ from ..settlement.service import SettlementService
 from .schema import (
     TaskCreateSchema,
     TaskOutSchema,
-    TaskPublishSchema,
     TaskQueryParam,
     TaskTypeCreateSchema,
     TaskTypeOutSchema,
@@ -139,10 +138,19 @@ async def publish_task_controller(
     db: Annotated[AsyncSession, Depends(db_getter)],
     redis: Annotated[Redis, Depends(redis_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
-    data: Annotated[TaskPublishSchema | None, Body(description="发布参数")] = None,
 ) -> JSONResponse:
-    result = await TaskService(auth, db).publish(redis=redis, id=id, data=data)
+    result = await TaskService(auth, db).publish(redis=redis, id=id)
     return SuccessResponse(data=result, msg="发布任务成功")
+
+
+@TaskRouter.post("/complete/{id}", summary="判定任务完成(运营)", response_model=ResponseSchema[TaskOutSchema])
+async def complete_task_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:complete"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="任务ID", ge=1)],
+) -> JSONResponse:
+    result = await TaskService(auth, db).complete(id=id)
+    return SuccessResponse(data=result, msg="任务完成判定成功")
 
 
 @TaskRouter.post("/settle/{id}", summary="触发归集结算", response_model=ResponseSchema[list[SettlementOutSchema]])

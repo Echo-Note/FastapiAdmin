@@ -88,7 +88,7 @@ import type { FormSchemaField, FormSchemaFieldType, FormSchemaOption } from "@/a
 
 defineOptions({ name: "FormSchemaEditor" });
 
-const props = defineProps<{ modelValue: FormSchemaField[] }>();
+const props = defineProps<{ modelValue?: FormSchemaField[] }>();
 const emit = defineEmits<{ (e: "update:modelValue", value: FormSchemaField[]): void }>();
 
 /** 字段类型下拉选项 */
@@ -116,7 +116,7 @@ const EXAMPLE_FIELDS: FormSchemaField[] = [
 ];
 
 const fields = computed<FormSchemaField[]>({
-  get: () => props.modelValue,
+  get: () => props.modelValue ?? [],
   set: (val) => emit("update:modelValue", val),
 });
 
@@ -142,7 +142,7 @@ function handleAdd() {
 
 function handleEdit(index: number) {
   editingIndex.value = index;
-  const src = fields.value[index];
+  const src = fields.value[index]!;
   editing.value = {
     name: src.name,
     label: src.label,
@@ -205,7 +205,9 @@ function move(index: number, dir: -1 | 1) {
   const target = index + dir;
   if (target < 0 || target >= fields.value.length) return;
   const next = [...fields.value];
-  [next[index], next[target]] = [next[target], next[index]];
+  const a = next[index]!;
+  next[index] = next[target]!;
+  next[target] = a;
   fields.value = next;
 }
 

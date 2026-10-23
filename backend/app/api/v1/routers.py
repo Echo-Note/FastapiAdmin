@@ -9,7 +9,8 @@ from app.modules.market.assignment.controller import AssignmentRouter
 from app.modules.market.company.controller import CompanyRouter
 from app.modules.market.institution.controller import InstitutionRouter
 from app.modules.market.mini_controller import MiniRouter
-from app.modules.market.quota.controller import QuotaRouter
+from app.modules.market.payout.controller import PayoutRouter
+from app.modules.market.project.controller import ProjectRouter
 from app.modules.market.report.controller import ReportRouter
 from app.modules.market.settlement.controller import SettlementRouter
 from app.modules.market.submission.controller import SubmissionRouter
@@ -76,11 +77,12 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
         InstitutionRouter,
         TaskTypeRouter,
         TaskRouter,
+        ProjectRouter,
         AssignmentRouter,
         SubmissionRouter,
         SettlementRouter,
         ReportRouter,
-        QuotaRouter,
+        PayoutRouter,
     ],
 }
 

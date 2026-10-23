@@ -117,7 +117,6 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "task.period", label: "周期", width: 90, formatter: (row: AssignmentTable) => row.task?.period ?? "—" },
         { prop: "user_id", label: "接收用户", minWidth: 130, formatter: (row: AssignmentTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
         { prop: "source", label: "来源", width: 96, status: ASSIGNMENT_SOURCE_MAP },
-        { prop: "assign_amount", label: "接收金额", width: 110, align: "right" },
         { prop: "status", label: "状态", width: 92, status: ASSIGNMENT_STATUS_MAP },
         { prop: "accepted_at", label: "接收时间", width: 168, showOverflowTooltip: true },
         { prop: "submitted_at", label: "首次提交", width: 168, showOverflowTooltip: true },
@@ -147,7 +146,7 @@ async function loadOptions() {
     TaskAPI.listTask({ page_no: 1, page_size: 100 }),
     UserAPI.listUser({ page_no: 1, page_size: 100 }),
   ]);
-  taskOptions.value = taskRes.data.data.items.map((t) => ({ value: t.id!, label: `${t.task_no ?? ""}（${t.company?.name ?? "—"}）` }));
+  taskOptions.value = taskRes.data.data.items.map((t) => ({ value: t.id!, label: `${t.task_no ?? ""}（${t.task_kind === "quota" ? "定额" : "周期性"}）` }));
   userOptions.value = userRes.data.data.items.map((u) => ({ value: u.id!, label: `${u.name ?? u.username ?? ""}` }));
   userMap.value = Object.fromEntries(userRes.data.data.items.map((u) => [u.id!, u.name ?? u.username ?? ""]));
 }

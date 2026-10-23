@@ -22,17 +22,16 @@ export interface TaskItem {
   task_no?: string
   task_type_id?: number
   task_type?: { id?: number, name?: string, unit?: string, form_schema?: FormSchemaField[] } | null
-  company_id?: number
-  company?: { id?: number, name?: string } | null
+  task_kind?: string
   period?: string
+  exec_time_start?: string | null
+  exec_time_end?: string | null
   unit_price?: number
   exec_qty?: number
   assign_mode?: string
-  assign_limit?: number | null
   claimed_count?: number
   status?: string
   published_at?: string | null
-  deadline_at?: string | null
 }
 
 /** 任务分派/接收（我的任务） */
@@ -41,19 +40,18 @@ export interface AssignmentItem {
   task_id?: number
   user_id?: number
   source?: string
-  assign_amount?: number
   status?: string
   accepted_at?: string | null
   submitted_at?: string | null
   task?: {
     id?: number
     task_no?: string
+    task_kind?: string
     period?: string
     unit_price?: number
     exec_qty?: number
     status?: string
-    deadline_at?: string | null
-    company?: { id?: number, name?: string } | null
+    exec_time_end?: string | null
     task_type?: {
       id?: number
       name?: string
@@ -67,7 +65,7 @@ export interface AssignmentItem {
 export interface FormSchemaField {
   name: string
   label?: string
-  type?: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'radio' | 'checkbox' | 'image' | 'file'
+  type?: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file'
   required?: boolean
   placeholder?: string
   options?: { label: string, value: string | number }[]
@@ -99,18 +97,16 @@ export interface InstitutionItem {
   address?: string
 }
 
-/** 我的额度/收益 */
-export interface QuotaSummary {
+/** 我的发放/津贴（对应后端 mini/payout 返回） */
+export interface PayoutSummary {
   user_id?: number
   period?: string
-  quota_amount?: number | null
-  received_amount?: number
-  payable_amount?: number
-  over_amount?: number
-  carryover_items?: {
+  payout_limit?: number
+  allowance_balance?: number
+  allowance_items?: {
     id?: number
+    user_id?: number
     from_period?: string
-    to_period?: string
     amount?: number
     status?: string
   }[]
@@ -152,10 +148,10 @@ export const MarketAPI = {
     return http.Get<MarketPageResult<SubmissionItem>>(`${MARKET_BASE}/mini/submissions`, params)
   },
 
-  /** 我的额度/收益 */
-  getMyQuota(period: string) {
+  /** 我的发放额度/津贴 */
+  getMyPayout(period: string) {
     const params: Record<string, any> = { period }
-    const method = http.Get<QuotaSummary>(`${MARKET_BASE}/mini/quota`, params)
+    const method = http.Get<PayoutSummary>(`${MARKET_BASE}/mini/payout`, params)
     method.config.cacheFor = 0
     return method
   },

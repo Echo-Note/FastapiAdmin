@@ -58,6 +58,7 @@ export interface TaskTypeTable extends BaseType {
   service_task?: string;
   unit?: string;
   default_price?: number;
+  default_kind?: string;
   exec_standard?: string;
   required?: boolean;
   form_schema?: FormSchemaField[];
@@ -71,6 +72,7 @@ export interface TaskTypeForm extends BaseFormType {
   service_task?: string;
   unit?: string;
   default_price?: number;
+  default_kind?: string;
   exec_standard?: string;
   required?: boolean;
   form_schema?: FormSchemaField[];

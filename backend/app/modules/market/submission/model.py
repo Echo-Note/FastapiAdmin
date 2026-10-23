@@ -27,6 +27,7 @@ class SubmissionModel(ModelMixin, UserMixin):
     institution_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_institution.id", ondelete="RESTRICT"), nullable=False, index=True, comment="对象机构ID")
     region: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="区域")
     archive_no: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True, comment="开发档案编号")
+    period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="提交月份(用于周期性任务单月一次约束)")
     form_data: Mapped[dict[str, Any]] = mapped_column(JSONType, nullable=False, comment="采集表单数据(异构)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="成果状态")
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, comment="版本(驳回重提+1)")

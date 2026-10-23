@@ -47,7 +47,7 @@ function statusInfo(status?: string) {
 }
 
 function amountText(item: AssignmentItem) {
-  return `¥${Number(item.assign_amount ?? 0).toFixed(2)}`
+  return `¥${Number(item.task?.unit_price ?? 0).toFixed(2)}`
 }
 
 /** 可提交成果的状态：已接收 / 进行中 / 已提交（驳回可重提）/ 已审核 */
@@ -108,9 +108,9 @@ onLoad(() => loadData())
               <wd-tag :type="statusInfo(item.status).type" plain :title="statusInfo(item.status).label" />
             </view>
             <view class="mt-2 flex items-center gap-3">
-              <wd-text class="wot-text-text-auxiliary text-2.5" :text="item.task?.company?.name ?? '-'" />
+              <wd-text class="wot-text-text-auxiliary text-2.5" :text="item.task?.task_kind === 'quota' ? '定额' : '周期性'" />
               <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.task?.period ?? '-'}`" />
-              <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${(item.task?.deadline_at || '').slice(0, 10)}`" />
+              <wd-text v-if="item.task?.exec_time_end" class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${(item.task?.exec_time_end || '').slice(0, 10)}`" />
             </view>
             <view class="mt-3 flex items-center justify-between">
               <view>
