@@ -21,6 +21,8 @@ NAMING_CONVENTION: dict[str, str] = {
 
 # 跨方言 JSON 类型：PostgreSQL（生产）使用 JSONB，SQLite/MySQL（测试环境）降级为
 # 通用 JSON，保证 create_all 与 autogenerate 在三种方言下均可渲染、零漂移。
+# 各模块定义 JSON 列时统一使用 JSONType，而非直接硬编码 JSONB，避免破坏基类
+# 「兼容 SQLite、MySQL 和 PostgreSQL」的承诺。
 JSONType = JSONB().with_variant(JSON(), "sqlite", "mysql")
 
 
