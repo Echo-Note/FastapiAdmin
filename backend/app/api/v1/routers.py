@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.modules.ai.chat.controller import ChatRouter
 from app.modules.common.file.controller import FileRouter
+from app.modules.dbconsole.controller import DbConsoleRouter
 from app.modules.generator.gencode.controller import GenRouter
 from app.modules.market.assignment.controller import AssignmentRouter
 from app.modules.market.company.controller import CompanyRouter
@@ -18,6 +19,7 @@ from app.modules.monitor.cache.controller import CacheRouter
 from app.modules.monitor.health.controller import HealthRouter
 from app.modules.monitor.online.controller import OnlineRouter
 from app.modules.monitor.server.controller import ServerRouter
+from app.modules.ops.ssh.controller import SshRouter
 from app.modules.system.auth.controller import AuthRouter
 from app.modules.system.dept.controller import DeptRouter
 from app.modules.system.dict.controller import DictRouter
@@ -82,6 +84,8 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
         ReportRouter,
         QuotaRouter,
     ],
+    "/dbconsole": [DbConsoleRouter],
+    "/ops": [SshRouter],
 }
 
 api_v1 = APIRouter()
