@@ -24,6 +24,9 @@ _ASSIGNMENT_PRELOAD = [
     "task.task_type",
     "task.task_type.created_by",
     "task.task_type.updated_by",
+    "task.task_type.template",
+    "task.task_type.template.created_by",
+    "task.task_type.template.updated_by",
     "task.project_links",
 ]
 
@@ -104,6 +107,8 @@ class AssignmentService:
             raise CustomException(msg="该任务不可接收（已接收或已处理）")
         if assignment.user_id != self.auth.user.id:
             raise CustomException(msg="无权接收该任务")
+        if assignment.task.exec_time_end is not None and assignment.task.exec_time_end <= datetime.now(UTC):
+            raise CustomException(msg="该任务已超出限定时间范围，不可接收")
 
         await AssignmentCRUD(self.auth, self.db).update(
             id=id,

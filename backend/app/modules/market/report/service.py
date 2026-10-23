@@ -10,8 +10,9 @@ from app.utils.common_util import search_to_dict
 from ..company.crud import CompanyCRUD
 from ..enums import ReportStatus, SettlementStatus
 from ..project.crud import ProjectCRUD, ProjectTaskCRUD
+from ..service_item.crud import ServiceItemCRUD
 from ..settlement.crud import SettlementCRUD
-from ..task.crud import TaskCRUD
+from ..task.crud import TaskCRUD, TaskTypeCRUD
 from .crud import ReportCRUD
 from .schema import ReportCreateSchema, ReportOutSchema, ReportQueryParam
 
@@ -51,8 +52,15 @@ class ReportService:
         )
 
     async def generate(self, data: ReportCreateSchema) -> ReportOutSchema:
-        """生成报告：按医药公司 × 周期汇总各项目下任务的完成量与结算金额。"""
+        """生成报告：按医药公司 × 周期汇总各项目下任务的完成量与结算金额。
+
+        可指定 ``service_item_id`` / ``task_type_id`` 生成某一服务项目/任务类型的独立报告（一期默认可空，按公司汇总）。
+        """
         await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
+        if data.service_item_id:
+            await ServiceItemCRUD(self.auth, self.db).get_or_404(id=data.service_item_id, msg="对外服务项目不存在")
+        if data.task_type_id:
+            await TaskTypeCRUD(self.auth, self.db).get_or_404(id=data.task_type_id, msg="任务类型不存在")
 
         # 该周期下该医药公司的所有项目
         projects = await ProjectCRUD(self.auth, self.db).get_list(
@@ -102,6 +110,8 @@ class ReportService:
         report = await ReportCRUD(self.auth, self.db).create(
             data={
                 "company_id": data.company_id,
+                "service_item_id": data.service_item_id,
+                "task_type_id": data.task_type_id,
                 "period": data.period,
                 "summary": summary,
                 "status": ReportStatus.GENERATED.value,

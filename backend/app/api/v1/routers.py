@@ -13,9 +13,11 @@ from app.modules.market.mini_controller import MiniRouter
 from app.modules.market.payout.controller import PayoutRouter
 from app.modules.market.project.controller import ProjectRouter
 from app.modules.market.report.controller import ReportRouter
+from app.modules.market.service_item.controller import ServiceItemRouter
 from app.modules.market.settlement.controller import SettlementRouter
 from app.modules.market.submission.controller import SubmissionRouter
 from app.modules.market.task.controller import TaskRouter, TaskTypeRouter
+from app.modules.market.template.controller import TemplateRouter
 from app.modules.monitor.cache.controller import CacheRouter
 from app.modules.monitor.health.controller import HealthRouter
 from app.modules.monitor.online.controller import OnlineRouter
@@ -77,11 +79,13 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
         MiniRouter,
         CompanyRouter,
         InstitutionRouter,
+        TemplateRouter,
         TaskTypeRouter,
         TaskRouter,
         ProjectRouter,
         AssignmentRouter,
         SubmissionRouter,
+        ServiceItemRouter,
         SettlementRouter,
         ReportRouter,
         PayoutRouter,

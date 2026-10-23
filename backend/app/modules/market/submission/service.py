@@ -78,20 +78,22 @@ class SubmissionService:
         - 定额任务：单用户单月可重复提交，不限次（名额限量已在接单环节占用）。
         """
         assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(
-            id=data.assignment_id, msg="任务实例不存在", preload=["task", "task.task_type"]
+            id=data.assignment_id, msg="任务实例不存在", preload=["task", "task.task_type", "task.task_type.template"]
         )
         if assignment.user_id != self.auth.user.id:
             raise CustomException(msg="无权向该任务提交成果")
         if assignment.status not in {AssignmentStatus.ACCEPTED.value, AssignmentStatus.SUBMITTING.value, AssignmentStatus.SUBMITTED.value}:
             raise CustomException(msg="任务尚未接收或已结束，无法提交成果")
-        await InstitutionCRUD(self.auth, self.db).get_or_404(id=data.institution_id, msg="机构不存在")
+        # 仅机构类采集对象需校验机构存在；个人类（staff/patient）不关联机构
+        if data.subject_type == "institution" and data.institution_id:
+            await InstitutionCRUD(self.auth, self.db).get_or_404(id=data.institution_id, msg="机构不存在")
 
         task = assignment.task
         period = task.period
 
         # 正式提交时执行规则校验与分类提交约束；草稿不校验
         if data.status == SubmissionStatus.PENDING.value:
-            _validate_form(task.task_type.form_schema, data.form_data)
+            _validate_form(task.task_type.template.form_schema, data.form_data)
             if task.task_kind == TaskKind.PERIODIC.value:
                 # 周期任务：单用户单月仅一次正式提交
                 existed = await SubmissionCRUD(self.auth, self.db).get_list(
@@ -125,10 +127,20 @@ class SubmissionService:
             raise CustomException(msg="仅草稿或已驳回的成果可修改")
 
         new_data: dict[str, Any] = data.model_dump(exclude_unset=True, exclude_none=True)
-        # 驳回重提：版本 +1，重新进入待审核
+        # 驳回重提：版本 +1，重新进入待审核，并校验必填 + 驱动分派状态回流
         if submission.status == SubmissionStatus.REJECTED.value:
+            assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(
+                id=submission.assignment_id, msg="任务实例不存在", preload=["task", "task.task_type", "task.task_type.template"]
+            )
+            # 重提即正式提交：按最终生效的表单数据执行必填校验
+            form_data = new_data.get("form_data", submission.form_data)
+            _validate_form(assignment.task.task_type.template.form_schema, form_data)
             new_data["version"] = submission.version + 1
             new_data["status"] = SubmissionStatus.PENDING.value
+            await SubmissionCRUD(self.auth, self.db).update(id=id, data=new_data)
+            # 驳回后分派回到进行中，重提时重新流转为已提交
+            await AssignmentCRUD(self.auth, self.db).update(id=assignment.id, data={"status": AssignmentStatus.SUBMITTED.value})
+            return await self.detail(id=id)
 
         await SubmissionCRUD(self.auth, self.db).update(id=id, data=new_data)
         return await self.detail(id=id)
@@ -150,6 +162,10 @@ class SubmissionService:
             update_data["review_comment"] = data.comment
 
         await SubmissionCRUD(self.auth, self.db).update(id=id, data=update_data)
+        # 审核（通过/驳回）后任务实例回到进行中：当前待审核成果已清空，
+        # 定额任务可继续提交下一份成果（名额限量在接单环节已占用），
+        # 周期任务由 create 的单月查重拦截，无法重复提交
+        await AssignmentCRUD(self.auth, self.db).update(id=submission.assignment_id, data={"status": AssignmentStatus.SUBMITTING.value})
         return await self.detail(id=id)
 
     async def my_submissions(

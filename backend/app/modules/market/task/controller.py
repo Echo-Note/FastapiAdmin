@@ -147,9 +147,10 @@ async def publish_task_controller(
 async def complete_task_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:complete"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
 ) -> JSONResponse:
-    result = await TaskService(auth, db).complete(id=id)
+    result = await TaskService(auth, db).complete(redis=redis, id=id)
     return SuccessResponse(data=result, msg="任务完成判定成功")
 
 

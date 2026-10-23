@@ -1,0 +1,335 @@
+[
+  {
+    "code": "svc_blank_grade_hospital_dev",
+    "service_no": 1,
+    "name": "空白等级医院开发",
+    "service_type": "合作开发服务",
+    "service_item": "空白等级医院开发",
+    "unit": "元/家",
+    "price": 25000
+  },
+  {
+    "code": "svc_blank_primary_care_dev",
+    "service_no": 2,
+    "name": "空白基层医疗进院开发",
+    "service_type": "合作开发服务",
+    "service_item": "空白基层医疗进院开发",
+    "unit": "元/家",
+    "price": 10000
+  },
+  {
+    "code": "svc_blank_private_medical_dev",
+    "service_no": 3,
+    "name": "空白民营医疗进院开发",
+    "service_type": "合作开发服务",
+    "service_item": "空白民营医疗进院开发",
+    "unit": "元/家",
+    "price": 10000
+  },
+  {
+    "code": "svc_retail_pharmacy_dev",
+    "service_no": 4,
+    "name": "零售药店合作开发",
+    "service_type": "合作开发服务",
+    "service_item": "零售药店合作开发",
+    "unit": "元/家",
+    "price": 1000
+  },
+  {
+    "code": "svc_commercial_channel_maintain",
+    "service_no": 5,
+    "name": "商业渠道维护服务",
+    "service_type": "商务维护服务",
+    "service_item": "商业渠道维护服务",
+    "unit": "元/家/次",
+    "price": 1000
+  },
+  {
+    "code": "svc_grade_hospital_maintain",
+    "service_no": 6,
+    "name": "等级医疗商务维护",
+    "service_type": "商务维护服务",
+    "service_item": "等级医疗商务维护",
+    "unit": "元/家/次",
+    "price": 1000
+  },
+  {
+    "code": "svc_primary_care_maintain",
+    "service_no": 7,
+    "name": "基层医疗商务维护",
+    "service_type": "商务维护服务",
+    "service_item": "基层医疗商务维护",
+    "unit": "元/家/次",
+    "price": 800
+  },
+  {
+    "code": "svc_private_medical_maintain",
+    "service_no": 8,
+    "name": "民营医疗商务维护",
+    "service_type": "商务维护服务",
+    "service_item": "民营医疗商务维护",
+    "unit": "元/家/次",
+    "price": 800
+  },
+  {
+    "code": "svc_retail_pharmacy_patrol",
+    "service_no": 9,
+    "name": "零售药店日常巡店",
+    "service_type": "商务维护服务",
+    "service_item": "零售药店日常巡店",
+    "unit": "元/家/次",
+    "price": 500
+  },
+  {
+    "code": "svc_commercial_sales_stock",
+    "service_no": 10,
+    "name": "商业公司商销数据收集(进销存)",
+    "service_type": "商业流向收集服务",
+    "service_item": "商业公司商销数据收集(进销存)",
+    "unit": "元/家/次",
+    "price": 500
+  },
+  {
+    "code": "svc_commercial_pure_sales",
+    "service_no": 11,
+    "name": "商业公司纯销数据收集(流向)",
+    "service_type": "商业流向收集服务",
+    "service_item": "商业公司纯销数据收集(流向)",
+    "unit": "元/家/次",
+    "price": 500
+  },
+  {
+    "code": "svc_grade_hospital_drug_data",
+    "service_no": 12,
+    "name": "等级医院用药数据收集",
+    "service_type": "用药数据收集服务",
+    "service_item": "等级医院用药数据收集",
+    "unit": "元/家/次",
+    "price": 1000
+  },
+  {
+    "code": "svc_primary_care_drug_data",
+    "service_no": 13,
+    "name": "基层医疗用药数据收集",
+    "service_type": "用药数据收集服务",
+    "service_item": "基层医疗用药数据收集",
+    "unit": "元/家/次",
+    "price": 800
+  },
+  {
+    "code": "svc_private_medical_drug_data",
+    "service_no": 14,
+    "name": "民营医疗用药数据收集",
+    "service_type": "用药数据收集服务",
+    "service_item": "民营医疗用药数据收集",
+    "unit": "元/家/次",
+    "price": 800
+  },
+  {
+    "code": "svc_retail_pharmacy_sales_data",
+    "service_no": 15,
+    "name": "零售药店销售数据收集",
+    "service_type": "用药数据收集服务",
+    "service_item": "零售药店销售数据收集",
+    "unit": "元/家/次",
+    "price": 500
+  },
+  {
+    "code": "svc_commercial_channel_research",
+    "service_no": 16,
+    "name": "商业渠道调研信息收集",
+    "service_type": "机构调研服务",
+    "service_item": "商业渠道调研信息收集",
+    "unit": "元/家/次",
+    "price": 800
+  },
+  {
+    "code": "svc_grade_hospital_research",
+    "service_no": 17,
+    "name": "等级医院调研信息收集",
+    "service_type": "机构调研服务",
+    "service_item": "等级医院调研信息收集",
+    "unit": "元/家/次",
+    "price": 800
+  },
+  {
+    "code": "svc_primary_care_research",
+    "service_no": 18,
+    "name": "基层医疗调研信息收集",
+    "service_type": "机构调研服务",
+    "service_item": "基层医疗调研信息收集",
+    "unit": "元/家/次",
+    "price": 600
+  },
+  {
+    "code": "svc_private_medical_research",
+    "service_no": 19,
+    "name": "民营医疗调研信息收集",
+    "service_type": "机构调研服务",
+    "service_item": "民营医疗调研信息收集",
+    "unit": "元/家/次",
+    "price": 600
+  },
+  {
+    "code": "svc_retail_pharmacy_research",
+    "service_no": 20,
+    "name": "零售药店调研信息收集",
+    "service_type": "机构调研服务",
+    "service_item": "零售药店调研信息收集",
+    "unit": "元/家/次",
+    "price": 500
+  },
+  {
+    "code": "svc_physician_medication_habit",
+    "service_no": 21,
+    "name": "临床用药习惯调研",
+    "service_type": "医务人员访谈服务",
+    "service_item": "临床用药习惯调研",
+    "unit": "元/份",
+    "price": 400
+  },
+  {
+    "code": "svc_physician_awareness",
+    "service_no": 22,
+    "name": "认知度调研",
+    "service_type": "医务人员访谈服务",
+    "service_item": "认知度调研",
+    "unit": "元/份",
+    "price": 400
+  },
+  {
+    "code": "svc_physician_academic_need",
+    "service_no": 23,
+    "name": "学术培训需求调研",
+    "service_type": "医务人员访谈服务",
+    "service_item": "学术培训需求调研",
+    "unit": "元/份",
+    "price": 400
+  },
+  {
+    "code": "svc_pharmacist_recommend_habit",
+    "service_no": 24,
+    "name": "产品推荐习惯调研",
+    "service_type": "药店店员访谈服务",
+    "service_item": "产品推荐习惯调研",
+    "unit": "元/份",
+    "price": 200
+  },
+  {
+    "code": "svc_pharmacist_awareness",
+    "service_no": 25,
+    "name": "认知度调研",
+    "service_type": "药店店员访谈服务",
+    "service_item": "认知度调研",
+    "unit": "元/份",
+    "price": 200
+  },
+  {
+    "code": "svc_pharmacist_training_need",
+    "service_no": 26,
+    "name": "学术培训需求调研",
+    "service_type": "药店店员访谈服务",
+    "service_item": "学术培训需求调研",
+    "unit": "元/份",
+    "price": 200
+  },
+  {
+    "code": "svc_patient_awareness",
+    "service_no": 27,
+    "name": "认知度调研",
+    "service_type": "患者访谈服务",
+    "service_item": "认知度调研",
+    "unit": "元/份",
+    "price": 100
+  },
+  {
+    "code": "svc_competitor_marketing",
+    "service_no": 28,
+    "name": "竞品营销数据收集",
+    "service_type": "竞品数据服务",
+    "service_item": "竞品营销数据收集",
+    "unit": "元/次",
+    "price": 1200
+  },
+  {
+    "code": "svc_competitor_activity",
+    "service_no": 29,
+    "name": "竞品活动信息收集",
+    "service_type": "竞品数据服务",
+    "service_item": "竞品活动信息收集",
+    "unit": "元/次",
+    "price": 1200
+  },
+  {
+    "code": "svc_market_potential",
+    "service_no": 30,
+    "name": "市场潜力数据收集",
+    "service_type": "市场数据服务",
+    "service_item": "市场潜力数据收集",
+    "unit": "元/次",
+    "price": 1500
+  },
+  {
+    "code": "svc_market_share",
+    "service_no": 31,
+    "name": "市场占有数据收集",
+    "service_type": "市场数据服务",
+    "service_item": "市场占有数据收集",
+    "unit": "元/次",
+    "price": 1500
+  },
+  {
+    "code": "svc_academic_material_promo",
+    "service_no": 32,
+    "name": "学术资料宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "学术资料宣传服务",
+    "unit": "元/次",
+    "price": 300
+  },
+  {
+    "code": "svc_product_brand_promo",
+    "service_no": 33,
+    "name": "产品品牌宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "产品品牌宣传服务",
+    "unit": "元/次",
+    "price": 300
+  },
+  {
+    "code": "svc_corp_brand_promo",
+    "service_no": 34,
+    "name": "企业品牌宣传服务",
+    "service_type": "宣传服务",
+    "service_item": "企业品牌宣传服务",
+    "unit": "元/次",
+    "price": 300
+  },
+  {
+    "code": "svc_patient_feedback",
+    "service_no": 35,
+    "name": "患者用药反馈",
+    "service_type": "专项调研服务",
+    "service_item": "患者用药反馈",
+    "unit": "元/份",
+    "price": 1000
+  },
+  {
+    "code": "svc_survey_region_report",
+    "service_no": 36,
+    "name": "问卷调研报告-区域报告",
+    "service_type": "调研报告服务",
+    "service_item": "问卷调研报告-区域报告",
+    "unit": "元/份",
+    "price": 6000
+  },
+  {
+    "code": "svc_survey_deep_report",
+    "service_no": 37,
+    "name": "问卷调研报告-深度报告",
+    "service_type": "调研报告服务",
+    "service_item": "问卷调研报告-深度报告",
+    "unit": "元/份",
+    "price": 30000
+  }
+]

@@ -24,7 +24,9 @@ class SubmissionModel(ModelMixin, UserMixin):
 
     assignment_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_assignment.id", ondelete="RESTRICT"), nullable=False, index=True, comment="归属任务实例ID")
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("sys_user.id", ondelete="RESTRICT"), nullable=False, index=True, comment="提交人ID")
-    institution_id: Mapped[int] = mapped_column(Integer, ForeignKey("market_institution.id", ondelete="RESTRICT"), nullable=False, index=True, comment="对象机构ID")
+    subject_type: Mapped[str] = mapped_column(String(32), nullable=False, default="institution", index=True, comment="采集对象类型(institution 机构/staff 医务人员·店员/patient 患者)")
+    institution_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("market_institution.id", ondelete="RESTRICT"), nullable=True, index=True, comment="对象机构ID(仅 subject_type=institution 时必填)")
+    subject_name: Mapped[str | None] = mapped_column(String(128), nullable=True, comment="对象名称/昵称(staff/patient 时必填，如受访医务人员昵称、患者编号)")
     region: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="区域")
     archive_no: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True, comment="开发档案编号")
     period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="提交月份(用于周期性任务单月一次约束)")

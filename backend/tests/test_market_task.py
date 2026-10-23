@@ -20,18 +20,41 @@ def _create_project(client: TestClient, headers: dict, code: str, company_id: in
     return resp.json()["data"]["items"][0]["id"]
 
 
+_TASK_NO_COUNTER = 100  # 避开种子任务号 1-44
+
+
+def _create_template(client: TestClient, headers: dict, code: str) -> int:
+    """创建采集模板（含 form_schema），返回模板 ID。"""
+    client.post(
+        "/market/templates/create",
+        json={
+            "code": code,
+            "name": f"模板{code}",
+            "scope": "1-4",
+            "form_schema": [{"name": "hospital_name", "label": "医院名称", "type": "text", "required": True}],
+        },
+        headers=headers,
+    )
+    resp = client.get("/market/templates/list", params={"code": code}, headers=headers)
+    return resp.json()["data"]["items"][0]["id"]
+
+
 def _create_task_type(client: TestClient, headers: dict, code: str) -> int:
+    global _TASK_NO_COUNTER
+    template_id = _create_template(client, headers, f"tpl_{code}")
+    _TASK_NO_COUNTER += 1
     client.post(
         "/market/task-types/create",
         json={
             "code": code,
             "name": f"类型{code}",
+            "task_no": _TASK_NO_COUNTER,
+            "template_id": template_id,
             "service_type": "医院管理",
             "service_item": "等级医院",
             "service_task": "等级医院管理",
             "unit": "家/月",
             "default_price": 3000,
-            "form_schema": [{"name": "hospital_name", "label": "医院名称", "required": True}],
         },
         headers=headers,
     )
@@ -41,18 +64,20 @@ def _create_task_type(client: TestClient, headers: dict, code: str) -> int:
 
 class TestTaskType:
     def test_create(self, test_client: TestClient, auth_headers: dict) -> None:
+        template_id = _create_template(test_client, auth_headers, "tpl_tt_create")
         resp = test_client.post(
             "/market/task-types/create",
-            json={"code": "tt_create", "name": "创建类型", "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 100, "form_schema": []},
+            json={"code": "tt_create", "name": "创建类型", "task_no": 200, "template_id": template_id, "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 100},
             headers=auth_headers,
         )
         assert resp.json()["success"] is True
         assert resp.json()["data"]["name"] == "创建类型"
 
     def test_create_duplicate_code_fails(self, test_client: TestClient, auth_headers: dict) -> None:
+        template_id = _create_template(test_client, auth_headers, "tpl_tt_dup")
         resp = test_client.post(
             "/market/task-types/create",
-            json={"code": "tt_create", "name": "重复编码", "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 100, "form_schema": []},
+            json={"code": "tt_create", "name": "重复编码", "task_no": 201, "template_id": template_id, "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 100},
             headers=auth_headers,
         )
         assert resp.json()["success"] is False
@@ -66,9 +91,10 @@ class TestTaskType:
 
     def test_delete(self, test_client: TestClient, auth_headers: dict) -> None:
         client = test_client
+        template_id = _create_template(test_client, auth_headers, "tpl_tt_del")
         client.post(
             "/market/task-types/create",
-            json={"code": "tt_del", "name": "待删类型", "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 100, "form_schema": []},
+            json={"code": "tt_del", "name": "待删类型", "task_no": 202, "template_id": template_id, "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 100},
             headers=auth_headers,
         )
         resp = client.get("/market/task-types/list", params={"code": "tt_del"}, headers=auth_headers)

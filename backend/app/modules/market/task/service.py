@@ -12,6 +12,7 @@ from app.utils.common_util import search_to_dict
 
 from ..enums import TaskKind, TaskStatus
 from ..project.crud import ProjectCRUD, ProjectTaskCRUD
+from ..template.crud import TemplateCRUD
 from .crud import TaskCRUD, TaskTypeCRUD
 from .schema import (
     TaskCreateSchema,
@@ -24,14 +25,20 @@ from .schema import (
     TaskUpdateSchema,
 )
 
-# task_type 为 UserBySchema（含 created_by/updated_by），必须嵌套预加载其审计关系，
-# 避免 detail()/page() 序列化时在异步环境下触发懒加载 MissingGreenlet
+# task_type 为 UserBySchema（含 created_by/updated_by），且其嵌套的 template 亦为 UserBySchema，
+# 必须完整预加载各层审计关系，避免 detail()/page() 序列化时在异步环境下触发懒加载 MissingGreenlet
 _TASK_PRELOAD = [
     "task_type",
     "task_type.created_by",
     "task_type.updated_by",
+    "task_type.template",
+    "task_type.template.created_by",
+    "task_type.template.updated_by",
     "project_links",
 ]
+
+# 任务类型详情/分页需预加载其所属采集模板（含 form_schema）及模板审计关系
+_TASK_TYPE_PRELOAD = ["template", "template.created_by", "template.updated_by"]
 
 
 class TaskTypeService:
@@ -42,8 +49,8 @@ class TaskTypeService:
         self.db = db
 
     async def detail(self, id: int) -> TaskTypeOutSchema:
-        """查询任务类型模板详情。"""
-        task_type = await TaskTypeCRUD(self.auth, self.db).get_or_404(id=id)
+        """查询任务类型（计价项）详情。"""
+        task_type = await TaskTypeCRUD(self.auth, self.db).get_or_404(id=id, preload=_TASK_TYPE_PRELOAD)
         return TaskTypeOutSchema.model_validate(task_type)
 
     async def page(
@@ -53,28 +60,36 @@ class TaskTypeService:
         search: TaskTypeQueryParam | None = None,
         order_by: list[dict[str, str]] | None = None,
     ) -> PageResultSchema[TaskTypeOutSchema]:
-        """分页查询任务类型模板。"""
+        """分页查询任务类型（计价项）。"""
         offset = (page_no - 1) * page_size
         return await TaskTypeCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
-            order_by=order_by or [{"id": "asc"}],
+            order_by=order_by or [{"task_no": "asc"}],
             search=search_to_dict(search),
             out_schema=TaskTypeOutSchema,
+            preload=_TASK_TYPE_PRELOAD,
         )
 
     async def create(self, data: TaskTypeCreateSchema) -> TaskTypeOutSchema:
-        """创建任务类型模板。"""
+        """创建任务类型（计价项）。"""
         if await TaskTypeCRUD(self.auth, self.db).get(code=data.code):
             raise CustomException(msg="已存在相同编码的任务类型")
+        if await TaskTypeCRUD(self.auth, self.db).get(task_no=data.task_no):
+            raise CustomException(msg="已存在相同任务号的任务类型")
+        await TemplateCRUD(self.auth, self.db).get_or_404(id=data.template_id, msg="采集模板不存在")
         task_type = await TaskTypeCRUD(self.auth, self.db).create(data=data)
-        return TaskTypeOutSchema.model_validate(task_type)
+        return await self.detail(id=task_type.id)
 
     async def update(self, id: int, data: TaskTypeUpdateSchema) -> TaskTypeOutSchema:
-        """更新任务类型模板。"""
+        """更新任务类型（计价项）。"""
         await TaskTypeCRUD(self.auth, self.db).get_or_404(id=id)
         if data.code and (exist := await TaskTypeCRUD(self.auth, self.db).get(code=data.code)) and exist.id != id:
             raise CustomException(msg="已存在相同编码的任务类型")
+        if data.task_no and (exist := await TaskTypeCRUD(self.auth, self.db).get(task_no=data.task_no)) and exist.id != id:
+            raise CustomException(msg="已存在相同任务号的任务类型")
+        if data.template_id:
+            await TemplateCRUD(self.auth, self.db).get_or_404(id=data.template_id, msg="采集模板不存在")
         await TaskTypeCRUD(self.auth, self.db).update(id=id, data=data)
         return await self.detail(id=id)
 
@@ -173,7 +188,7 @@ class TaskService:
         await TaskCRUD(self.auth, self.db).update(id=id, data=update_data)
         return await self.detail(id=id)
 
-    async def complete(self, id: int) -> TaskOutSchema:
+    async def complete(self, redis: Redis, id: int) -> TaskOutSchema:
         """判定任务完成（运营手动）：PUBLISHED / IN_PROGRESS → COMPLETED。"""
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status not in {TaskStatus.PUBLISHED.value, TaskStatus.IN_PROGRESS.value}:
@@ -182,6 +197,10 @@ class TaskService:
             id=id,
             data={"status": TaskStatus.COMPLETED.value, "completed_by": self.auth.user.id, "completed_at": datetime.now(UTC)},
         )
+        # 定额任务完成后清理 Redis 接单计数，避免残留
+        if task.task_kind == TaskKind.QUOTA.value:
+            claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{id}"
+            await RedisCURD(redis).delete(claim_key)
         return await self.detail(id=id)
 
     async def _sync_project_links(self, task_id: int, project_ids: list[int]) -> None:

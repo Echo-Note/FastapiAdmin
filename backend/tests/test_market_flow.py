@@ -39,10 +39,22 @@ def _create_project(client: TestClient, headers: dict, code: str, company_id: in
     return client.get("/market/projects/list", params={"code": code}, headers=headers).json()["data"]["items"][0]["id"]
 
 
+_FLOW_TASK_NO_COUNTER = 1000  # 避开种子任务号 1-44
+
+
 def _create_task_type(client: TestClient, headers: dict, code: str) -> int:
+    """创建模板 + 任务类型（计价项），返回任务类型 ID。"""
+    client.post(
+        "/market/templates/create",
+        json={"code": f"tpl_{code}", "name": f"模板{code}", "scope": "1-4", "form_schema": [{"name": "hospital_name", "label": "医院名称", "type": "text", "required": True}]},
+        headers=headers,
+    )
+    template_id = client.get("/market/templates/list", params={"code": f"tpl_{code}"}, headers=headers).json()["data"]["items"][0]["id"]
+    global _FLOW_TASK_NO_COUNTER
+    _FLOW_TASK_NO_COUNTER += 1
     client.post(
         "/market/task-types/create",
-        json={"code": code, "name": code, "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 3000, "form_schema": [{"name": "hospital_name", "label": "医院名称", "required": True}]},
+        json={"code": code, "name": code, "task_no": _FLOW_TASK_NO_COUNTER, "template_id": template_id, "service_type": "医院管理", "service_item": "等级医院", "service_task": "采集", "unit": "家/月", "default_price": 3000},
         headers=headers,
     )
     return client.get("/market/task-types/list", params={"code": code}, headers=headers).json()["data"]["items"][0]["id"]

@@ -4,42 +4,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
 from app.core.validator import DateTimeStr
-
-
-class FormSchemaOption(BaseModel):
-    """采集字段选项（select/radio/checkbox 的可选项）。"""
-
-    label: str = Field(description="选项显示名")
-    value: str = Field(description="选项值")
-
-
-class FormSchemaField(BaseModel):
-    """采集字段定义（驱动小程序端「提交成果」动态表单）。
-
-    每个字段对应表单上的一个输入项：
-    - name      字段唯一标识，作为表单数据的 key（建议英文/拼音，如 hospital_name，勿重复）
-    - label     字段显示名（如 医院名称）
-    - type      字段类型：text/textarea/number/date/select/radio/checkbox/image/file
-    - required  是否必填
-    - options   选项列表（仅 select/radio/checkbox 需要）
-    - image     图片上传（如打卡照片、机构内/外部照片），file 为文件附件（如合同、单据、宣传资料）
-    """
-
-    name: str = Field(min_length=1, max_length=64, description="字段唯一标识(建议英文/拼音，如 hospital_name)")
-    label: str = Field(min_length=1, max_length=128, description="字段显示名(如 医院名称)")
-    type: Literal["text", "textarea", "number", "date", "select", "radio", "checkbox", "image", "file"] = Field(default="text", description="字段类型")
-    required: bool = Field(default=False, description="是否必填")
-    placeholder: str | None = Field(default=None, max_length=255, description="输入占位提示")
-    options: list[FormSchemaOption] | None = Field(default=None, description="选项列表(仅 select/radio/checkbox 需要)")
+from app.modules.market.template.schema import TemplateOutSchema
 
 
 class TaskTypeOutSchema(BaseSchema, UserBySchema):
-    """任务类型模板响应模型"""
+    """任务类型（对内计价项）响应模型"""
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="唯一编码(如 hospital_manage)")
+    code: str = Field(description="唯一编码(如 hospital_delivery)")
     name: str = Field(description="任务类型名")
+    task_no: int = Field(description="任务号(1-44)")
+    template_id: int = Field(description="所属采集模板ID")
+    template: TemplateOutSchema | None = Field(default=None, description="所属采集模板(含 form_schema)")
     service_type: str = Field(description="结算单三级-类型")
     service_item: str = Field(description="结算单三级-项目")
     service_task: str = Field(description="结算单三级-任务")
@@ -48,14 +25,18 @@ class TaskTypeOutSchema(BaseSchema, UserBySchema):
     default_kind: str = Field(default="periodic", description="默认任务分类(periodic 周期性/quota 定额)")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool = Field(default=False, description="是否必选")
-    form_schema: list[FormSchemaField] = Field(default_factory=list, description="采集字段 Schema")
+    min_qty: int | None = Field(default=None, description="必选最低执行数量")
+    max_per_period: int | None = Field(default=None, description="周期内执行次数上限")
+    dedup_rule: str | None = Field(default=None, description="去重约束")
 
 
 class TaskTypeCreateSchema(BaseModel):
-    """创建任务类型模板"""
+    """创建任务类型（计价项）"""
 
-    code: str = Field(min_length=1, max_length=64, description="唯一编码(如 hospital_manage)")
+    code: str = Field(min_length=1, max_length=64, description="唯一编码(如 hospital_delivery)")
     name: str = Field(min_length=1, max_length=128, description="任务类型名")
+    task_no: int = Field(ge=1, le=32767, description="任务号(1-44 为内置计价项序号，新增可延续)")
+    template_id: int = Field(gt=0, description="所属采集模板ID")
     service_type: str = Field(min_length=1, max_length=64, description="结算单三级-类型")
     service_item: str = Field(min_length=1, max_length=64, description="结算单三级-项目")
     service_task: str = Field(min_length=1, max_length=64, description="结算单三级-任务")
@@ -64,14 +45,18 @@ class TaskTypeCreateSchema(BaseModel):
     default_kind: Literal["periodic", "quota"] = Field(default="periodic", description="默认任务分类(periodic 周期性/quota 定额)")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool = Field(default=False, description="是否必选")
-    form_schema: list[FormSchemaField] = Field(default_factory=list, description="采集字段 Schema")
+    min_qty: int | None = Field(default=None, ge=0, description="必选最低执行数量")
+    max_per_period: int | None = Field(default=None, ge=0, description="周期内执行次数上限")
+    dedup_rule: str | None = Field(default=None, max_length=128, description="去重约束")
 
 
 class TaskTypeUpdateSchema(BaseModel):
-    """更新任务类型模板"""
+    """更新任务类型（计价项）"""
 
     code: str | None = Field(default=None, min_length=1, max_length=64, description="唯一编码")
     name: str | None = Field(default=None, min_length=1, max_length=128, description="任务类型名")
+    task_no: int | None = Field(default=None, ge=1, le=32767, description="任务号(1-44 为内置序号，新增可延续)")
+    template_id: int | None = Field(default=None, gt=0, description="所属采集模板ID")
     service_type: str | None = Field(default=None, min_length=1, max_length=64, description="结算单三级-类型")
     service_item: str | None = Field(default=None, min_length=1, max_length=64, description="结算单三级-项目")
     service_task: str | None = Field(default=None, min_length=1, max_length=64, description="结算单三级-任务")
@@ -80,7 +65,9 @@ class TaskTypeUpdateSchema(BaseModel):
     default_kind: Literal["periodic", "quota"] | None = Field(default=None, description="默认任务分类(periodic 周期性/quota 定额)")
     exec_standard: str | None = Field(default=None, description="执行标准")
     required: bool | None = Field(default=None, description="是否必选")
-    form_schema: list[FormSchemaField] | None = Field(default=None, description="采集字段 Schema")
+    min_qty: int | None = Field(default=None, ge=0, description="必选最低执行数量")
+    max_per_period: int | None = Field(default=None, ge=0, description="周期内执行次数上限")
+    dedup_rule: str | None = Field(default=None, max_length=128, description="去重约束")
 
 
 class TaskTypeQueryParam(BaseQueryParam, UserByQueryParam):
