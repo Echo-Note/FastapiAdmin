@@ -400,6 +400,26 @@
 
 ---
 
+### 2026-10-26 — 成果导入「同名不同人」处理：同名冲突告警
+
+#### 1. 原因
+
+执行人仅凭姓名区分，完全同名（两个「黄莉」）会按 `name` 精确匹配合并到同一账号，无法区分「同一人重复导入」与「同名不同人」。真实素材（文件名 + 结算单内容）均不含工号/手机号，经确认采用「告警 + 人工确认」策略，暂不引入新标识字段。
+
+#### 2. 修改内容
+
+- `import_center/schema.py`：`ImportResultSchema` 新增 `warnings` 字段（需人工确认的告警），与 `errors`（跳过/错误）分离。
+- `import_center/service.py`：`_get_or_create_user` 同名命中复用账号时追加告警「执行人「X」与已有账号（username）同名，成果已归并至该账号；若为不同人员请人工拆分」。
+- 前端 `import.ts`：`ImportResult` 增 `warnings`；`import/index.vue`：结果区新增同名冲突告警展示（`type=warning`），`errors` 展示改为 `type=error`。
+- 测试：`test_market_import_center_flow.py` 同名复用用例增 `warnings` 断言。
+
+#### 3. 验证
+
+- 后端 22 passed（15 单元 + 7 集成）；`ruff check` 通过。
+- 前端 `pnpm ts:check` 通过；eslint 无报错。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。

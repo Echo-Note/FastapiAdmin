@@ -16,4 +16,5 @@ class ImportResultSchema(BaseModel):
     settlement_created: int = Field(default=0, description="新增结算单数")
     report_created: int = Field(default=0, description="新增报告数")
     report_attachment_linked: int = Field(default=0, description="已关联报告附件数")
-    errors: list[str] = Field(default_factory=list, description="跳过/告警信息列表")
+    errors: list[str] = Field(default_factory=list, description="跳过/错误信息列表")
+    warnings: list[str] = Field(default_factory=list, description="需人工确认的告警信息列表（如同名冲突）")

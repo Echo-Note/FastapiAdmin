@@ -43,9 +43,14 @@
                 <div class="stat-label">{{ item.label }}</div>
               </div>
             </div>
-            <ElAlert v-if="settlementResult.errors.length" :title="`跳过 ${settlementResult.errors.length} 条`" type="warning" :closable="false" class="result-alert">
+            <ElAlert v-if="settlementResult.errors.length" :title="`跳过 ${settlementResult.errors.length} 条`" type="error" :closable="false" class="result-alert">
               <ul class="error-list">
                 <li v-for="(err, i) in settlementResult.errors" :key="i">{{ err }}</li>
+              </ul>
+            </ElAlert>
+            <ElAlert v-if="settlementResult.warnings.length" :title="`同名冲突 ${settlementResult.warnings.length} 条，需人工确认`" type="warning" :closable="false" class="result-alert">
+              <ul class="error-list">
+                <li v-for="(w, i) in settlementResult.warnings" :key="i">{{ w }}</li>
               </ul>
             </ElAlert>
           </template>

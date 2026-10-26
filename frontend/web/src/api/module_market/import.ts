@@ -12,6 +12,7 @@ export interface ImportResult {
   report_created: number;
   report_attachment_linked: number;
   errors: string[];
+  warnings: string[];
 }
 
 const ImportAPI = {

@@ -125,12 +125,15 @@ class TestUserDedup:
         assert "huangli2" in usernames
 
     def test_same_name_user_reused_across_files(self, test_client: TestClient, auth_headers: dict) -> None:
-        """同名执行人出现在两个文件：复用同一账号，不重复创建。"""
+        """同名执行人出现在两个文件：复用同一账号，不重复创建，并产生同名冲突告警。"""
         file_a = _inner_xlsx(task_no=1, qty=3, amount=3000)
         file_b = _inner_xlsx(task_no=2, qty=2, amount=2000)
         _upload_settlement(test_client, auth_headers, "0.重庆-省平台项目结算单-重庆王芳.xlsx", file_a, "2099-06")
         second = _upload_settlement(test_client, auth_headers, "0.重庆-省平台项目结算单-重庆王芳.xlsx", file_b, "2099-06")
         assert second["data"]["user_created"] == 0  # 同名复用，不新建用户
+        # 同名命中产生告警，提示运营人工确认是否为同名不同人
+        assert len(second["data"]["warnings"]) == 1
+        assert "同名" in second["data"]["warnings"][0]
         resp = test_client.get("/system/user/list", params={"name": "王芳"}, headers=auth_headers)
         assert resp.json()["data"]["total"] == 1
 

@@ -291,7 +291,8 @@ class ImportService:
         """按执行人获取或创建 C 端用户，返回用户 ID（无法识别执行人时返回 None）。
 
         去重策略：
-        - 先按 ``name`` 精确匹配，命中即复用（同名视为同一人，保证重复导入幂等）；
+        - 先按 ``name`` 精确匹配，命中即复用（保证重复导入幂等）；因无法仅凭姓名区分
+          「同一人重复导入」与「同名不同人」，命中时追加告警交由运营人工确认；
         - ``name`` 未命中但拼音 ``username`` 已被同音他人占用（如「黄莉」vs「黄丽」同拼
           ``huangli``），则追加数字后缀生成新账号，避免两个不同的人被合并到同一账号；
         - 两者都未命中时按拼音 ``username`` 直接创建。
@@ -300,9 +301,13 @@ class ImportService:
             result.errors.append(f"执行人「{executor}」无法识别，已跳过其成果")
             return None
 
-        # 同名精确命中 → 复用（幂等）
+        # 同名精确命中 → 复用（幂等）；同名可能是「同一人重复导入」或「同名不同人」，
+        # 无法仅凭姓名区分，故追加告警交由运营人工确认/拆分
         existing = await UserCRUD(self.auth, self.db).get(name=executor)
         if existing:
+            result.warnings.append(
+                f"执行人「{executor}」与已有账号（{existing.username}）同名，成果已归并至该账号；若为不同人员请人工拆分"
+            )
             return existing.id
 
         # 同名未命中 → 生成不冲突的拼音账号（同音不同字追加后缀）
