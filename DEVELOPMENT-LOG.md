@@ -379,6 +379,27 @@
 
 ---
 
+### 2026-10-26 — 成果导入前端集成（运营端上传页面）
+
+#### 1. 原因
+
+后端导入接口（`POST /market/import/settlement`、`POST /market/import/report`）与菜单（`MarketImport`，`component_path=module_market/import/index`）已就绪，运营端缺上传页面。
+
+#### 2. 修改内容
+
+- 新增 `frontend/web/src/api/module_market/import.ts`：`ImportAPI.importSettlement`（多文件）+ `ImportAPI.linkReport`（单文件），均走 FormData multipart；`ImportResult` 类型对齐后端 `ImportResultSchema`。
+- 新增 `frontend/web/src/views/module_market/import/index.vue`：两个 Tab ——「结算单导入」（周期 + 多选 xlsx 拖拽上传 + 导入结果统计与跳过告警列表）、「报告附件关联」（服务项目号 + 周期 + 单份 pptx 上传）。
+
+#### 3. 遇到的问题与处理
+
+1. **el-upload 文件类型谓词 TS2677**：`UploadUserFile.raw` 类型为 `UploadRawFile`（`File & { uid }`），用 `File` 做 filter 类型谓词触发 TS2677/TS2345；改为 `f is UploadRawFile` 后 `UploadRawFile[]` 兼容 `File[]` 形参。
+
+#### 4. 验证
+
+- `pnpm ts:check` 通过；eslint 无报错。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
