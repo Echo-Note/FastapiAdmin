@@ -85,21 +85,31 @@ class ImportService:
         inner_rows: list[InnerSettlementRow] = []
         outer_groups: list[tuple[str, list[OuterSettlementRow]]] = []
         for path in file_paths:
+            filename = Path(path).name
             try:
                 kind = detect_kind(path)
                 if kind == "inner":
-                    executor = _executor_from_filename(Path(path).name)
+                    # 文件名二次校验：明细模板（如 1.等级医院管理采集模板（必选）-重庆熊丽.xlsx）
+                    # 的首个 sheet 虽也是「结算单」（含「实际执行」），但整体是采集明细而非结算单，
+                    # 须靠文件名约定过滤，避免把模板文件名误当执行人姓名生成超长拼音账号
+                    if "省平台项目结算单-" not in filename:
+                        result.errors.append(f"文件 {filename} 非对内结算单（文件名不含「省平台项目结算单-」），已跳过")
+                        continue
+                    executor = _executor_from_filename(filename)
                     inner_rows.extend(parse_inner_settlement(path, executor))
                 elif kind == "outer":
-                    company_name = _company_name_from_filename(Path(path).name)
+                    if "服务项目结算单" not in filename:
+                        result.errors.append(f"文件 {filename} 非对外结算单（文件名不含「服务项目结算单」），已跳过")
+                        continue
+                    company_name = _company_name_from_filename(filename)
                     if not company_name:
-                        result.errors.append(f"文件 {Path(path).name} 无法从文件名解析公司名，已跳过")
+                        result.errors.append(f"文件 {filename} 无法从文件名解析公司名，已跳过")
                         continue
                     outer_groups.append((company_name, parse_outer_settlement(path)))
                 else:
-                    result.errors.append(f"文件 {Path(path).name} 无法识别为结算单，已跳过")
+                    result.errors.append(f"文件 {filename} 无法识别为结算单，已跳过")
             except Exception as e:  # noqa: BLE001 - 单文件失败不阻断整体导入
-                result.errors.append(f"文件 {Path(path).name} 导入失败: {e!s}")
+                result.errors.append(f"文件 {filename} 导入失败: {e!s}")
         # 跨文件统一导入：对内按 task_no 分组汇总各执行人数量，对外按公司逐个落报告
         await self._import_inner(inner_rows, period, result)
         for company_name, rows in outer_groups:

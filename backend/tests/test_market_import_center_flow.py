@@ -164,3 +164,21 @@ class TestReportAttachment:
             headers=auth_headers,
         )
         assert resp.json()["success"] is False
+
+
+class TestSkipNonSettlement:
+    """非结算单文件（明细模板等）应被跳过，不误导入、不误建超长账号。"""
+
+    def test_skip_template_file_with_settlement_sheet(self, test_client: TestClient, auth_headers: dict) -> None:
+        """明细模板首个 sheet 虽含「实际执行」（detect_kind 识别为 inner），但文件名
+        非对内结算单约定，应跳过而非把模板文件名当执行人姓名。"""
+        content = _inner_xlsx(task_no=5, qty=4, amount=4000)
+        body = _upload_settlement(
+            test_client, auth_headers, "1.等级医院管理采集模板（必选）-重庆熊丽.xlsx", content, "2099-07"
+        )
+        data = body["data"]
+        assert data["user_created"] == 0
+        assert data["task_created"] == 0
+        assert data["assignment_created"] == 0
+        assert data["settlement_created"] == 0
+        assert any("非对内结算单" in e for e in data["errors"])
