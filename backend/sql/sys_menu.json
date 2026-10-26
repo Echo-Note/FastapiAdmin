@@ -5235,6 +5235,52 @@
                         "show_text_badge": null
                     }
                 ]
+            },
+            {
+                "name": "成果导入",
+                "type": 2,
+                "icon": null,
+                "order": 13,
+                "permission": "module_market:import:execute",
+                "route_name": "MarketImport",
+                "route_path": "import",
+                "component_path": "module_market/import/index",
+                "status": 0,
+                "keep_alive": true,
+                "hidden": false,
+                "always_show": false,
+                "title": "成果导入",
+                "params": null,
+                "affix": false,
+                "redirect": null,
+                "description": "初始化数据",
+                "children": [
+                    {
+                        "name": "导入",
+                        "type": 3,
+                        "icon": null,
+                        "order": 1,
+                        "permission": "module_market:import:execute",
+                        "route_name": null,
+                        "route_path": null,
+                        "component_path": null,
+                        "status": 0,
+                        "keep_alive": true,
+                        "hidden": false,
+                        "always_show": false,
+                        "title": "导入",
+                        "params": null,
+                        "affix": false,
+                        "redirect": null,
+                        "description": "初始化数据",
+                        "link": null,
+                        "is_iframe": false,
+                        "is_hide_tab": false,
+                        "active_path": null,
+                        "show_badge": false,
+                        "show_text_badge": null
+                    }
+                ]
             }
         ]
     }

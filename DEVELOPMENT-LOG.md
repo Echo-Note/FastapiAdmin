@@ -310,6 +310,75 @@
 
 ---
 
+### 2026-10-26 — 成果导入功能（market/import_center 模块）
+
+#### 1. 背景
+
+重庆省平台项目真实成果素材（对内任务成果 + 对外服务项目成果）需要**可复用导入功能**：上传结算单 xlsx / 报告 pptx，后端解析入库。方向经确认：可复用导入接口、对内+对外都导、基础数据（执行人用户 / 委托公司）一并创建、报告作为附件引用。
+
+#### 2. 新增模块
+
+`backend/app/modules/market/import_center/`（无 model/crud，复用其它模块的 CRUD 写库）：
+- `parser.py`：结算单解析（对内/对外自动识别 + 合并单元格 forward fill）
+- `service.py`：导入编排（基础数据创建 + task/assignment/settlement/report 写库，幂等）
+- `controller.py`：`POST /market/import/settlement`（结算单导入）+ `POST /market/import/report`（报告附件关联）
+- `schema.py`：导入结果统计
+
+`backend/app/modules/market/models.py`：market 域 17 个模型统一注册入口（解决 TYPE_CHECKING 循环引用在独立加载时的 mapper 缺失）。
+
+#### 3. 导入映射
+
+- 对内结算单（熊丽 20900 / 熊志鹏 5100）：按计价项序号分组，一个计价项一个 task（`exec_qty` 汇总各执行人数量）→ 每执行人一条 assignment + settlement（合计 26000）
+- 对外结算单（万邦 57400）：创建委托公司 + 每实际执行服务项目一条 report（summary 记录数量金额）
+- 报告 pptx：作为 report.attachment 附件路径引用
+
+#### 4. 遇到的问题与处理
+
+1. **结算单合并单元格 forward fill 误伤稀疏列**：实际执行数量/金额是稀疏数据（仅执行行有值），不能与「类型/项目/单价」等定义列一起 fill，需按列范围区分。
+2. **model TYPE_CHECKING 循环引用依赖全量导入**：独立使用 ImportService 时 mapper 缺失，建 `models.py` 统一注册。
+3. **task_no 唯一冲突**：不同执行人同计价项，task_no 不含执行人导致冲突 → 改为一个计价项一个 task、`exec_qty` 汇总各执行人数量。
+4. **分文件导入汇总丢失**：逐文件处理导致 exec_qty 只算单执行人 → 改为先收集所有文件的行再统一分组汇总。
+5. **UserCreateSchema 密码强度校验**：默认密码 `123456` 不满足「至少两类」→ 仿 `batch_import` 先 hash 再传 schema。
+6. **TRUNCATE CASCADE 误清 seed**：`market_service_item` 有 FK 指向 `market_company`，`TRUNCATE market_company CASCADE` 级联清空服务项目 → 清理业务数据改用 `DELETE`（非 CASCADE）。
+
+#### 5. 验证
+
+- 熊丽 8 行（20900）+ 熊志鹏 4 行（5100）+ 万邦 9 服务项目（57400）
+- task 8（exec_qty 汇总正确：5→6、31→16、32→10、34→31）、assignment 12、settlement 12（26000）、report 9
+- 幂等重跑全 0；报告附件关联成功；`ruff check` all passed
+
+---
+
+### 2026-10-26 — 成果导入测试补齐 + 执行人去重 + 上传文件名解析 bug 修复
+
+#### 1. 原因
+
+上一记录「成果导入功能」落地后缺测试覆盖，且审阅发现两个缺陷：
+1. **同音姓名合并**：执行人 username 由拼音生成（`_username_from_name`），「黄莉」「黄丽」同拼 `huangli`，仅按 `username` 查询会把两个不同的人合并到同一账号。
+2. **上传文件名被污染**：`controller._save_upload` 用 `UploadUtil.generate_safe_filename` 保存，会追加 `_时间戳A随机码` 后缀；对内结算单执行人从文件名解析（`0.重庆-省平台项目结算单-重庆熊丽.xlsx` → 执行人「熊丽」），被存成 `...重庆熊丽_20261026…A123.xlsx` 后 `_executor_from_filename` 解析出 `熊丽_20261026…A123`。对外结算单公司名不受影响（时间戳落在「服务项目结算单」之后被切掉）。
+
+#### 2. 修改内容
+
+- `import_center/service.py`：`_get_or_create_user` 改为「先按 `name` 精确匹配（同名视为同一人，幂等）→ 拼音 `username` 冲突则追加数字后缀」，新增通用 `_next_available(base, crud, field)`；`_get_or_create_company` 同步用 `_next_available` 生成不冲突的 `code`（`CompanyModel.code` 也有唯一约束）。
+- `import_center/controller.py`：`_save_upload` 保存文件名改用 `UploadUtil.sanitize_filename`（保留原始文件名、仅清理危险字符），不再追加时间戳。导入场景同名覆盖可接受（同一结算单重复导入本就幂等）。
+- 新增 `tests/test_market_import_center.py`（15 用例）：文件名约定/拼音转换、单元格转换、forward fill、detect_kind、对内/对外结算单解析。
+- 新增 `tests/test_market_import_center_flow.py`（7 用例）：对内导入、对外导入、幂等重跑、同音去重（黄莉/黄丽 → `huangli`/`huangli2`）、同名跨文件复用、报告附件关联与不存在分支。
+
+#### 3. 遇到的问题与处理
+
+1. **generate_safe_filename 时间戳污染文件名解析**
+   - 现象：HTTP 上传对内结算单后执行人被识别成 `熊丽_20261026…A123`，导致误建带时间戳的用户。
+   - 处理：导入专用上传保留原始文件名（sanitize），文件名约定解析与落盘名解耦。
+2. **同名执行人合并语义**
+   - 现状：完全同名（如两个「黄莉」）按同一人合并，因文件名仅保留姓名、无工号/手机号等辅助标识，暂无法区分。若日后出现同名不同人需引入额外标识。
+
+#### 4. 验证
+
+- `pytest tests/test_market_import_center.py` 15 passed；`test_market_import_center_flow.py` 7 passed。
+- market 全量 81 passed；`ruff check` all passed。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -334,3 +403,7 @@
 6. **存量库「加 NOT NULL 列 + 删种子重播种」的连锁坑**（2026-10-23）
    - 现象：① autogen 给已有数据的表加 `NOT NULL` 列（产物无默认值）报 `NotNullViolationError`；② 删旧种子重新播种时若只用 `DELETE`（序列不归位），后续插入拿到的自增 ID 错位，导致写死 ID 的映射表（如 `market_service_item_task`）FK 引用断裂。
    - 结论：market 域 seed 用硬编码 ID 引用（`template_id`/`task_type_id`/`service_item_id`），依赖「空库从 1 自增」。存量库遇结构变更需重置种子时，用 `TRUNCATE ... RESTART IDENTITY CASCADE` 清空并归位序列，不要裸 `DELETE`。
+
+7. **SQLAlchemy model 循环引用（TYPE_CHECKING + 字符串 relationship）依赖全量导入**（2026-10-26）
+   - 现象：market 域 17 个 model 用 `TYPE_CHECKING` 延迟导入对方，字符串 `relationship` 靠 `routers.py` 全量导入才注册 mapper；独立 import 某模块（脚本/单测）时 mapper 初始化失败，报 `failed to locate a name ('XxxModel')`，且是「逐个冒泡」（补一个又缺下一个）。
+   - 结论：需要独立加载模型集的场景（导入服务、脚本、单测）必须显式触发全量注册。market 域已建 `models.py` 统一入口（17 个 model），`import_center/service.py` 引入；后续若新增跨模块 relationship，记得同步登记进 `models.py`。
