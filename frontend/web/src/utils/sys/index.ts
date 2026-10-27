@@ -335,7 +335,7 @@ class VersionManager {
 
     const poll = async () => {
       try {
-        const resp = await fetch(`/?_t=${Date.now()}`, { cache: "no-store" });
+        const resp = await fetch(`${import.meta.env.BASE_URL}/?_t=${Date.now()}`, { cache: "no-store" });
         if (!resp.ok) return;
         const html = await resp.text();
 
