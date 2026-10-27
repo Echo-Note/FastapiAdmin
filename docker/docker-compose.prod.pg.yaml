@@ -1,0 +1,149 @@
+# ============================================================
+# FoxWork 线上环境编排（Backend + Caddy）
+#
+# 数据库与 Redis 使用腾讯云内网独立实例（不在此编排内）：
+#   - PostgreSQL：172.30.0.8:5432（用户 xfoxlab）
+#   - Redis：172.30.0.48:6379
+#
+# 与 docker-compose.yaml（旧 MySQL 版）平行，互不影响。
+# 使用方式：
+#   cd docker
+#   cp .env.prod.pg.example .env.prod.pg   # 填入真实口令/域名
+#   docker compose --env-file .env.prod.pg -f docker-compose.prod.pg.yaml up -d --build
+#
+# 前提：
+#   1. 域名 admin.xfoxlab.com.cn / wxh5.xfoxlab.com.cn 的 A 记录已指向本机公网 IP；
+#   2. 腾讯云安全组放行 80 / 443（Caddy 自动签发 HTTPS 需要 80 做 ACME 校验）；
+#   3. PG/Redis 实例的安全组已放行本机（172.30.0.13）访问 5432 / 6379；
+#   4. 前端产物已构建并放入 docker/nginx/web/dist、docker/nginx/app/dist/build/h5。
+# ============================================================
+
+name: foxwork
+
+services:
+  # ==================== 后端 ====================
+  backend:
+    container_name: foxwork-backend
+    build:
+      context: ../
+      dockerfile: ./docker/backend/Dockerfile
+      args:
+        DB: postgres
+    image: "foxwork-backend:${BACKEND_IMAGE_TAG:-latest}"
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      TZ: "Asia/Shanghai"
+      ENVIRONMENT: "${DEPLOY_ENV:-prod}"
+      # 生产禁止启动时自动建表/迁移/播种；必须手动执行 python main.py init 完成初始化与升级
+      AUTO_INIT_DB: "${AUTO_INIT_DB:-false}"
+      # PostgreSQL（腾讯云内网实例）
+      DATABASE_TYPE: "postgres"
+      DATABASE_HOST: "${DATABASE_HOST:-172.30.0.8}"
+      DATABASE_PORT: "5432"
+      DATABASE_USER: "${DATABASE_USER:-xfoxlab}"
+      DATABASE_PASSWORD: "${DATABASE_PASSWORD:?请设置 DATABASE_PASSWORD}"
+      DATABASE_NAME: "${DATABASE_NAME:-foxwork}"
+      # Redis（腾讯云内网实例）
+      REDIS_HOST: "${REDIS_HOST:-172.30.0.48}"
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?请设置 REDIS_PASSWORD}"
+      REDIS_DB_NAME: "1"
+      # 日志
+      LOGGER_LEVEL: "${LOGGER_LEVEL:-INFO}"
+      # 令牌签名密钥 / 数据加密主密钥（必须显式提供）
+      SECRET_KEY: "${SECRET_KEY:?请设置 SECRET_KEY（openssl rand -hex 32）}"
+      DATA_ENCRYPTION_KEY: "${DATA_ENCRYPTION_KEY:-}"
+      DATA_ENCRYPTION_OLD_KEYS: "${DATA_ENCRYPTION_OLD_KEYS:-}"
+      # Host 头校验（list[str]，必须 JSON 数组）
+      ALLOWED_HOSTS: '${ALLOWED_HOSTS:-["admin.xfoxlab.com.cn","wxh5.xfoxlab.com.cn"]}'
+      ALLOW_LOCALHOST_HOSTS: "true"
+      OAUTH_ALLOWED_HOSTS: '${OAUTH_ALLOWED_HOSTS:-["admin.xfoxlab.com.cn","wxh5.xfoxlab.com.cn"]}'
+      # 生产跨域白名单（str，逗号分隔）
+      PROD_CORS_ORIGINS: "${PROD_CORS_ORIGINS:-https://admin.xfoxlab.com.cn,https://wxh5.xfoxlab.com.cn}"
+      CORS_STRICT_STARTUP: "${CORS_STRICT_STARTUP:-false}"
+      # 演示模式：生产可写需 false
+      DEMO_ENABLE: "${DEMO_ENABLE:-false}"
+      # 定时任务代码块执行（等同 RCE，生产保持 false）
+      SCHEDULER_ALLOW_CODE_EXEC: "${SCHEDULER_ALLOW_CODE_EXEC:-false}"
+    ports:
+      # 仅本机，便于调试；对外由 Caddy 反代
+      - "127.0.0.1:${BACKEND_PORT:-8001}:8001"
+    volumes:
+      # 上传文件持久化（重建容器不丢用户上传）
+      - ./backend/static/upload:/home/static/upload
+    networks:
+      - app_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c 'import urllib.request; req = urllib.request.Request(\"http://localhost:8001/api/v1/monitor/health/check\", headers={\"Host\": \"admin.xfoxlab.com.cn\", \"X-Forwarded-Proto\": \"https\"}); urllib.request.urlopen(req, timeout=5)' || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 256m
+
+  # ==================== Caddy（TLS 终止 + 反向代理）====================
+  caddy:
+    container_name: foxwork-caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    platform: linux/amd64
+    environment:
+      TZ: "Asia/Shanghai"
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTP_PORT:-80}:80/udp"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 前端静态产物（本地构建后放入）
+      - ./nginx/web/dist:/srv/web:ro
+      - ./nginx/app/dist/build/h5:/srv/app:ro
+      # 证书与配置持久化
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - app_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+        reservations:
+          memory: 64m
+
+# ==================== 持久化卷 ====================
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+
+# ==================== 网络 ====================
+networks:
+  app_network:
+    driver: bridge

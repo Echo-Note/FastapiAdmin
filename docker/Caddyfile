@@ -1,0 +1,70 @@
+# ============================================================
+# FoxWork Caddyfile（TLS 自动签发 + 反向代理 + 静态站点）
+#
+# 前提：admin.xfoxlab.com.cn / wxh5.xfoxlab.com.cn 的 A 记录已指向本机公网 IP，
+#       且 80/443 端口可从公网访问（80 用于 ACME http-01 校验）。
+# 证书由 Caddy 自动向 Let's Encrypt 申请并续期，无需手动维护。
+# ============================================================
+
+{
+    # ACME 证书通知邮箱（仅用于证书到期提醒）
+    email service@xfoxlab.com.cn
+    # 关闭 Caddy 管理端点（纯反代用途不需要）
+    admin off
+}
+
+# ==================== 运营后台（Vue3 SPA）====================
+# 前端产物 base=/web/，产物根为 /srv/web（即 nginx/web/dist）
+admin.xfoxlab.com.cn {
+    encode gzip
+
+    # 后端 API 反向代理（WebSocket 由 Caddy 自动升级）
+    handle /api/v1/* {
+        reverse_proxy backend:8001
+    }
+
+    # /web/ 前缀映射到 /srv/web，history 路由回退到 index.html
+    handle_path /web/* {
+        root * /srv/web
+        try_files {path} /index.html
+        file_server
+    }
+
+    # 根路径重定向到 /web/
+    handle {
+        redir / /web/ 308
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}
+
+# ==================== 小程序 H5（uni-app）====================
+# 前端产物 base=/app/，产物根为 /srv/app（即 nginx/app/dist/build/h5）
+wxh5.xfoxlab.com.cn {
+    encode gzip
+
+    # 后端 API 反向代理
+    handle /api/v1/* {
+        reverse_proxy backend:8001
+    }
+
+    # /app/ 前缀映射到 /srv/app，history 路由回退到 index.html
+    handle_path /app/* {
+        root * /srv/app
+        try_files {path} /index.html
+        file_server
+    }
+
+    # 根路径重定向到 /app/
+    handle {
+        redir / /app/ 308
+    }
+
+    log {
+        output stdout
+        format console
+    }
+}
