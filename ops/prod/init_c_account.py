@@ -23,7 +23,7 @@ from app.modules.system.menu.model import MenuModel
 from app.modules.system.role.model import RoleModel
 from app.modules.system.user.model import UserModel, UserRolesModel
 
-from base import PasswordHash, async_db_session, bind_menus_to_role, env
+from base import PwdUtil, async_db_session, bind_menus_to_role, env
 
 
 async def ensure_role(db: AsyncSession, code: str, name: str, data_scope: int, description: str) -> RoleModel:
@@ -58,7 +58,7 @@ async def ensure_user(
     if user is None:
         user = UserModel(
             username=username,
-            password=PasswordHash.hash_password(password),
+            password=PwdUtil.hash_password(password),
             name=name,
             is_superuser=False,
             dept_id=dept_id,
@@ -69,7 +69,7 @@ async def ensure_user(
         await db.flush()
         print(f"  新建账号：{username}")
     else:
-        user.password = PasswordHash.hash_password(password)
+        user.password = PwdUtil.hash_password(password)
         user.status = 0
         print(f"  账号已存在（更新密码）：{username}")
     return user

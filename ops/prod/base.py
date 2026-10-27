@@ -3,7 +3,7 @@
 供 ``ops/prod/`` 下各初始化脚本 import，统一提供：
 - 模型全量注册（确保含 FK 的 mapper 可完整解析）
 - 异步数据库会话 ``async_db_session``
-- 密码哈希 ``PasswordHash``
+- 密码哈希 ``PwdUtil``
 - 环境变量读取辅助 ``env``（自动加载脚本同目录的 ``.env``）
 - 菜单/角色辅助（``ensure_menu`` / ``collect_subtree_ids`` / ``bind_menus_to_role``）
 
@@ -19,7 +19,7 @@ from sqlalchemy import select
 from app.core.base_model import MappedBase
 from app.core.database import async_db_session
 from app.utils.import_util import ImportUtil
-from app.utils.password_util import PasswordHash
+from app.utils.password_util import PwdUtil
 
 # 全量注册模型：确保 StorageNodeModel/UserModel/RoleModel/MenuModel 等含 FK 的 mapper 可完整解析
 ImportUtil.find_models(MappedBase)
@@ -130,7 +130,7 @@ __all__ = [
     "MappedBase",
     "ImportUtil",
     "async_db_session",
-    "PasswordHash",
+    "PwdUtil",
     "env",
     "ensure_menu",
     "collect_subtree_ids",

@@ -26,7 +26,7 @@ from app.modules.system.role.model import RoleModel
 from app.modules.system.user.model import UserModel, UserRolesModel
 
 from base import (
-    PasswordHash,
+    PwdUtil,
     async_db_session,
     bind_menus_to_role,
     collect_subtree_ids,
@@ -101,7 +101,7 @@ async def ensure_user(
     if user is None:
         user = UserModel(
             username=username,
-            password=PasswordHash.hash_password(password),
+            password=PwdUtil.hash_password(password),
             name=name,
             is_superuser=is_superuser,
             dept_id=dept_id,
@@ -112,7 +112,7 @@ async def ensure_user(
         await db.flush()
         print(f"  新建账号：{username}")
     else:
-        user.password = PasswordHash.hash_password(password)
+        user.password = PwdUtil.hash_password(password)
         user.name = name
         user.is_superuser = is_superuser
         user.status = 0
