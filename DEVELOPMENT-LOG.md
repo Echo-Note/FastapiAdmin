@@ -710,6 +710,32 @@
 
 ---
 
+### 2026-10-27 — 生产部署完成（前端上线 + 菜单 redirect 数据修复 + PasswordHash→PwdUtil）
+
+#### 1. 原因
+
+后端已部署完成，需完成前端运营后台上线（让「运营工作台」页面生效）；上线联调中发现线上 `GET /user/current/info` 返回 400，且 `ops/prod/` 初始化脚本仍引用已重命名的 `PasswordHash`。
+
+#### 2. 完成内容
+
+**前端构建部署**
+- `frontend/web` 执行 `pnpm build:prod`（`base=/web`，terser 压缩 + gzip/brotli），产物 rsync 到服务器 `~/foxwork/docker/nginx/web/dist/`（Caddy 挂载 `/srv/web`）。
+- 验收：`https://admin.xfoxlab.com.cn/web/` 首页、入口 JS、健康检查均 200。
+
+**线上菜单数据修复**
+- 现象：`GET /api/v1/system/user/current/info` 返回 400「目录类型必须填写重定向地址」。
+- 根因：`sys_menu` 里「运营工作台」目录（id=214，type=1）`redirect` 为 NULL——它是后加的种子菜单，在存量库上重新初始化时以不完整方式写入（丢了 redirect）。响应模型 `MenuOutSchema` 继承 `MenuCreateSchema` 的 `validate_fields` 写入校验，读取菜单时对该目录抛错，连带登录后首个接口整体 400。
+- 处理：`UPDATE sys_menu SET redirect='/ops-dashboard/overview' WHERE id=214`，补回与 `sys_menu.json` 一致的 redirect 值。
+
+**PasswordHash→PwdUtil 修复**
+- `ops/prod/base.py`、`init_c_account.py`、`init_ops_account.py` 中 `from app.utils.password_util import PasswordHash` 改为 `PwdUtil`（类早已改名，旧引用会导致 ImportError）。提交 `1dcce22d fix: 类型`。
+
+#### 3. 遇到的问题与处理
+
+1. **前端部署验证时 curl 返回 SSL error（exit 35）**：本机/服务器 curl `localhost`、`127.0.0.1` 均 TLS 握手失败——Caddy 只对配置域名（`admin.xfoxlab.com.cn` 等）签发证书，`localhost` SNI 不匹配。处理：`curl --resolve admin.xfoxlab.com.cn:443:127.0.0.1` 指定 SNI 后验证通过；对外域名访问实际正常。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
