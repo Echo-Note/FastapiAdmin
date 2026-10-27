@@ -1,5 +1,47 @@
 [
     {
+        "name": "运营工作台",
+        "type": 1,
+        "icon": "ri:dashboard-line",
+        "order": 0,
+        "permission": null,
+        "route_name": "OpsDashboard",
+        "route_path": "/ops-dashboard",
+        "component_path": null,
+        "status": 0,
+        "keep_alive": true,
+        "hidden": false,
+        "always_show": false,
+        "title": "运营工作台",
+        "params": null,
+        "affix": false,
+        "redirect": "/ops-dashboard/overview",
+        "description": "运营工作台（市场数据概览）",
+        "children": [
+            {
+                "name": "工作台概览",
+                "type": 2,
+                "icon": "ri:dashboard-3-line",
+                "order": 1,
+                "permission": "module_market:dashboard:query",
+                "route_name": "OpsDashboardOverview",
+                "route_path": "overview",
+                "component_path": "module_market/dashboard/index",
+                "status": 0,
+                "keep_alive": true,
+                "hidden": false,
+                "always_show": false,
+                "title": "工作台概览",
+                "params": null,
+                "affix": false,
+                "redirect": null,
+                "description": "市场数据统计概览",
+                "scope": "web"
+            }
+        ],
+        "scope": "web"
+    },
+    {
         "name": "系统管理",
         "type": 1,
         "icon": "ri:settings-2-line",

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="玄狐 LOGO">
+  <defs>
+    <linearGradient id="foxBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF7A5C"/>
+      <stop offset="1" stop-color="#E8433A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 头部主轮廓：几何红狐头像，锐利三角耳 + 垂直向下尖吻 -->
+  <path
+    d="M112 80
+       L128 170
+       L116 300
+       L224 430
+       L256 476
+       L288 430
+       L396 300
+       L384 170
+       L400 80
+       L352 170
+       L256 155
+       L160 170
+       Z"
+    fill="url(#foxBody)"
+  />
+
+  <!-- 眼睛：两道细长上挑弧线，白色 -->
+  <path d="M168 232 Q196 252 230 242" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round"/>
+  <path d="M344 232 Q316 252 282 242" fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round"/>
+
+  <!-- 鼻尖：白色小三角 -->
+  <path d="M256 440 L246 458 L266 458 Z" fill="#ffffff"/>
+</svg>
