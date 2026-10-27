@@ -470,6 +470,246 @@
 
 ---
 
+### 2026-10-27 — 新增 PostgreSQL 线上 docker-compose 部署 + 服务器 SSH 密钥加固
+
+#### 1. 原因
+
+用户要求：①在当前基础上添加 docker-compose 部署线上环境（新服务器 `118.24.244.36`，域名 `admin.xfoxlab.com.cn` / `wxh5.xfoxlab.com.cn`，用 Caddy 反代）；②服务器改为密钥登录、关闭密码登录、仅密钥登录。
+
+#### 2. 修改内容
+
+**部署文件（新增，与旧 MySQL 版 `docker-compose.yaml` 平行）**
+- `docker/docker-compose.prod.pg.yaml`：`postgres:18-alpine` + `redis:7-alpine` + `backend`（`DB=postgres` 构建）+ `caddy:2-alpine` 四容器完整编排。
+- `docker/Caddyfile`：两个域名 `/api/v1/*` 反代 `backend:8001` + 静态站点 + Caddy 自动 HTTPS。
+- `docker/.env.prod.pg.example`：PG/Redis/安全/域名等环境变量模板（`ALLOWED_HOSTS`/`OAUTH_ALLOWED_HOSTS` 为 JSON 数组）。
+- `docker/README.prod.pg.md`：部署前置条件与上线步骤。
+
+**服务器 SSH 加固（118.24.244.36）**
+- 生成专用密钥对 `~/.ssh/foxwork_prod`（ed25519），公钥推入 ubuntu 用户 authorized_keys。
+- 关闭密码登录：新增 `/etc/ssh/sshd_config.d/99-hardening.conf` + 修正 cloud-init 的 `50-cloud-init.conf`（`PasswordAuthentication no`）；`PermitRootLogin prohibit-password`。
+- SSH 端口 22 → 12211：改 systemd socket override（`/etc/systemd/system/ssh.socket.d/port-12211.conf`）并同步改 sshd_config `Port` 备用。
+
+#### 3. 遇到的问题与处理
+
+1. **服务器实际是全新的，与「仅连宿主机」选择矛盾**
+   - 现象：探查发现 118.24.244.36 是空 Ubuntu 26.04（无 PG/Redis/docker/caddy，仅监听 22/53）。用户此前选择「服务器已有 PG/Redis、仅连宿主机」的前提不成立。
+   - 处理：改为**完整容器化**（PG/Redis 也进 compose，用用户给的 `xfoxlab` / Redis 密码初始化）。
+2. **Ubuntu 26.04 SSH 端口由 systemd socket activation 控制**
+   - 现象：sshd_config 的 `Port` 全是注释，端口实际由 `ssh.socket` 的 `ListenStream` 决定。
+   - 处理：改 ssh.socket override，先加 12211 保留 22 兜底 → 验证 12211 可登录 → 再撤 22。
+3. **腾讯云 cloud-init 写死 `PasswordAuthentication yes`**
+   - 现象：drop-in 的 `PasswordAuthentication no` 被词法序更靠前的 `50-cloud-init.conf`（cloud-init 注入 yes）覆盖。
+   - 处理：直接 sed 改 `50-cloud-init.conf` 为 no，`sshd -T` 复核后 reload。
+4. **22 端口「nc 可达但 SSH 被拒」假象**：撤掉 22 后 `nc -z` 仍显示可达（腾讯云网络层 TCP 假响应），但 `ss` 已无 22 监听、SSH 登录 `Connection closed`，确认为已关闭。
+
+#### 4. 验证
+
+- `docker compose config` 语法通过；SSH 密钥登录 12211 OK、密码登录被拒、22 已停用。
+
+---
+
+### 2026-10-27 — 线上发布部署完成（拉起 caddy + 双域名 HTTPS 签发）
+
+#### 1. 原因
+
+上一记录落地了 compose 编排与 SSH 加固，但线上只起了 `foxwork-backend`，`foxwork-caddy` 未启动——对外 80/443 无服务、双域名无法访问、HTTPS 证书未签发。用户要求「发布部署没完成就继续完成」。
+
+#### 2. 完成内容
+
+- 拉起 `foxwork-caddy`（拉取 `caddy:2-alpine` 镜像 + `docker compose up -d caddy`），80/443 对外监听就绪。
+- 双域名 Let's Encrypt 证书自动签发成功：`admin.xfoxlab.com.cn` / `wxh5.xfoxlab.com.cn`。
+- 验收：两域名首页均 200；`/api/v1/monitor/health/check` 返回 `db_status=1 / redis_status=1 / environment=prod`；`foxwork-backend` healthy + `foxwork-caddy` up。
+
+#### 3. 遇到的问题与处理
+
+1. **admin 域名首次签发失败（跨境 secondary validation 超时）**
+   - 现象：`wxh5` 走 `tls-alpn-01`（443）一次成功；`admin` 的 `tls-alpn-01` 未通过、回退 `http-01`，但 Let's Encrypt 海外 secondary 校验节点访问 80 报 `Timeout during connect (likely firewall problem)`，签发失败后回退到连不上的 ZeroSSL 卡住。
+   - 处理：`docker compose restart caddy` 重新触发签发（wxh5 证书已缓存不受影响），`admin` 第二次走 `http-01` 通过，证书生效。
+
+---
+
+### 2026-10-27 — 腾讯云安全组拆分优化（服务器/数据库独立安全组）
+
+#### 1. 原因
+
+三类资源（CVM `ins-2j0mc4d2` / PG `postgres-hdiavxkv` / Redis `crs-ooea4ubc`）此前共用一个系统默认安全组 `sg-fpqyb3b2`，规则混杂：SSH 12211 全网开放、PG 5432 / Redis 6379 对整个 VPC 网段 `172.30.0.0/20` 开放。用户要求按最佳实践拆分为独立安全组、数据库最小权限。
+
+#### 2. 修改内容
+
+- 新建服务器安全组 `sg-kie3663c`（foxwork-server）：入站 80/443/12211（全网）+ 出站全放行，绑定 CVM。
+- 新建数据库安全组 `sg-e9vg2lm8`（foxwork-database）：入站 5432/6379 仅 `172.30.0.13/32`（CVM 内网 IP）+ 出站全放行，绑定 PG + Redis。
+- 清空 default 安全组 `sg-fpqyb3b2` 的 8 条入站规则（保留全放行出站）。
+- 顺带修正 `docker-compose.prod.pg.yaml` 注释中 PG/Redis 内网地址写反、`Caddyfile` ACME 邮箱改为 `service@xfoxlab.com.cn`。
+
+#### 3. 遇到的问题与处理
+
+1. **API 创建的安全组无默认出站规则 → CVM 切组后连不上数据库**
+   - 现象：CVM 切到新 server 组后，backend 报 `Timeout connecting to server`，PG/Redis 连不上；但 SSH、Web 仍正常。
+   - 根因：`CreateSecurityGroup` API 创建的安全组出站默认全拒（只有控制台创建才会自动带全放行出站）。SSH/Web 是入站连接（有状态，响应自动放行），而 CVM 主动访问 PG/Redis 是出站连接，需显式出站规则。
+   - 处理：给 server 组和 database 组补「出站全放行」规则后恢复。教训见踩坑 11。
+
+#### 4. 验证
+
+- 最终绑定：CVM→`sg-kie3663c`、PG/Redis→`sg-e9vg2lm8`；default 组入站 0 条。
+- `/api/v1/monitor/health/check` 返回 `db_status=1 / redis_status=1`；SSH 12211 可达、双域名 HTTPS 200。
+
+---
+
+### 2026-10-27 — 修复前端静态资源 MIME type 错误（SPA base 前缀与 Caddy root 不匹配）
+
+#### 1. 原因
+
+运营后台 / 小程序 H5 打开白屏，浏览器报 `Failed to load module script: Expected a JavaScript module but the server responded with MIME type "text/html"`。
+
+#### 2. 根因
+
+前端构建产物的 `base` 分别是 `/web/`（运营后台）与 `/app/`（小程序 H5），`index.html` 用 `/web/js/*.js`、`/app/assets/*.js` 绝对路径引用资源；但 Caddy 的 `root` 直接指向产物根（`/srv/web`、`/srv/app`），未剥离 `/web/`、`/app/` 前缀，导致请求 `/web/js/xxx.js` 时实际查找 `/srv/web/web/js/xxx.js`（多一层），找不到便 `try_files` 回退到 `index.html`，返回 HTML 而非 JS。
+
+#### 3. 修改内容
+
+`docker/Caddyfile` 两个站点改用 `handle_path` 剥离前缀：
+
+- `admin`：`handle_path /web/*` → root `/srv/web`；根路径 `redir / /web/ 308`
+- `wxh5`：`handle_path /app/*` → root `/srv/app`；根路径 `redir / /app/ 308`
+
+#### 4. 验证
+
+`/web/js/index.sSvSqKWy.js` 与 `/app/assets/index-BSh6nfjC.js` 均返回 `200 text/javascript`；两站点首页 200；根路径 308 跳转正确；API 健康检查 `db_status=1 / redis_status=1`。
+
+---
+
+### 2026-10-27 — 修复前端运行时错误（WS 端点未配置 + 旧产物 page_size 超限）
+
+#### 1. 原因
+
+运营后台登录后报两个错误：① `TypeError: Cannot read properties of undefined (reading 'replace')`（`httpEndpoint`）；② `GET /api/v1/system/user/list?page_size=1000` 返回 422 `Input should be less than or equal to 100`。
+
+#### 2. 根因
+
+① `httpEndpoint(import.meta.env.VITE_APP_WS_ENDPOINT)` 中 `VITE_APP_WS_ENDPOINT` 未配置（仓库只有 `.env.production.example`，无真实 `.env.production`），`httpEndpoint` 里 `endpoint.replace(...)` 对 undefined 直接崩溃。
+② 服务器上的前端产物是 10-22 的旧构建，`loadOptions` 当时用 `page_size=1000`；当前源码已改为 `page_size=100`，但产物未重新构建。
+
+#### 3. 修改内容
+
+- `frontend/web/src/utils/sse/index.ts`：`httpEndpoint` 增加 undefined 兜底，回退到 `window.location.origin`（同源 SSE）。
+- 新建 `frontend/web/.env.production`：设置 `VITE_APP_WS_ENDPOINT = wss://admin.xfoxlab.com.cn`、`VITE_APP_ENV = prod`、`VITE_DROP_CONSOLE = true`。
+- 重新构建 `frontend/web`（`pnpm run build:prod`）并 rsync 部署到服务器 `docker/nginx/web/dist/`。
+
+#### 4. 验证
+
+新 bundle `index.CvYtKwlp.js` 中 `page_size:1000` 为 0、`page_size:100` 与 `window.location.origin` 兜底均已打入；`/web/js/index.CvYtKwlp.js` 返回 `200 text/javascript`；SSE 端点 `/api/v1/monitor/health/stream` 正常返回健康数据。
+
+---
+
+### 2026-10-27 — 修复小程序 H5 登录 CORS 错误（app 端未迁移同源部署）
+
+#### 1. 原因
+
+线上小程序 H5（`wxh5.xfoxlab.com.cn`）登录页验证码获取失败，浏览器报 CORS 错误：`Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present`，请求地址为 `https://service.fastapiadmin.com/api/v1/system/auth/captcha/get`。
+
+#### 2. 根因
+
+`frontend/app/.env.production` 未跟上新域名同源部署方案：`VITE_API_BASE_URL` 仍指向旧域名 `service.fastapiadmin.com`，导致 H5 跨域请求旧域名，而旧域名后端 CORS 白名单无 `wxh5.xfoxlab.com.cn`，preflight 被拒。web 端（运营后台）此前已迁移同源（见上一记录），仅 app 端遗漏。
+
+#### 3. 修改内容
+
+- `frontend/app/.env.production`：`VITE_API_BASE_URL` 由 `https://service.fastapiadmin.com` 改为**留空**（走同源相对路径 `/api/v1`）；`VITE_APP_WS_ENDPOINT` 由 `wss://service.fastapiadmin.com` 改为 `wss://wxh5.xfoxlab.com.cn`。
+
+#### 4. 部署与验证
+
+- 重新构建 H5（`pnpm run build:h5`）并 `rsync --delete` 上传至服务器 `/home/ubuntu/foxwork/docker/nginx/app/dist/build/h5/`（Caddy `/srv/app` ro 挂载，file_server 读盘无需重启）。
+- 验证：产物中 `service.fastapiadmin.com` 出现次数为 0；同源验证码接口 `https://wxh5.xfoxlab.com.cn/api/v1/system/auth/captcha/get` 返回 `200 application/json`（`{"code":0,"msg":"获取验证码成功"}`）。
+
+#### 5. 遇到的问题与处理
+
+1. **本机 curl 线上 443 被网络层拦截（SSL_ERROR_SYSCALL）**：本机到 `118.24.244.36` 的 443 出站被拦，验证需 SSH 到服务器本机执行；且 Caddy 自动 HTTP→HTTPS 重定向，用 `http://127.0.0.1` 测会得到 308 误导，需用 `--resolve wxh5.xfoxlab.com.cn:443:127.0.0.1 -k` 走 HTTPS 正确验证。
+
+---
+
+### 2026-10-27 — 腾讯云资源 Terraform 编排（安全组/CAM 子账号/COS 自定义域名）
+
+#### 1. 原因
+
+用户要求：①把安全组、CAM 子账号等腾讯云资源改用 Terraform 编排（IaC 化）；②对象存储 COS 配置自定义域名，用 `xfoxlab.com.cn`，前缀由助手定（定为 `cos`，即 `cos.xfoxlab.com.cn`）。
+
+#### 2. 修改内容
+
+**新增 `terraform/` 目录**（IaC 项目；当日已独立为同级独立 git 仓库 `../foxwork-infra`，脱离本仓库单独版本控制）：
+- `provider.tf`：`tencentcloudstack/tencentcloud` provider（region=ap-chongqing），认证走环境变量 `TENCENTCLOUD_SECRET_ID/SECRET_KEY`（与 tccli 根账号同源），密钥不进库。
+- `variables.tf`：region / project / domain / cos_domain_prefix / cvm_private_ip 及派生 locals。
+- `security_groups.tf`：`foxwork-server`（入站 80/443/12211 + 出站全放行）、`foxwork-database`（入站 5432/6379 仅 172.30.0.13/32 + 出站全放行），各配 `security_group_rule_set`。
+- `cam.tf`：`foxwork` 子账号（console_login=false, use_api=true）+ `foxwork-cos-access` 策略 + 用户策略绑定。
+- `cos.tf`：生产桶 `foxwork-prod-1516998879`（private）+ `origin_domain_rules` 绑定 `cos.xfoxlab.com.cn`（REST）。
+- `dnspod.tf`：新增 `cos` CNAME → `foxwork-prod-1516998879.cos.ap-chongqing.myqcloud.com`。
+- 其余：`outputs.tf`、`.gitignore`（忽略 tfstate/tfvars/.terraform）、`terraform.tfvars.example`。
+
+**导入已有资源**（`terraform import`，将存量基础设施纳入管理）：
+- 安全组 `sg-kie3663c`/`sg-e9vg2lm8` + 两组 rule_set（按 SG id 导入）。
+- CAM 用户 `foxwork`、策略 `foxwork-cos-access`（PolicyId 291479731）、用户策略绑定（导入 ID 为 `foxwork#291479731`）。
+- COS 桶 `foxwork-prod-1516998879`。
+
+导入后 `terraform plan` 零 drift（安全组/CAM/策略的描述字符串精确匹配云端），仅剩 2 处新增：COS 域名绑定 + DNS 记录。
+
+#### 3. 遇到的问题与处理
+
+1. **本机无 Terraform 且 homebrew-core 已移除 terraform 公式**
+   - 现象：`brew install terraform` 报 `No available formula`（Hashicorp 已把 terraform 移出 core，只有 terraform-ls/terraformer 等周边）。
+   - 处理：改为从 `releases.hashicorp.com` 直接下载官方二进制 v1.17.0 到 `~/.local/bin/terraform`（已在 PATH），绕开 `brew tap hashicorp/tap`（走 GitHub，国内慢）。
+
+2. **COS 自定义域名绑定被 ICP 备案拦截（未解决，待用户完成备案）**
+   - 现象：`terraform apply` 时 DNS 记录创建成功，但 COS 桶 `PUT Bucket domain` 报 `451 DomainAuditFailed: Please complete the ICP registration of your domain before use it in Mainland China`。
+   - 结论：`xfoxlab.com.cn`（主体「玄狐（重庆）人工智能科技有限公司」）尚未完成 ICP 备案（或备案未与本账号 100054224426 关联）。COS 回源自定义域名是**硬性备案要求**（比 CVM 更严格）；域名已实名但 `ba` 接口无该域名备案记录。
+   - 影响：`cos.xfoxlab.com.cn` CNAME 已生效，但 COS 侧域名绑定未写入，请求会被 COS 拒绝。Terraform 状态中 `cos_bucket.prod` 保持「待加 origin_domain_rules」，备案完成后重跑 `terraform apply` 即可补齐。
+
+3. **`cam_user_policy_attachment` 导入 ID 格式**
+   - 现象：用 uid（27836463）导入报 `ResourceNotFound.UserNotExist`。
+   - 处理：正确格式是 `user_name#policy_id`（即 `foxwork#291479731`），非 uid。
+
+#### 4. 验证
+
+- `terraform validate` 通过；`terraform plan` 显示已有资源零 drift。
+- `dig cos.xfoxlab.com.cn` 返回 `foxwork-prod-1516998879.cos.ap-chongqing.myqcloud.com`（CNAME 生效）。
+- 待备案完成后 `terraform apply` 补齐 COS 域名绑定即可闭环。
+
+---
+
+### 2026-10-27 — 运营工作台（市场数据统计）+ 运营端/C 端权限收紧
+
+#### 1. 原因
+
+用户要求：①为运营设计独立 dashboard（市场数据统计）；②运营角色权限仅限「运营工作台 + 市场管理」菜单；③C 端用户权限仅限 C 端专属菜单，不能有全部页面权限。
+
+#### 2. 修改内容
+
+**后端：运营工作台统计 API**
+- 新增 `app/modules/market/dashboard/` 模块（schema/service/controller），`GET /market/dashboard/overview`，权限码 `module_market:dashboard:query`。
+- 统计：任务（总数/进行中/已完成/已结算）、成果（总数/待审核/通过/驳回）、结算（总数/应发金额合计）、基础数据（项目/公司/机构/服务项目计数），均排除软删除。
+- `routers.py` 注册 DashboardRouter 到 `/market` 分组。
+
+**前端：运营工作台页面**
+- `api/module_market/dashboard.ts` + `views/module_market/dashboard/index.vue`（统计卡片）。
+
+**菜单**
+- `sys_menu.json` 新增「运营工作台」目录（/ops-dashboard）+「工作台概览」子菜单（component_path=module_market/dashboard/index，权限码 module_market:dashboard:query，scope=web）。
+
+**权限脚本（ops/prod/）**
+- `base.py` 增加 `ensure_menu` / `collect_subtree_ids` / `bind_menus_to_role` 菜单辅助。
+- `init_ops_account.py`：运营角色（OPERATOR）只关联「运营工作台 + 市场管理全部菜单」；创建 admin（超管）+ operator（OPERATOR）。
+- `init_c_account.py`：USER 角色只关联 scope=app 的 C 端菜单（首页/同事/打卡/消息/我的）；创建 user。
+- 脚本幂等，密码/密钥走 `.env`。
+
+#### 3. 关键设计
+
+- 菜单用 `scope` 字段区分端：`web`（管理端，运营）/ `app`（移动端，C 端）；C 端 5 个菜单 scope=app。
+- 权限模型 = 角色-菜单关联（sys_role_menus）→ 前端菜单渲染 + 后端 API 权限码校验（AuthPermission，超管 is_superuser 绕过）。
+
+#### 4. 验证
+
+- `ruff check` 通过（dashboard 模块 + routers.py）；`python -m py_compile` 通过（ops/prod 脚本）。
+- basedpyright 对新建 dashboard 目录有 reportImplicitRelativeImport 误报（import 与其它 controller 完全一致），ruff 已确认正确。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -498,3 +738,31 @@
 7. **SQLAlchemy model 循环引用（TYPE_CHECKING + 字符串 relationship）依赖全量导入**（2026-10-26）
    - 现象：market 域 17 个 model 用 `TYPE_CHECKING` 延迟导入对方，字符串 `relationship` 靠 `routers.py` 全量导入才注册 mapper；独立 import 某模块（脚本/单测）时 mapper 初始化失败，报 `failed to locate a name ('XxxModel')`，且是「逐个冒泡」（补一个又缺下一个）。
    - 结论：需要独立加载模型集的场景（导入服务、脚本、单测）必须显式触发全量注册。market 域已建 `models.py` 统一入口（17 个 model），`import_center/service.py` 引入；后续若新增跨模块 relationship，记得同步登记进 `models.py`。
+
+8. **Ubuntu 24/26 SSH 端口由 systemd socket activation 控制，改 sshd_config `Port` 不生效**（2026-10-27）
+   - 现象：sshd_config 里 `#Port 22` 全是注释，端口实际由 `ssh.socket` 的 `ListenStream=0.0.0.0:22` 决定；只改 sshd_config 的 Port 不会改监听端口。
+   - 结论：改端口要写 `/etc/systemd/system/ssh.socket.d/*.conf` override（`ListenStream=` 清空默认再列新端口），然后 `systemctl daemon-reload && systemctl restart ssh.socket`；同时把 sshd_config 的 Port 同步改掉（socket activation 关闭时的备用）。改端口是高风险操作：**先加新端口保留旧端口兜底 → 验证新端口可登录 → 再撤旧端口**。
+
+9. **腾讯云 cloud-init 在 `sshd_config.d/50-cloud-init.conf` 写死 `PasswordAuthentication yes`**（2026-10-27）
+   - 现象：自定义 drop-in 里写 `PasswordAuthentication no` 被忽略，`sshd -T` 仍显示 yes——因为 sshd_config 的 `Include /etc/ssh/sshd_config.d/*.conf` 按词法序处理，`50-cloud-init.conf`（cloud-init 注入）排在 `99-*.conf` 之前，其 `yes` 先匹配生效。
+   - 结论：关密码登录前先 `grep -r PasswordAuthentication /etc/ssh/sshd_config.d/` 排查 cloud-init 残留，直接 sed 改 `50-cloud-init.conf`（或改主配置），`sshd -t` 校验后 reload，并用 `sshd -T` 复核最终生效值。
+
+10. **中国服务器 + Let's Encrypt 跨境校验偶发超时导致证书签发失败**（2026-10-27）
+   - 现象：`tls-alpn-01`/`http-01` 校验时，Let's Encrypt 海外 secondary validation 节点访问中国服务器 80/443 偶发 `Timeout during connect (likely firewall problem)`；同一 Caddy 实例下两个域名结果可能不同（`wxh5` 一次过、`admin` 失败回退到连不上的 ZeroSSL 卡住）。
+   - 结论：证书签发失败时先别急着改防火墙——用本机 `curl -I http://<ip>/`（返回 308 即 80 端口实际可达）排除真实防火墙问题，再 `docker compose restart caddy` 重试签发即可（已缓存证书不受影响）；属跨境网络抖动，非配置问题。
+
+11. **腾讯云 `CreateSecurityGroup` API 创建的安全组无默认出站规则**（2026-10-27）
+   - 现象：API/CLI 创建安全组后出站默认为「全拒绝」，CVM 切到该组后主动访问数据库/公网全部超时；但入站型服务（SSH/Web）因安全组有状态、响应包自动放行而不受影响，造成「SSH 通、Web 通、就是连不上数据库」的迷惑现象。
+   - 结论：用 API/CLI 创建安全组后，务必显式补「出站全放行」规则（`Protocol=ALL, CidrBlock=0.0.0.0/0, Action=ACCEPT`）；只有控制台创建才会默认带出站放行。排查「连不上下游」时，先检查本机所在安全组的**出站**规则，而非只盯着下游的入站规则。
+
+12. **SPA 前端 `base` 前缀与 Caddy `root` 不匹配 → 静态资源回退 index.html 报 MIME 错误**（2026-10-27）
+   - 现象：页面白屏，浏览器报 `Expected a JavaScript module but got MIME "text/html"`——前端 `index.html` 用 `/web/`、`/app/` 前缀引用资源，但 Caddy root 直接指向产物根，未剥离前缀，资源 404 后 `try_files` 回退到 `index.html`。
+   - 结论：部署带 `base` 前缀的 SPA 时，Caddy 用 `handle_path /前缀/*`（剥离前缀）+ root 指向产物根，勿让 root 直接叠加请求路径；根路径用 `redir / /前缀/ 308` 跳转。验证方式：`curl -I` 资源 URL 应返回 `text/javascript`，而非 `text/html`。
+
+13. **前端 `import.meta.env.VITE_XXX` 未配置时是 `undefined`，直接链式调用会运行时崩溃**（2026-10-27）
+   - 现象：`VITE_APP_WS_ENDPOINT` 未配置时，`httpEndpoint(import.meta.env.VITE_APP_WS_ENDPOINT)` 里 `endpoint.replace(...)` 抛 `Cannot read properties of undefined (reading 'replace')`，触发 ErrorBoundary。
+   - 结论：读 `import.meta.env.VITE_XXX` 用于字符串操作（replace/URL 构造）前必须兜底（`?.` 或回退同源 origin）；关键运行时变量应在 `.env.production` 显式配置，仓库里的 `.env.production.example` 只是模板，上线前要真正落地。前端改动必须重新构建 + 部署，否则线上仍是旧产物（旧 bug 依然复现）。
+
+14. **COS 自定义域名（回源）必须完成 ICP 备案，否则 `PUT Bucket domain` 报 `DomainAuditFailed`**（2026-10-27）
+   - 现象：`terraform apply` 绑定 `cos.xfoxlab.com.cn` 时，`tencentcloud_cos_bucket` 报 `451 DomainAuditFailed: Please complete the ICP registration of your domain before use it in Mainland China`；DNS CNAME 已成功、只有域名绑定这步被拦。
+   - 结论：COS 回源自定义域名是硬性备案要求（比 CVM 更严格），域名需先完成 ICP 备案且备案主体与本账号一致。`xfoxlab.com.cn` 当前未备案（或未关联账号 100054224426）。备案完成后重跑 `terraform apply` 即可补齐域名绑定；DNS 记录与 Terraform 配置可先行落地，无需回退。
