@@ -17,6 +17,7 @@ type _LocationUrl =
   "/subPages/module_market/my-earnings/index" |
   "/subPages/module_market/my-task/index" |
   "/subPages/module_market/submission-form/index" |
+  "/subPages/module_market/task-detail/index" |
   "/subPages/module_market/task-hall/index" |
   "/subPages/module_system/notices/index" |
   "/subPages/module_system/profile/index" |

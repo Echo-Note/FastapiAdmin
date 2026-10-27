@@ -148,20 +148,19 @@
           }
         },
         {
+          "path": "module_market/task-detail/index",
+          "type": "page",
+          "name": "market-task-detail",
+          "style": {
+            "navigationBarTitleText": "任务详情"
+          }
+        },
+        {
           "path": "module_market/task-hall/index",
           "type": "page",
           "name": "market-task-hall",
           "style": {
             "navigationBarTitleText": "任务大厅",
-            "enablePullDownRefresh": true
-          }
-        },
-        {
-          "path": "module_market/task-detail/index",
-          "type": "page",
-          "name": "market-task-detail",
-          "style": {
-            "navigationBarTitleText": "任务详情",
             "enablePullDownRefresh": true
           }
         },

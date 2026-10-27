@@ -26,7 +26,9 @@ export interface SSEClientOptions {
 }
 
 /** ws(s):// 基址转 http(s)://：SSE 走普通 HTTP，复用同一环境变量配置 */
-export function httpEndpoint(endpoint: string): string {
+export function httpEndpoint(endpoint?: string): string {
+  // 未配置 WS 端点时回退到同源 origin，避免 new URL(path, "") 抛错导致页面崩溃
+  if (!endpoint) return window.location.origin;
   return endpoint.replace(/^ws/, "http");
 }
 
