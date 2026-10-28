@@ -736,6 +736,397 @@
 
 ---
 
+### 2026-10-28 — 任务模块重新设计（推倒重来，后端已落地）
+
+#### 1. 原因
+
+用户指出市场域现有设计有缺陷，要求**重新设计、不做兼容**。依据 `docs/materials/任务/`（6 个药品示例任务目录，各 38 文件）与 `docs/重庆-省平台-市场管理-项目任务清单.xlsx` 重新分析，给出 7 点硬要求：①任务配置 JSONB + Pydantic；②任务层级两级（`市场机构管理-等级医院管理`）；③添加项目时选一级/二级；④C 端任务名 = `项目名-二级任务名`（如 `一心坦-等级医院管理`）；⑤任务发布有周期（如一年），周期内每月重复提交成果 + 每月提交报告给甲方；⑥按项目任务清单 TO C 任务制作任务模板，发布项目可选关联；⑦后台收敛为 4 模块（项目管理/任务管理/发放管理/机构管理）。
+
+#### 2. 分析结论（关键发现）
+
+1. **目录是两级**：一级（市场机构管理/市场档案信息调研/专项调研/会议服务）→ 二级（等级医院管理/…）；`配送协调/库存盘点/价格核查/竞品调研/销售对账` 是二级任务采集表内的**多行子表工作区**，不是独立任务层级。
+2. **单价挂在二级任务**：`等级医院管理`=2000 元/月/家（一个二级任务内多个工作区共享同一单价），v1.x 把单价拆到 44 计价项是错的。
+3. **结算单只有一套**（类型/任务/单位/单价/执行标准/实际执行），v1.x 的 `service_item(37)+task_type(44)` 两套 + 映射是过度设计。
+4. **任务设计应聚合为一份 JSONB**：表单 + 单价 + 执行标准 + 执行人要求 + 提交/去重规则 + 执行子模式，由 Pydantic `TaskConfig` 权威定义。
+
+#### 3. 修改内容（仅新增设计文档）
+
+- 新增 `docs/06-任务模块重新设计.md`：两级任务目录（5 一级 + 22 二级）、`TaskConfig`/`FormSchemaField` Pydantic 模型、4 模块收敛（project/task/payout/institution）、状态机、API 摘要、分模块并行实施计划。
+- 关键模型变更：`market_task_category` + `market_task_template(config JSONB)` 取代 `market_task_type(44)+market_template(9)`；`market_project_template` 承载「项目选二级模板」；`market_task.name` 自动生成 `{项目}-{二级}`；`market_report` 改月度、按「项目×二级任务×月份」生成；新增 `market_institution_image` 归集 C 端图片。
+
+#### 4. 评审拍板（用户确认）
+
+- 单价：专项调研 4 项、宣传 2 项先按「可配、暂空」落地（`price=null`）。
+- 月度报告：运营**手动**点「生成月度报告」，不自动。
+- 节奏：推倒重写，不兼容。
+
+#### 5. 后端落地内容（已完成，4 个并行 Agent + 主 Agent）
+
+- **删除旧模块**：`service_item`/`template`/`quota`/`import_center`/`dashboard`/`company`/`report`/`assignment`/`submission`/`settlement`（后 5 个迁入新目录重写）；删除旧种子 `market_template/task_type/service_item/service_item_task.json`；删除 `alembic/versions` 3 个中间态迁移（恢复「仅 __init__.py」）。
+- **共享件**：`config.py`（`TaskConfig`/`SubmitRule`/`ExecMode`）、`enums.py`（移除 `TaskKind`，新增 `SubjectType`/`PricingMode`/`SubmitCadence`）、`models.py`（16 模型注册）、`routers.py`（13 个 market Router）、`initialize.py`（seed 清单 `TaskCategory→TaskTemplate`）、`mini_controller.py`（C 端接口，补 `tasks/{id}`/`assignments/{id}` 详情）。
+- **种子**：`market_task_category.json`（5 一级）、`market_task_template.json`（22 二级，含完整 `form_schema`）。
+- **4 个模块重写**（五件套 model/schema/crud/service/controller）：
+  - `project`（项目管理）：`CompanyModel`/`ProjectModel`/`ProjectTemplateModel`/`ReportModel`；`ProjectService.publish` 按关联模板批量生成任务、`ReportService.generate` 手动生成月度报告。
+  - `task`（任务管理）：`TaskCategoryModel`/`TaskTemplateModel`/`TaskModel`/`AssignmentModel`/`SubmissionModel`；`TaskService.publish/hall_tasks`、`AssignmentService.accept/claim`、`SubmissionService.review`。
+  - `payout`（发放管理）：`SettlementModel(带 period)/SettlementItemModel(两级 category_name/template_name)/PayoutConfigModel/AllowanceModel/AllowanceDetailModel`；`SettlementService.settle/confirm`、`PayoutService.my_payout`。
+  - `institution`（机构管理）：`InstitutionModel`/`InstitutionImageModel`；`InstitutionImageService.list_by_institution` 归集图片。
+
+#### 6. 验证结果
+
+- `ruff check`：All checks passed。
+- `import`：16 模型 + 13 market Router（/mini /companies /projects /reports /categories /templates /tasks /assignments /submissions /settlements /payout /institutions /institution-images）全部成功。
+- `configure_mappers`：全量 relationship 字符串引用（含跨模块 TaskTemplateModel/SubmissionModel/UserModel）解析成功。
+- 种子校验：22 个二级模板 `config` 全部通过 `TaskConfig.model_validate`。
+
+#### 7. 剩余待办
+
+- 前端：web 4 菜单（项目管理/任务管理/发放管理/机构管理）+ 菜单 seed + app C 端页面。
+- 测试：`tests/test_market_*.py` 基于旧模型，需重写（当前会 collection 失败）。
+- `dashboard`（运营工作台）与 `import_center`（成果导入）随旧模型一并删除，若需保留需基于新模型重建。
+
+---
+
+### 2026-10-28 — 市场模块重写收尾：修复索引名冲突 + 前端 web 类型错误
+
+#### 1. 原因
+
+4 个并行 Agent 完成后端 4 模块（task/project/payout/institution）重写后，遗留两处阻断：
+
+1. **后端全量测试 ERROR**：`create_all` 自举时抛 `DuplicateTableError: relation "ix_market_task_template_id" already exists`，所有依赖 TestClient 布局的用例（含 market 集成测试）失败。
+2. **前端 web `pnpm ts:check` 14 处报错**：`form-schema-editor` 引用已删除的 `task-type` 模块、`institution-image` 用不存在的 `formatter` 属性、`task-template` 布尔选项类型不匹配。
+
+#### 2. 修改内容
+
+**后端索引名冲突修复**
+
+- 根因：SQLAlchemy 命名约定 `ix_%(column_0_label)s` 下，`market_task.template_id`（列索引）与 `market_task_template.id`（表名+主键列）都渲染为 `ix_market_task_template_id`，`create_all` 建到第二个同名索引时撞名。
+- 处理：`task/model.py` 的 `TaskModel.template_id` 移除 `index=True`，改为在 `__table_args__` 显式声明 `Index("ix_market_task_template_fk", "template_id")`（SQLAlchemy 的 `Column.index` 仅接受布尔，不接受字符串名，需用显式 `Index` 对象）。
+- 删除 dev autogen 残留的根迁移 `alembic/versions/2026_10_28_1158_8bbefa5ae3cb.py`（恢复 versions/ 仅 `__init__.py` 纯净态，见踩坑 15）。
+
+**前端 web 类型修复**
+
+- 新建 `api/module_market/form-schema.ts`：`FormSchemaField`/`FormSchemaFieldType`/`FormSchemaOption`，对齐后端 `form_schema.py` 权威定义。
+- `form-schema-editor/index.vue`：import 由已删除的 `task-type` 改为 `form-schema`。
+- `task-template.ts`：`TaskConfig.form_schema` 由 `Record<string, unknown>[]` 改为 `FormSchemaField[]`。
+- `institution-image/index.vue`：`FaDescriptions` 的 `DescriptionsItem` 无 `formatter` 属性，改为 `slot` + 具名插槽渲染 `#来源成果`。
+- `task-template/index.vue`：`ENABLED_OPTIONS` 布尔值改为字符串 `"true"/"false"`（`OptionType.value` 仅 `string | number`），搜索表单 `enabled` 类型同步。
+
+#### 3. 验证
+
+- 后端：`pytest tests/` 242 passed；`ruff check app/modules/market/` all passed。
+- 前端：`pnpm ts:check` 通过（0 错误）。
+
+#### 4. 剩余待办（未阻断，待决策）
+
+- 小程序端 `api/module_market/index.ts` 仍残留旧模型类型（`TaskTypeItem`/`TaskItem`/`AssignmentItem` 引用 `task_type`/`service_item`/`task_kind`/`unit_price`/`exec_qty` 等已删除概念）；各页面已改用本地类型 + `as any` 绕过，类型定义待清理对齐。
+- `sys_menu.json` 仍保留「运营工作台」菜单（`module_market/dashboard/index`），但 dashboard 模块已删除；需决策「删除该菜单」或「基于新模型重建 dashboard」并同步 `ops/prod/init_ops_account.py` 的角色菜单绑定。
+
+---
+
+### 2026-10-28 — 市场模块重写终检：清理再生迁移 + 全量验证通过
+
+#### 1. 原因
+
+4 个并行 Agent 重写完成后，主 Agent 做最终校验与收尾。发现 dev autogen 在「收尾」记录删除 `2026_10_28_1158_8bbefa5ae3cb.py` 之后，又生成了新的根迁移 `2026_10_28_1248_5101bfa2ec1c.py`（`down_revision=None`，针对旧 schema 的增量），违反「versions/ 仅 __init__.py」口径。
+
+#### 2. 修改内容
+
+- 删除残留根迁移 `alembic/versions/2026_10_28_1248_5101bfa2ec1c.py`，恢复 versions/ 仅 `__init__.py`。
+
+#### 3. 验证
+
+- 后端：`ruff check app/modules/market/` All checks passed；`models.py` 16 模型 + `routers.py` 13 market Router 导入成功；`pytest tests/` **242 passed**。
+- 前端 web：`pnpm ts:check` 通过（0 错误）。
+
+#### 4. 剩余待办（仍待决策，与「收尾」记录一致）
+
+- 小程序端 `api/module_market/index.ts` 旧模型类型清理（页面已用本地类型 + `as any` 绕过，无运行时影响）。
+- `sys_menu.json`「运营工作台」菜单去留（dashboard 模块已删）。
+
+---
+
+### 2026-10-28 — 收尾两项待办落地：小程序端类型对齐 + 基于新模型重建 dashboard
+
+#### 1. 原因
+
+用户拍板两项待办：①小程序端旧模型类型残留顺手对齐；②「运营工作台」菜单不删，改为**基于新模型重建 dashboard 统计**。
+
+#### 2. 小程序端类型对齐（frontend/app）
+
+- `api/module_market/index.ts`：删除已废弃的 `TaskTypeItem`（旧 `market_task_type` 概念），`TaskItem`/`AssignmentItem` 对齐新 `TaskOutSchema`/`AssignmentOutSchema`（`task_no`/`project_id`/`template_id`/`template.config`/`name`/`assign_mode`，移除 `task_type`/`task_kind`/`unit_price`/`exec_qty`/`exec_time_*` 等已删概念）；`SubmissionItem` 补 `period`/`reviewer_id`/`ai_check_*`；新增 `TaskConfig`/`TaskCategoryItem`/`TaskTemplateItem` 三级类型（对齐 `config.py`/`form_schema.py`）。
+- `constants/market.constant.ts`：删除 `TASK_KIND_MAP` 与 `taskKindText()`（引用已删的 `task_kind` 周期/定额概念，且全仓库无调用）。
+
+#### 3. 基于新模型重建 dashboard
+
+**后端（`app/modules/market/dashboard/` 五件套缺 crud/model，与旧版一致仅 schema/service/controller/__init__）**
+- `schema.py`：`DashboardOverviewSchema` 将 `service_item_count` 替换为 `category_count`（一级分类）+ `template_count`（二级模板）。
+- `service.py`：`overview()` 统计对象从旧 `ServiceItemModel` 改为新 `TaskCategoryModel`/`TaskTemplateModel`；其余（任务/成果/结算/项目/公司/机构）模型不变，均排除软删除。
+- `controller.py`：`GET /market/dashboard/overview`，权限码 `module_market:dashboard:query` 不变。
+- `routers.py`：重新注册 `DashboardRouter` 到 `/market` 分组（14 个 market Router）。
+
+**前端 web**
+- `api/module_market/dashboard.ts`：`DashboardOverview` 增 `category_count`/`template_count`、删 `service_item_count`。
+- `views/module_market/dashboard/index.vue`：基础数据卡片由「服务项目」改为「一级分类 + 二级模板」两张；修复 `getOverview()` 取值（`res.data.data` 而非 `res.data`，响应拦截器返回完整 AxiosResponse）。
+
+**测试**
+- 新增 `tests/test_market_dashboard.py`（3 用例）：结构完整性、种子计数（一级分类 5 / 二级模板 22）、未认证 401。
+
+**ops/prod**
+- `init_ops_account.py` 无需改动：`ensure_dashboard_menu` 本就按 `component_path=module_market/dashboard/index` + `permission=module_market:dashboard:query` 建菜单并绑定 OPERATOR 角色，与重建后的模块/前端/菜单 seed 完全一致。
+
+#### 4. 验证
+
+- 后端：`ruff check` all passed；`pytest tests/` **245 passed**（+3 dashboard 用例）。
+- 前端 web：`pnpm ts:check` 通过（0 错误）。
+
+---
+
+### 2026-10-28 — 任务目录：分类+模板合并为树形表格，form_schema 可视化编辑
+
+#### 1. 原因
+
+用户要求把「任务分类」「任务模板」两个页面合并为**树形结构**展示（分类父行 + 模板子行），并明确：任务模板的采集表单结构 `form_schema` 不能用 JSON 文本（运营人员太难用），改为可视化表单编辑器。
+
+#### 2. 后端：新增分类树接口
+
+- `task/schema.py`：新增 `TaskTemplateTreeOutSchema`（树子节点，**不含 category 嵌套**，避免 `MissingGreenlet` 懒加载冗余）+ `TaskCategoryTreeSchema`（继承分类出参 + `children: list[TaskTemplateTreeOutSchema]`）。
+- `task/service.py`：`TaskCategoryService.tree()` 一次查全部分类（`order_by sort`）→ 逐个查其下模板（`search category_id`）→ 组装树；`_template_tree_out()` 用 `TaskConfig` 解析 config。
+- `task/controller.py`：`GET /market/categories/tree`（权限码 `module_market:task_category:query`），**注册在 `/detail/{id}` 之前**避免 `/tree` 被路径参数路由吞掉。
+
+#### 3. 前端：树形表格 + 可视化 form_schema
+
+- `api/module_market/task-category.ts`：新增 `treeCategory()` + `TaskCategoryTreeItem`/`TaskTemplateTreeItem` 类型（`category_id` 必填，用于类型守卫）。
+- 新建 `views/module_market/task-catalog/index.vue`：`FaTable` + `tree-props="{ children: 'children' }"` + `row-key="id"`（与菜单管理一致）；`useTableColumns` 定义列；操作列用 `isTemplate(row)`（`"category_id" in row` 类型守卫）区分父行（新增模板/编辑/删除分类）与子行（详情/编辑/删除模板）；分类表单走 `FaDialog`+`FaForm`，模板表单 `form_schema` 用 `FormSchemaEditor`（`v-model` 绑定 `FormSchemaField[]`，经 FaForm 具名 slot `#form_schema` 接入）。
+- 删除旧 `views/module_market/task-category/index.vue` 与 `task-template/index.vue`（菜单已不再引用）。
+
+#### 4. 菜单合并（`sql/sys_menu.json`）
+
+- 「任务分类」「任务模板」两个 type 2 菜单合并为单个「任务目录」：`route_name=MarketTaskCatalog`、`route_path=task-catalog`、`component_path=module_market/task-catalog/index`；children 合并为 6 个按钮（新增分类/编辑分类/删除分类 + 新增模板/编辑模板/删除模板），权限码沿用原有两套不新增。
+- 用 `json.load`+`json.dump(indent=4, ensure_ascii=False)` 精确改写，已 dry-run 验证与原文字节级一致（diff 0）。
+
+#### 5. 验证
+
+- 后端：`ruff check` all passed；`pytest tests/` **248 passed**（新增 `tests/test_market_task_catalog.py` 3 用例：树结构/归属、sort 排序、未认证 401）。
+- 前端 web：`pnpm ts:check` 通过（0 错误）。
+
+---
+
+### 2026-10-28 — 重建 dev 库 + 开发环境初始化（站点/存储/账号）
+
+#### 1. 原因
+
+「任务目录」菜单合并改了 `sys_menu.json`（种子数据），seed 幂等（表已有数据则跳过），需重建数据库让新菜单生效；同时补齐开发环境的站点信息、对象存储、运营/C 端账号。
+
+#### 2. 开发环境对象存储：dev 桶 + 独立子账号
+
+- 开发环境 COS 用 `xfoxlab-dev-1516998879`（与生产 `foxwork-prod` 隔离）。
+- `foxwork-infra`（独立 Terraform 仓库）`cam.tf` 新增 dev 子账号 `foxwork-dev`（UIN `100054319693`）+ 策略 `foxwork-dev-cos-access`（仅限 dev 桶）+ 绑定 + `tencentcloud_cam_access_key`（API 密钥进 state）；`outputs.tf` 输出 dev 密钥（sensitive）。
+- `terraform apply` 用 `-target` 只落地 4 个 dev 资源，**跳过 `foxwork-prod` 桶的 `origin_domain_rules` 更新**（那是 ICP 备案遗留 drift，带上会因 `DomainAuditFailed` 失败）。
+
+#### 3. 脚本与代码改动
+
+- `ops/prod/init_storage_node.py`：新增 `COS_DESCRIPTION` 环境变量（原 description 硬编码「生产 COS 存储」，dev 复用需可配）；节点名 `COS_NODE_NAME` 已支持。
+- dev 环境初始化执行顺序（均连 dev 库，`PYTHONPATH=backend` + `uv run`）：
+  1. `init_site_info.py` → 站点/品牌参数 12 项
+  2. `init_storage_node.py`（export `COS_*` 覆盖 ops/prod/.env 生产值：dev 桶 + foxwork-dev 密钥）→ 节点「COS 开发存储」is_default
+  3. `init_ops_account.py` → OPERATOR 角色绑定 52 菜单（含新「任务目录」）、admin/operator 账号
+  4. `init_c_account.py` → USER 角色 + 5 C 端菜单、user 账号
+
+#### 4. 验证
+
+- `task_storage_node`：`COS 开发存储`（xfoxlab-dev-1516998879 / ap-chongqing / is_default=t）。
+- `sys_user`：super / admin（超管）/ operator / user 四账号就绪；`sys_menu` 含「任务目录」；`sys_param.sys_name`=玄狐科技。
+
+---
+
+### 2026-10-28 — 任务目录优化：树形展开修复 + 类型列中文 + form_schema 分组结构重构
+
+#### 1. 原因
+
+用户反馈任务目录 4 个优化点：① 树形展开异常（子项展开为空、收起子项误关父级）；② 表格「类型」列显示英文 `template`/`category`；③ 二级模板的一级分类显示编号而非名称；④ 采集表单结构出现「一、会议信息（必填）」式分节标题，且生成 JSON 应为分组结构。
+
+#### 2. 改动
+
+- **树形展开（row-key 冲突）**：`task-catalog/index.vue` 原 `row-key="id"`，一级分类与二级模板各自独立自增（分类 id=1..5、模板 id=1..22 撞车）导致 Element Plus 树形表格渲染错乱。改为 `loadTree` 给节点生成复合唯一 key（`category-{id}` / `template-{id}`），`row-key="_rowKey"`。
+- **类型列中文**：formatter 返回「模板」/「分类」，删除未生效的 `status` 死配置。
+- **一级分类名称**：后端 `TaskTemplateTreeOutSchema` 增 `category_name`，`tree()` 循环时填充；前端表格模板子行增「一级分类」列。
+- **form_schema 结构重构**：由「扁平数组 + section 标记」改为「按分节分组的对象」`dict[分节名, dict[字段名, 字段定义]]`。字段定义去掉 `name`/`section`（由两层 key 表达）、`type=section` 取消；`table` 子列抽为 `FormSchemaColumn`。分节标题清洗（去「一、」序号与「（必填）」后缀）。
+
+#### 3. 涉及文件
+
+- 后端：`form_schema.py`（重写，新增 `FormSchemaColumn` + `FormSchema` 别名）、`config.py`（`form_schema` 类型改 dict）、`task/schema.py` + `task/service.py`（tree 补分类名）。
+- 种子数据：`backend/sql/market_task_template.json` 22 个模板的 `form_schema` 全部迁移为分组结构（脚本一次性迁移）。
+- 前端 web：`api/module_market/form-schema.ts`、`task-template.ts`、`task-category.ts`、`task.ts` 类型对齐；`form-schema-editor/index.vue` 重写为分组编辑；`task-catalog/index.vue` 适配。
+- 小程序：`api/module_market/index.ts` 类型对齐；`submission-form/index.vue` 改为按分节嵌套遍历渲染，`form_data` 提交结构保持扁平不变（字段名仍作为 form_data 的 key）。
+
+#### 4. 验证与注意
+
+- `uv run` 验证 22 个模板 config 均能被新 `TaskConfig` 解析，分节标题已清洗（如「会议信息」「会议照片」）。
+- 前端 web / 小程序 lint 零错误；后端改动无新增 lint 错误。
+- 种子数据幂等（表已有数据则跳过），**需重建 dev 库**让新的 form_schema 分组结构生效（同「重建 dev 库」记录）。
+
+---
+
+### 2026-10-28 — form_schema 分节结构再调整：中文 key → code/name 分离
+
+#### 原因
+
+用户反馈分节名（中文）直接作为 form_schema 外层 key 不规范——展示名与标识耦合，将来分节改名/按分节落库/国际化都会变成负担。改为分节「英文 code + 中文 name」分离，与字段一致。
+
+#### 改动
+
+- `form_schema` 由 `dict[分节名, dict[字段名, 字段定义]]` 改为**有序分节数组** `list[FormSchemaSection]`，`FormSchemaSection = {code, name, fields}`。
+- 后端 `form_schema.py` 新增 `FormSchemaSection`；`config.py` 的 `form_schema` 类型改为 `list[FormSchemaSection]`。
+- 种子数据 22 个模板迁移：分节名映射为英文 code（「执行信息」→ execution_info、「会议信息」→ meeting_info 等，共 29 个分节名）。
+- 前端 web / 小程序类型对齐；`form-schema-editor` 分节编辑增「分节标识 code + 分节名 name」两输入，code 校验字母开头、仅字母数字下划线、唯一。
+- `form_data` 提交结构仍保持扁平不变（字段名英文作为 key，分节名不落库）。
+
+#### 验证与注意
+
+- 22 个模板均能被新 TaskConfig 解析，分节 code 唯一；前端 web / 小程序 lint 零错误。
+- dev 库 `market_task_template` 表已 `TRUNCATE ... RESTART IDENTITY CASCADE`（级联清空引用它的 market_task/project_template/report/assignment/settlement/submission 等业务表）后重新播种。
+
+---
+
+### 2026-10-28 — 任务目录三级化：类型→类型→任务（按 Excel 清单重排）
+
+#### 原因
+
+用户指出任务目录的层级设计不对，应按 `docs/重庆-省平台-市场管理-项目任务清单.xlsx`：**TO B 的「类型」为一级，TO C 的「类型」为二级，TO C 的「任务」为三级**。原实现是两级（分类+模板），且「配送协调/库存盘点」等任务被埋在模板 `form_schema` 的 table 分节里。
+
+#### 三级结构（权威 = Excel 清单）
+
+- **一级（TO B 类型，6 个）**：商务管理服务、市场机构调研服务、访谈问卷调研服务、市场宣传服务、专项管理报告、会议服务（会议服务为 Excel 清单外、用户要求保留）。
+- **二级（TO C 类型，18 个）**：如商务管理服务下等级医疗管理/基层医疗管理/民营医疗管理/零售药店管理/商业公司管理；市场档案信息调研（原 5 个档案调研模板合并为 1 个二级）。
+- **三级（TO C 任务，51 个）**：如等级医疗管理下配送协调/库存盘点/价格核查/竞品调研/销售对账。
+
+#### 数据模型
+
+- 新增 `TaskItemModel`（`market_task_item` 表）：code、name、template_id（`uq(template_id, code)` 联合唯一）、config（`TaskItemConfig`）、sort、enabled。
+- `TaskItemConfig = {columns, multi, unit, price, exec_standard, executor_requirement, max_per_month}`，`columns` 用扩展后的 `FormSchemaColumn`（完整类型含 radio + options）。
+- `FormSchemaField.type` 去掉 `table`（多行子表提升为三级任务）；`TaskConfig` 去掉 `exec_modes`（问卷/宣传类的「医务人员/非医务人员调研」「户外/媒介宣传」提升为三级任务）。
+- 任务三形态映射：商务类任务 = 原 table 分节（`multi=true`）；档案/问卷/宣传类任务 = 原字段组或 exec_modes（`multi=false`）。
+
+#### 种子数据
+
+- 迁移脚本从旧 22 模板生成三份：`market_task_category.json`（6）、`market_task_template.json`（18，form_schema 只留通用字段）、`market_task_item.json`（51，脚本一次性迁移）。
+
+#### 前后端
+
+- 后端：schema（TaskItem 系列 + tree 三级 + `TaskTemplateOutSchema.items`）、service（`TaskItemService` + tree 三级 + `_TASK_PRELOAD` 加 `template.items`）、controller（`/market/items` 路由，复用 task_template 权限）、crud、routers、initialize（prepare_init_models 加 TaskItemModel）。
+- 前端 web：`task-catalog` 三级树 + 三级 CRUD（新增 `columns-editor.vue` 编辑任务采集字段）；`form-schema-editor` 去 table。
+- 小程序：`submission-form` 消费「通用字段（form_schema）+ 三级任务（多行/单行）」；`form_data` 提交结构保持扁平。
+
+#### 验证
+
+- 22/18/51 三级数据入库正确；后端全量导入 + 路由注册通过；前端 web / 小程序 lint 零错误；dev 库已 DROP + CREATE 重建并重新播种 + 重跑 4 个环境初始化脚本（站点/存储/账号）。
+
+---
+
+### 2026-10-28 — 三级任务采集字段改回分节 form_schema（columns → FormSchemaSection 列表）
+
+#### 1. 原因
+
+用户反馈：三级任务（如「价格核查」）的采集表单应为**完整的分节结构**，自包含「执行信息」「价格核查」「管理核实」等分节，数据形态类似 `{"执行信息":{"区域":"xxx","医院等级":"xxx"},"价格核查":{}}`，且在**添加/编辑/详情展示**时都按分节分别添加与展示。此前「模板通用字段（form_schema）+ 任务专属字段（columns 数组）」拆成两块、且任务字段用扁平 `columns`（`FormSchemaColumn`，name 在列内）的方案不符合预期。
+
+#### 2. 修改内容
+
+**后端（权威定义源）**
+
+- `form_schema.py`：删除 `FormSchemaColumn`（三级任务不再用数组形式，字段名与字段定义分离，统一用 `FormSchemaField`）。`FormSchemaField` 改为「二级模板 + 三级任务」共用定义。
+- `config.py`：`TaskItemConfig.columns: list[FormSchemaColumn]` → `form_schema: list[FormSchemaSection]`（与 `TaskConfig.form_schema` 同构）；`multi` 保留（商务类任务多行子表 True / 档案·问卷·宣传类任务单行 False）。
+
+**种子**
+
+- `market_task_item.json` 51 条任务：`config.columns` 迁移为 `config.form_schema`，每条任务折叠为单个分节（`code`=任务 code、`name`=任务名、`fields`=列名 → `{label/type/required/placeholder/options}`）。已用 `TaskItemConfig.model_validate` 全量校验通过。
+
+**前端 web**
+
+- `form-schema.ts`：删除 `FormSchemaColumn`/`FormSchemaColumnType`，`FormSchema` 明确为「二级模板 + 三级任务共用」。
+- `task-item.ts`：`TaskItemConfig.columns` → `form_schema: FormSchema`。
+- `task-catalog/index.vue`：三级任务编辑由 `ColumnsEditor` 改用 `FormSchemaEditor`（分节可视化编辑）；详情展示由「任务采集字段（列数组）」改为「任务采集字段（分节，含分节列）」。
+- 删除 `columns-editor.vue`（数组形式列编辑器，已被 FormSchemaEditor 取代）。
+
+**前端 app（小程序）**
+
+- `api/module_market/index.ts`：删除 `FormSchemaColumn`，`TaskItemConfig.columns` → `form_schema`。
+- `submission-form/index.vue`：新增 `taskFields(task)` 把三级任务 `form_schema` 展平为字段列表；多行子表（multi）与单行字段组的列渲染由 `task.config.columns` 改为 `taskFields(task)`。
+
+#### 3. 关键口径
+
+- 三级任务 `form_schema` 与二级模板 `form_schema` **同构**（都是 `list[FormSchemaSection]`），字段名由分节 `fields` 的 key 表达，不再用 `FormSchemaColumn.name`。
+- `multi` 仍为**任务级**开关：`multi=true` 的任务整体渲染为一张可重复的多行子表（其 form_schema 字段即为列），`multi=false` 渲染为单行字段组。当前种子每条任务仅一个分节，多分节 + multi 的组合语义（按分节粒度多行）未展开，留待后续明确。
+
+#### 4. 验证
+
+- 后端：`ruff check app/modules/market/` All checks passed；`app.api.v1.routers` 15 个 market Router 导入成功；51 条种子 `TaskItemConfig.model_validate` 全量通过。
+- 前端 web：`pnpm ts:check` 通过（0 错误）；小程序：`pnpm type-check` 通过（0 错误）。
+
+---
+
+### 2026-10-28 — form_schema 加回分节内多行子表（type=table）+ form_data 按分节嵌套
+
+#### 1. 原因
+
+用户给出真实采集表（重庆省平台「价格核查」表单）示例图：一张表单 = 三个分节（一、执行信息（必填）键值对字段；二、价格核查（必填）——**多行明细子表**（产品名称/规格/生产企业/挂网价/采购价/销售价）+ 表后单字段（异常说明）；三、管理核实（必填）——打卡照片等）。即分节内可「键值对字段 + 多行子表 + 单字段」混排。上一轮把多行子表整体提升为三级任务（任务级 `multi` 开关）的方案仍不匹配；且成果详情按「通用采集字段（模板级）」扁平表格展示（带分节列）被用户划掉，要求按分节块展示。
+
+#### 2. 修改内容
+
+**后端（权威定义源）**
+
+- `form_schema.py`：`FormSchemaField.type` 加回 `"table"`（多行子表），新增 `columns: list[FormSchemaColumn] | None`（子列定义，`FormSchemaColumn` 回归，子列类型不允许再嵌套 table）；`FormSchemaSection` 新增 `required: bool`（分节必填标记，展示「(必填)」）。
+- `config.py`：`TaskItemConfig` 移除 `multi`（多行语义由分节内 table 字段表达，任务级开关无法表达「子表 + 表后单字段」混排）。
+
+**种子（脚本一次性迁移后删除）**
+
+- `market_task_item.json` 51 条：原平铺字段按 `multi` 拆分——`multi=true` 的商务类任务折叠为分节内 `type=table` 字段（字段名=分节 code、label=分节名、columns=原子段）；`multi=false` 保持平铺；全部分节补 `required: true`；删除 `config.multi`。
+- `market_task_template.json` 18 条：全部分节补 `required: true`。
+
+**前端 web**
+
+- `form-schema.ts`：`FormSchemaColumn` 回归、`FormSchemaFieldType` 加 `table`、`FormSchemaField.columns?`、`FormSchemaSection.required?`。
+- `form-schema-editor/index.vue`：类型下拉加回「多行子表」；`type=table` 时展示子列编辑器（列显示名/列标识/类型/必填，增删、查重、防嵌套）；分节编辑加「是否必填」开关；类型列/选项列对 table 展示「子表 N 列：…」摘要；示例更新为「执行信息 + 价格核查(子表+异常说明) + 管理核实」。
+- `task-item.ts` / `task-catalog/index.vue`：`TaskItemConfig` 去 `multi`，编辑表单去「是否多行」开关；三级任务详情由「模板通用字段 + 任务采集字段两张扁平表」改为**按分节块展示**（模板通用分节 + 任务自有分节按序合并，每分节一个带标题块 + 字段表格，table 字段显示子列摘要）。
+
+**前端 app（小程序）**
+
+- `api/module_market/index.ts`：类型同 web 对齐（`FormSchemaColumn` 回归、table 类型、section required、去 multi）。
+- `submission-form/index.vue`：重构为**分节渲染 + 分节嵌套提交**——`allSections` = 模板通用分节 + 全部三级任务分节按序合并；`form_data` 改为 `{分节code: {字段名: 值}}`，其中 `type=table` 字段值为 `list[dict[子列名, 值]]`（行可增删）；必填校验覆盖单值必填字段与子表必填列；分节标题展示「（必填）」。
+
+#### 3. 关键口径
+
+- **form_data 按分节 code 嵌套落库**：`{"execution_info": {"region": "..."}, "price_check": {"price_check": [{"product_name": "..."}]}, "management_verification": {"door_photo": "url"}}`——对齐用户示例 `{"执行信息":{...},"价格核查":{...}}`（key 用分节英文 code）。多行子表数据挂在「分节内 table 字段名」下。
+- **多行子表 = 分节内 `type=table` 字段**（columns 子列），不再是任务级 `multi` 开关；分节内可与单值字段混排（如价格明细表 + 异常说明）。
+- 展示口径：模板 `form_schema`（执行信息/管理核实等通用分节）+ 任务 `form_schema`（任务专属分节）按序合并为一个分节表单，web 详情、web 编辑器、C 端提交页三处一致。
+
+#### 4. 验证
+
+- 后端：`ruff check app/modules/market/` All checks passed；15 market Router 导入成功；18 模板 + 51 任务种子全量 `model_validate` 通过。
+- 前端 web：`pnpm ts:check` 通过；小程序：`pnpm type-check` 通过。
+
+#### 5. 遗漏修复：数据库未重播种导致任务分节「缺失」
+
+- 现象：用户反馈「价格核查里缺少价格核查、配送协调里缺少配送协调」——详情只显示模板通用分节（执行信息/管理核实），任务自有分节整个不见。
+- 根因：种子初始化 `__init_data` 幂等（表已有数据即整体跳过）。改了 `market_task_item.json` 后，库内 `market_task_item.config` 仍是**最旧的 `{multi, columns}` 结构**，后端 `TaskItemConfig.model_validate` 解析时 `form_schema` 取默认空列表，任务分节因此「缺失」。
+- 处理：`TRUNCATE TABLE market_task_item, market_task_template RESTART IDENTITY CASCADE`（级联清空引用它们的业务数据）后按新种子重播种 18 模板 + 51 任务，验证 `price_check` 的 config 已为 `form_schema[分节 price_check → 子表 price_check(columns)]`。
+- 教训：凡改 market 域种子文件（含 form_schema 结构迁移），**必须同时清库重播种**，否则幂等跳过导致「代码改了、库还是旧的」的假象（与踩坑 6 同源）。
+
+#### 6. 落地一键重置脚本
+
+- 新增 `app/scripts/reseed_market.py`：动态收集全部 `market_` 表（来自 `MappedBase.metadata`），`TRUNCATE ... RESTART IDENTITY CASCADE` 清空，再按依赖顺序重播种「任务分类 → 任务模板 → 三级任务」三张种子表；非 DEV 环境需 `--force`。
+- 用法（backend 目录）：`PYTHONPATH=. uv run python -m app.scripts.reseed_market`。实测清空 17 张表、重播种 6 分类 + 18 模板 + 51 任务，`price_check`/`grade_hospital_manage` 种子结构验证正确。
+
+#### 7. 执行信息/管理核实/基本信息不是模板「通用节点」
+
+- 现象：用户明确纠正「执行信息/管理核实不是通用节点，是这几个任务碰巧都有而已」。此前把 `execution_info`/`management_verification`（管理类）与 `basic_profile`（调研类）当成模板级 `TaskConfig.form_schema` 的「通用采集字段」，三级任务通过 `TaskItemService._template_sections` 继承/合并来获得，属错误抽象。
+- 处理：
+  1. 种子 `market_task_template.json`：清空管理类（category 1，5 个）与调研类（category 3，7 个）模板的 `form_schema`；仅「无三级任务的叶子模板」（category 2/4/6：档案调研、宣传、科普、3 个会议活动）保留 `form_schema`。
+  2. `service.py`：删除 `TaskItemService` 的 `_template_sections` 继承逻辑，三级任务完全自包含、不从模板继承分节。
+  3. `config.py` / 前端 `task-catalog`：`TaskConfig.form_schema` 口径改为「仅无三级任务的叶子模板使用」，清除「通用采集字段」「含继承自模板的通用分节」等误导文案。
+- 口径：**凡有三级任务的模板不承载 `form_schema`，表单结构完全由三级任务自包含**；详情/编辑只渲染任务自身 `form_schema`。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -792,3 +1183,8 @@
 14. **COS 自定义域名（回源）必须完成 ICP 备案，否则 `PUT Bucket domain` 报 `DomainAuditFailed`**（2026-10-27）
    - 现象：`terraform apply` 绑定 `cos.xfoxlab.com.cn` 时，`tencentcloud_cos_bucket` 报 `451 DomainAuditFailed: Please complete the ICP registration of your domain before use it in Mainland China`；DNS CNAME 已成功、只有域名绑定这步被拦。
    - 结论：COS 回源自定义域名是硬性备案要求（比 CVM 更严格），域名需先完成 ICP 备案且备案主体与本账号一致。`xfoxlab.com.cn` 当前未备案（或未关联账号 100054224426）。备案完成后重跑 `terraform apply` 即可补齐域名绑定；DNS 记录与 Terraform 配置可先行落地，无需回退。
+
+15. **SQLAlchemy 索引命名约定 `ix_%(column_0_label)s` 下「表名+列名」拼接会产生跨表同名索引冲突**（2026-10-28）
+   - 现象：`market_task.template_id`（列索引）与 `market_task_template.id`（ModelMixin 主键 `index=True`）都渲染为 `ix_market_task_template_id`，`create_all` 建到第二个同名索引时抛 `DuplicateTableError: relation "ix_market_task_template_id" already exists`，全部测试在 TestClient 布局阶段 ERROR。
+   - 结论：当出现「`X.Y_id` 列」与「`X_Y` 表的主键 `id`」并存时，默认命名约定会把两者拼成同一个 `ix_X_Y_id`。修复需给冲突列改用**显式 `Index` 对象**（`__table_args__` 里 `Index("ix_X_Y_fk", "Y_id")`），因为 `Column.index` 参数只接受布尔、不接受字符串名。给新模型加 `_id` 外键列时，先扫一遍是否存在 `前缀_该后缀` 形式的表名，避免重名。
+   - 附带：dev autogen 在「旧库 → 新模型」时生成的根迁移（`down_revision=None`）是对旧 schema 的增量，不是从空库的干净迁移，且版本文件目录应保持「仅 `__init__.py`」，勿提交这类中间态迁移（否则与 create_all 自举库撞表/撞索引）。

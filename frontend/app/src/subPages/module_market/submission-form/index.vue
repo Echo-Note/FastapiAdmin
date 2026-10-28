@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FormSchemaField, InstitutionItem } from '@/api/module_market'
+import type { FormSchema, FormSchemaField, InstitutionItem, TaskItemConfig } from '@/api/module_market'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,37 +14,97 @@ const router = useRouter()
 const assignmentId = ref<number>()
 const taskNo = ref('')
 const formLoading = ref(false)
-const formSchema = ref<FormSchemaField[]>([])
-const formData = reactive<Record<string, any>>({})
+const formSchema = ref<FormSchema>([])
+
+/** 三级任务（含任务专属采集字段） */
+interface TaskItemView {
+  code: string
+  name: string
+  config?: TaskItemConfig | null
+}
+const taskItems = ref<TaskItemView[]>([])
 
 const institutionId = ref<number>()
 const institutions = ref<InstitutionItem[]>([])
-const region = ref('')
-const archiveNo = ref('')
+const period = ref(currentMonth())
 
 const showInstitutionPicker = ref(false)
 const institutionColumns = computed(() => [institutions.value.map(i => ({ value: i.id, label: i.name }))])
 
+/** 当前月份（提交月份默认值，如 2026-03） */
+function currentMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** 完整采集表单分节：三级任务分节已自包含（含继承自模板的通用分节）。
+ *  同模板下多个任务都复制了执行信息/管理核实等通用分节，按分节 code 去重只渲染一次；
+ *  模板 form_schema 仅作旧数据兜底（分节 code 未被任务覆盖时补充）。 */
+interface SectionView {
+  code: string
+  name: string
+  required?: boolean
+  fields: Record<string, FormSchemaField>
+}
+const allSections = computed<SectionView[]>(() => {
+  const sections: SectionView[] = []
+  const seen = new Set<string>()
+  const push = (s: { code: string, name: string, required?: boolean, fields?: Record<string, FormSchemaField> }) => {
+    if (!s.code || seen.has(s.code))
+      return
+    seen.add(s.code)
+    sections.push({ code: s.code, name: s.name, required: s.required, fields: s.fields ?? {} })
+  }
+  for (const task of taskItems.value) {
+    for (const s of task.config?.form_schema ?? [])
+      push(s)
+  }
+  for (const s of formSchema.value)
+    push(s)
+  return sections
+})
+
+/** 表单数据：按分节 code 嵌套 {分节code: {字段名: 值}}，多行子表字段值为行数组 */
+const formData = reactive<Record<string, Record<string, any>>>({})
+
+function sectionData(sectionCode: string): Record<string, any> {
+  if (!formData[sectionCode])
+    formData[sectionCode] = {}
+  return formData[sectionCode]!
+}
+
+/** 多行子表空行：按子列定义初始化 */
+function tableEmptyRow(field: FormSchemaField): Record<string, any> {
+  const row: Record<string, any> = {}
+  for (const col of field.columns ?? [])
+    row[col.name] = ''
+  return row
+}
+
+function rowsOf(sectionCode: string, fieldName: string): Record<string, any>[] {
+  const v = formData[sectionCode]?.[fieldName]
+  return Array.isArray(v) ? v : []
+}
+
+function addTableRow(sectionCode: string, fieldName: string, field: FormSchemaField) {
+  sectionData(sectionCode)[fieldName].push(tableEmptyRow(field))
+}
+
+function removeTableRow(sectionCode: string, fieldName: string, index: number) {
+  const rows = rowsOf(sectionCode, fieldName)
+  if (rows.length <= 1)
+    return
+  rows.splice(index, 1)
+}
+
 /** 动态下拉字段选择器 */
 const activeField = ref<FormSchemaField | null>(null)
+const activeSectionCode = ref('')
+const activeFieldName = ref('')
 const showFieldPicker = ref(false)
 const fieldPickerColumns = computed(() => [(activeField.value?.options ?? []).map(o => ({ value: o.value, label: o.label }))])
 
 const submitting = ref(false)
-
-/** 是否为分节标题（纯分组，不渲染输入项） */
-function isSection(field: FormSchemaField) {
-  return field.type === 'section'
-}
-
-/** 是否为多行子表 */
-function isTable(field: FormSchemaField) {
-  return field.type === 'table'
-}
-
-/** 简单输入字段（排除 section 分节标题与 table 子表） */
-const simpleFields = computed(() => formSchema.value.filter(f => !isSection(f) && !isTable(f)))
-const tableFields = computed(() => formSchema.value.filter(isTable))
 
 function isRequired(field: FormSchemaField) {
   return field.required === true
@@ -68,27 +128,27 @@ function onInstitutionConfirm(e: { value: Array<string | number> }) {
   showInstitutionPicker.value = false
 }
 
-function openFieldPicker(field: FormSchemaField) {
+function openFieldPicker(sectionCode: string, name: string, field: FormSchemaField) {
   if (!field.options?.length)
     return
   activeField.value = field
+  activeSectionCode.value = sectionCode
+  activeFieldName.value = name
   showFieldPicker.value = true
 }
 
 function onFieldPickerConfirm(e: { value: Array<string | number> }) {
-  if (activeField.value?.name)
-    formData[activeField.value.name] = e.value[0]
+  if (activeSectionCode.value && activeFieldName.value)
+    sectionData(activeSectionCode.value)[activeFieldName.value] = e.value[0]
   showFieldPicker.value = false
 }
 
 function fieldLabel(field: FormSchemaField) {
-  return field.label || field.name || ''
+  return field.label || ''
 }
 
-function fieldValueText(field: FormSchemaField) {
-  if (!field.name)
-    return ''
-  const v = formData[field.name]
+function fieldValueText(sectionCode: string, name: string, field: FormSchemaField) {
+  const v = sectionData(sectionCode)[name]
   if (v === undefined || v === null || v === '')
     return ''
   if (usePicker(field)) {
@@ -98,7 +158,7 @@ function fieldValueText(field: FormSchemaField) {
   return String(v)
 }
 
-/** 当前正在上传的字段名（防止重复上传） */
+/** 当前正在上传的字段（分节.字段名，防止重复上传） */
 const uploadingField = ref('')
 
 /** 解析上传响应，返回 file_url，失败提示并返回 null */
@@ -116,8 +176,9 @@ function parseUploadUrl(result: UniApp.UploadFileSuccessCallbackResult): string 
 }
 
 /** 选择并上传图片（image 字段） */
-function chooseAndUploadImage(field: FormSchemaField) {
-  if (uploadingField.value || !field.name)
+function chooseAndUploadImage(sectionCode: string, name: string) {
+  const key = `${sectionCode}.${name}`
+  if (uploadingField.value)
     return
   uni.chooseImage({
     count: 1,
@@ -126,12 +187,12 @@ function chooseAndUploadImage(field: FormSchemaField) {
       const filePath = res.tempFilePaths?.[0]
       if (!filePath)
         return
-      uploadingField.value = field.name!
+      uploadingField.value = key
       try {
         const result = await MarketAPI.uploadFile(filePath)
         const url = parseUploadUrl(result)
         if (url)
-          formData[field.name!] = url
+          sectionData(sectionCode)[name] = url
       }
       catch {
         toast.error('上传失败')
@@ -144,8 +205,9 @@ function chooseAndUploadImage(field: FormSchemaField) {
 }
 
 /** 选择并上传文件（file 字段） */
-function chooseAndUploadFile(field: FormSchemaField) {
-  if (uploadingField.value || !field.name)
+function chooseAndUploadFile(sectionCode: string, name: string) {
+  const key = `${sectionCode}.${name}`
+  if (uploadingField.value)
     return
   uni.chooseFile({
     count: 1,
@@ -154,12 +216,12 @@ function chooseAndUploadFile(field: FormSchemaField) {
       const filePath = Array.isArray(tempFiles) ? tempFiles[0]?.path : tempFiles?.path
       if (!filePath)
         return
-      uploadingField.value = field.name!
+      uploadingField.value = key
       try {
         const result = await MarketAPI.uploadFile(filePath)
         const url = parseUploadUrl(result)
         if (url)
-          formData[field.name!] = url
+          sectionData(sectionCode)[name] = url
       }
       catch {
         toast.error('上传失败')
@@ -185,78 +247,67 @@ async function loadInstitutions() {
   }
 }
 
-/** 子表行数据：fieldName → 行对象数组 */
-const tableRows = reactive<Record<string, Record<string, any>[]>>({})
-
-function tableRowList(field: FormSchemaField): Record<string, any>[] {
-  if (!field.name)
-    return []
-  if (!tableRows[field.name])
-    tableRows[field.name] = [tableEmptyRow(field)]
-  return tableRows[field.name]
+/** 初始化表单数据：按分节嵌套，多行子表字段初始化为首行 */
+function initFormData() {
+  for (const section of allSections.value) {
+    const sec = sectionData(section.code)
+    for (const [fieldName, field] of Object.entries(section.fields)) {
+      if (field.type === 'table')
+        sec[fieldName] = [tableEmptyRow(field)]
+      else
+        sec[fieldName] = field.type === 'number' ? undefined : ''
+    }
+  }
 }
 
-function tableEmptyRow(field: FormSchemaField): Record<string, any> {
-  const row: Record<string, any> = {}
-  for (const col of field.columns ?? [])
-    row[col.name ?? ''] = ''
-  return row
-}
-
-function addTableRow(field: FormSchemaField) {
-  if (!field.name)
-    return
-  tableRows[field.name].push(tableEmptyRow(field))
-}
-
-function removeTableRow(field: FormSchemaField, index: number) {
-  if (!field.name)
-    return
-  if (tableRows[field.name].length <= 1)
-    return
-  tableRows[field.name].splice(index, 1)
-}
-
-/** 校验必填字段，返回是否通过 */
+/** 校验必填：单值必填字段 + 多行子表的必填列 */
 function validate(): boolean {
   if (!institutionId.value) {
     toast.warning(t('market.selectInstitution'))
     return false
   }
-  for (const field of simpleFields.value) {
-    if (field.name && isRequired(field) && (formData[field.name] === undefined || formData[field.name] === null || formData[field.name] === '')) {
-      toast.warning(`${fieldLabel(field)} 为必填项`)
-      return false
+  for (const section of allSections.value) {
+    for (const [name, field] of Object.entries(section.fields)) {
+      if (field.type === 'table') {
+        for (const row of rowsOf(section.code, name)) {
+          for (const col of field.columns ?? []) {
+            if (col.required && (row[col.name] === undefined || row[col.name] === null || row[col.name] === '')) {
+              toast.warning(`${section.name}·${field.label} 的「${col.label}」为必填项`)
+              return false
+            }
+          }
+        }
+        continue
+      }
+      const v = sectionData(section.code)[name]
+      if (isRequired(field) && (v === undefined || v === null || v === '')) {
+        toast.warning(`${fieldLabel(field)} 为必填项`)
+        return false
+      }
     }
   }
   return true
 }
 
-function buildPayload(status: 'DRAFT' | 'PENDING') {
-  // 收集子表数据并入 form_data
-  const payload: Record<string, any> = { ...formData }
-  for (const field of tableFields.value) {
-    if (field.name)
-      payload[field.name] = tableRowList(field)
-  }
+/** 构造提交载荷：{ assignment_id, subject_type, institution_id, subject_name, period, form_data }，form_data 按分节嵌套 */
+function buildPayload() {
   return {
     assignment_id: assignmentId.value,
+    subject_type: 'institution',
     institution_id: institutionId.value,
-    region: region.value || undefined,
-    archive_no: archiveNo.value || undefined,
-    form_data: payload,
-    status,
+    subject_name: undefined,
+    period: period.value,
+    form_data: JSON.parse(JSON.stringify(formData)),
   }
 }
 
-async function handleSubmit(status: 'DRAFT' | 'PENDING') {
+async function handleSubmit() {
   if (!validate())
     return
   submitting.value = true
   try {
-    await MarketAPI.createSubmission(buildPayload(status))
-    toast.success(status === 'DRAFT' ? t('market.draftSaved') : t('market.submitSuccess'))
-    // 提交完成回跳「我的任务」，列表刷新后展示最新状态
+    await MarketAPI.createSubmission(buildPayload())
+    toast.success(t('market.submitSuccess'))
     setTimeout(() => router.replace({ name: 'market-my-task' }), 300)
   }
   catch {
@@ -267,37 +318,26 @@ async function handleSubmit(status: 'DRAFT' | 'PENDING') {
   }
 }
 
-/** 从「我的任务」现取分派实例以获取 form_schema（消除 URL 透传，规避超长与模板陈旧） */
+/** 从「我的任务」现取分派实例以获取 form_schema 与三级任务 */
 async function loadAssignment() {
   formLoading.value = true
   try {
     const res = await MarketAPI.getMyAssignments({ page_no: 1, page_size: 100 })
-    const items = (res as any).items as Array<{ id?: number; task_no?: string; task?: { task_type?: { template?: { form_schema?: FormSchemaField[] } | null } | null } | null }> ?? []
-    const found = items.find(i => String(i.id) === String(assignmentId.value))
-    if (found?.task?.task_type?.template?.form_schema) {
-      formSchema.value = found.task.task_type.template.form_schema
-      taskNo.value = found.task_no ?? ''
-    }
-    else {
-      formSchema.value = []
-    }
+    const list = (res as any).items as Array<{ id?: number; task_no?: string; task?: { name?: string; template?: { config?: { form_schema?: FormSchema } | null; items?: TaskItemView[] | null } | null } | null }> ?? []
+    const found = list.find(i => String(i.id) === String(assignmentId.value))
+    formSchema.value = found?.task?.template?.config?.form_schema ?? []
+    taskItems.value = found?.task?.template?.items ?? []
+    taskNo.value = found?.task?.name ?? found?.task_no ?? ''
   }
   catch {
     formSchema.value = []
+    taskItems.value = []
     toast.error(t('common.loadFailed'))
   }
   finally {
     formLoading.value = false
   }
-  // 初始化动态字段默认值（简单字段 + 子表首行）
-  for (const field of simpleFields.value) {
-    if (field.name)
-      formData[field.name] = field.type === 'number' ? undefined : ''
-  }
-  for (const field of tableFields.value) {
-    if (field.name)
-      tableRows[field.name] = [tableEmptyRow(field)]
-  }
+  initFormData()
 }
 
 onLoad((query) => {
@@ -324,88 +364,77 @@ onLoad((query) => {
             </view>
             <wd-picker :visible="showInstitutionPicker" :columns="institutionColumns" @confirm="onInstitutionConfirm" @cancel="showInstitutionPicker = false" />
           </wd-form-item>
-          <wd-form-item :label="t('market.region')" border>
-            <wd-input v-model="region" :placeholder="t('market.region')" />
-          </wd-form-item>
-          <wd-form-item :label="t('market.archiveNo')" border>
-            <wd-input v-model="archiveNo" :placeholder="t('market.archiveNo')" />
+          <wd-form-item :label="t('market.period')" required border>
+            <wd-input v-model="period" :placeholder="t('market.period')" />
           </wd-form-item>
 
-          <!-- 动态采集字段：分节标题 / 简单字段 / 多行子表 -->
-          <template v-for="field in formSchema" :key="field.name || field.label">
-            <!-- 分节标题 -->
-            <view v-if="isSection(field)" class="mt-3 mb-1 flex items-center gap-2">
+          <!-- 采集字段：模板通用分节 + 三级任务分节，按分节分组渲染 -->
+          <template v-for="section in allSections" :key="section.code">
+            <view class="mt-3 mb-1 flex items-center gap-2">
               <view class="h-3 w-1 rounded-full bg-blue-500" />
-              <text class="text-sm font-semibold text-gray-800">{{ field.label }}</text>
+              <text class="text-sm font-semibold text-gray-800">{{ section.name }}{{ section.required ? '（必填）' : '' }}</text>
             </view>
 
-            <!-- 多行子表 -->
-            <view v-else-if="isTable(field)" class="mb-3 w-full">
-              <view class="mb-1 text-sm font-medium text-gray-700">{{ field.label }}</view>
-              <view v-for="(row, rowIndex) in tableRowList(field)" :key="rowIndex" class="mb-2 rounded-lg bg-gray-50 p-2">
-                <view class="mb-1 flex items-center justify-between">
-                  <text class="text-xs text-gray-500">{{ field.label }} #{{ rowIndex + 1 }}</text>
-                  <text v-if="tableRowList(field).length > 1" class="text-xs text-red-500" @click="removeTableRow(field, rowIndex)">删除行</text>
+            <template v-for="(field, fieldName) in section.fields" :key="fieldName">
+              <!-- 多行子表字段：按子列渲染行，可增删行 -->
+              <view v-if="field.type === 'table'" class="mb-2">
+                <view v-for="(row, rowIndex) in rowsOf(section.code, fieldName)" :key="rowIndex" class="mb-2 rounded-lg bg-gray-50 p-2">
+                  <view class="mb-1 flex items-center justify-between">
+                    <text class="text-xs text-gray-500">{{ field.label }} #{{ rowIndex + 1 }}</text>
+                    <text v-if="rowsOf(section.code, fieldName).length > 1" class="text-xs text-red-500" @click="removeTableRow(section.code, fieldName, rowIndex)">删除行</text>
+                  </view>
+                  <view v-for="col in field.columns ?? []" :key="col.name" class="mb-2 flex items-center gap-2">
+                    <text class="w-20 shrink-0 text-xs text-gray-600">{{ col.label }}</text>
+                    <input v-model="row[col.name]" class="flex-1 rounded bg-white px-2 py-1 text-sm" :placeholder="col.label || ''">
+                  </view>
                 </view>
-                <view v-for="col in field.columns ?? []" :key="col.name" class="mb-2 flex items-center gap-2">
-                  <text class="w-20 shrink-0 text-xs text-gray-600">{{ col.label }}</text>
-                  <input
-                    v-model="row[col.name ?? '']"
-                    class="flex-1 rounded bg-white px-2 py-1 text-sm"
-                    :placeholder="col.label || ''"
-                  />
+                <view class="text-center">
+                  <text class="text-xs text-blue-500" @click="addTableRow(section.code, fieldName, field)">+ 添加一行</text>
                 </view>
               </view>
-              <view class="text-center">
-                <text class="text-xs text-blue-500" @click="addTableRow(field)">+ 添加一行</text>
-              </view>
-            </view>
 
-            <!-- 简单字段 -->
-            <wd-form-item v-else :label="fieldLabel(field)" border :required="isRequired(field)">
-              <view v-if="usePicker(field)" class="flex-1" @click="openFieldPicker(field)">
-                <wd-cell :value="fieldValueText(field)" is-link :border="false" />
-              </view>
-              <wd-input
-                v-else-if="field.type === 'textarea'"
-                v-model="formData[field.name ?? '']"
-                type="textarea"
-                :placeholder="field.placeholder || fieldLabel(field)"
-              />
-              <view v-else-if="field.type === 'image'" class="flex-1" @click="chooseAndUploadImage(field)">
-                <image
-                  v-if="formData[field.name ?? '']"
-                  :src="formData[field.name ?? '']"
-                  mode="aspectFill"
-                  class="h-40 w-40 rounded-2 object-cover"
+              <wd-form-item v-else :label="fieldLabel(field)" border :required="isRequired(field)">
+                <view v-if="usePicker(field)" class="flex-1" @click="openFieldPicker(section.code, fieldName, field)">
+                  <wd-cell :value="fieldValueText(section.code, fieldName, field)" is-link :border="false" />
+                </view>
+                <wd-input
+                  v-else-if="field.type === 'textarea'"
+                  v-model="formData[section.code][fieldName]"
+                  type="textarea"
+                  :placeholder="field.placeholder || fieldLabel(field)"
                 />
-                <view v-else class="flex h-24 items-center justify-center rounded-2 bg-gray-50 text-sm text-gray-400">
-                  {{ uploadingField === field.name ? '上传中…' : '点击上传图片' }}
+                <view v-else-if="field.type === 'image'" class="flex-1" @click="chooseAndUploadImage(section.code, fieldName)">
+                  <image
+                    v-if="formData[section.code][fieldName]"
+                    :src="formData[section.code][fieldName]"
+                    mode="aspectFill"
+                    class="h-40 w-40 rounded-2 object-cover"
+                  />
+                  <view v-else class="flex h-24 items-center justify-center rounded-2 bg-gray-50 text-sm text-gray-400">
+                    {{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '点击上传图片' }}
+                  </view>
                 </view>
-              </view>
-              <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(field)">
-                <view class="flex h-12 items-center justify-between rounded-2 bg-gray-50 px-3 text-sm">
-                  <text class="text-gray-600">{{ formData[field.name ?? ''] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
-                  <text class="text-gray-400">{{ uploadingField === field.name ? '上传中…' : '' }}</text>
+                <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(section.code, fieldName)">
+                  <view class="flex h-12 items-center justify-between rounded-2 bg-gray-50 px-3 text-sm">
+                    <text class="text-gray-600">{{ formData[section.code][fieldName] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
+                    <text class="text-gray-400">{{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '' }}</text>
+                  </view>
                 </view>
-              </view>
-              <wd-input
-                v-else
-                v-model="formData[field.name ?? '']"
-                :type="field.type === 'number' ? 'number' : 'text'"
-                :placeholder="field.placeholder || fieldLabel(field)"
-              />
-            </wd-form-item>
+                <wd-input
+                  v-else
+                  v-model="formData[section.code][fieldName]"
+                  :type="field.type === 'number' ? 'number' : 'text'"
+                  :placeholder="field.placeholder || fieldLabel(field)"
+                />
+              </wd-form-item>
+            </template>
           </template>
         </wd-form>
         <wd-picker :visible="showFieldPicker" :columns="fieldPickerColumns" @confirm="onFieldPickerConfirm" @cancel="showFieldPicker = false" />
       </view>
 
-      <view class="mt-4 flex gap-3">
-        <wd-button block variant="plain" :loading="submitting" @click="handleSubmit('DRAFT')">
-          {{ t('market.saveDraft') }}
-        </wd-button>
-        <wd-button block type="primary" :loading="submitting" @click="handleSubmit('PENDING')">
+      <view class="mt-4">
+        <wd-button block type="primary" :loading="submitting" @click="handleSubmit">
           {{ t('market.submit') }}
         </wd-button>
       </view>

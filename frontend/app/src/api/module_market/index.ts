@@ -16,107 +16,144 @@ export interface MarketPageResult<T> {
   has_next?: boolean
 }
 
-/** 任务类型模板摘要（对应后端 TaskTypeOutSchema） */
-export interface TaskTypeItem {
-  id?: number
-  name?: string
-  task_no?: number
-  template_id?: number
-  template?: { form_schema?: FormSchemaField[] } | null
-  unit?: string
-  service_type?: string
-  service_item?: string
-  service_task?: string
-  default_price?: number
-  default_kind?: string
-  exec_standard?: string
+/** 多行子表（type=table）的子列定义（对齐后端 FormSchemaColumn，不允许再嵌套 table） */
+export interface FormSchemaColumn {
+  name: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file'
   required?: boolean
-  min_qty?: number | null
-  max_per_period?: number | null
-  dedup_rule?: string | null
+  placeholder?: string
+  options?: { label: string, value: string }[]
 }
 
-/** 公开任务（任务大厅展示，对应后端 TaskOutSchema） */
+/** 采集字段定义（对齐后端 form_schema.py FormSchemaField，字段名由外层 dict 的 key 表达） */
+export interface FormSchemaField {
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file' | 'table'
+  required?: boolean
+  placeholder?: string
+  options?: { label: string, value: string }[]
+  /** 子表列定义（仅 type=table 需要） */
+  columns?: FormSchemaColumn[]
+}
+
+/** 采集表单分节：英文 code + 中文 name + 其下字段（对齐后端 FormSchemaSection） */
+export interface FormSchemaSection {
+  code: string
+  name: string
+  /** 分节是否必填（标题展示「(必填)」标记） */
+  required?: boolean
+  fields: Record<string, FormSchemaField>
+}
+
+/** 采集表单结构：有序分节列表 */
+export type FormSchema = FormSchemaSection[]
+
+/** 任务设计配置（对齐后端 config.py TaskConfig，JSONB 宿主） */
+export interface TaskConfig {
+  subject_type?: string
+  unit?: string
+  pricing_mode?: string
+  price?: number | null
+  exec_standard?: string | null
+  executor_requirement?: string | null
+  submit_rule?: { cadence?: string, max_per_day?: number | null, dedup?: string | null }
+  form_schema?: FormSchema
+  report_required?: boolean
+}
+
+/** 三级任务设计配置（对齐后端 config.py TaskItemConfig） */
+export interface TaskItemConfig {
+  form_schema?: FormSchema
+  unit?: string | null
+  price?: number | null
+  exec_standard?: string | null
+  executor_requirement?: string | null
+  max_per_month?: number | null
+}
+
+/** 一级任务分类（对齐后端 TaskCategoryOutSchema） */
+export interface TaskCategoryItem {
+  id?: number
+  code?: string
+  name?: string
+  sort?: number
+  description?: string | null
+}
+
+/** 二级任务模板（对齐后端 TaskTemplateOutSchema） */
+export interface TaskTemplateItem {
+  id?: number
+  code?: string
+  name?: string
+  category_id?: number
+  category?: TaskCategoryItem | null
+  config?: TaskConfig | null
+  enabled?: boolean
+}
+
+/** 任务实例（对齐后端 TaskOutSchema） */
 export interface TaskItem {
   id?: number
   task_no?: string
-  task_type_id?: number
-  task_type?: TaskTypeItem | null
-  task_kind?: string
+  project_id?: number
+  template_id?: number
+  template?: TaskTemplateItem | null
+  name?: string
   period?: string
-  exec_time_start?: string | null
-  exec_time_end?: string | null
-  unit_price?: number
-  exec_qty?: number
   assign_mode?: string
-  claimed_count?: number
   status?: string
+  publisher_id?: number | null
   published_at?: string | null
 }
 
-/** 任务分派/接收（我的任务） */
+/** 任务分配/接收（对齐后端 AssignmentOutSchema） */
 export interface AssignmentItem {
   id?: number
   task_id?: number
+  task?: TaskItem | null
   user_id?: number
   source?: string
   status?: string
   accepted_at?: string | null
   submitted_at?: string | null
-  task?: {
-    id?: number
-    task_no?: string
-    task_kind?: string
-    period?: string
-    unit_price?: number
-    exec_qty?: number
-    status?: string
-    exec_time_end?: string | null
-    task_type?: TaskTypeItem | null
-  } | null
 }
 
-/** 动态表单字段定义（来自采集模板的 form_schema） */
-export interface FormSchemaField {
-  name?: string | null
-  label?: string
-  type?: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file' | 'table' | 'section'
-  section?: string | null
-  required?: boolean
-  placeholder?: string
-  options?: { label: string, value: string | number }[]
-  columns?: FormSchemaField[] | null
-}
-
-/** 成果提交 */
+/** 成果提交（对齐后端 SubmissionOutSchema） */
 export interface SubmissionItem {
   id?: number
   assignment_id?: number
   user_id?: number
   subject_type?: string
   institution_id?: number | null
-  institution?: { id?: number, name?: string, type?: string } | null
   subject_name?: string | null
   region?: string | null
   archive_no?: string | null
+  period?: string
   form_data?: Record<string, unknown>
   status?: string
   version?: number
+  reviewer_id?: number | null
   review_comment?: string | null
   reviewed_at?: string | null
+  ai_check_status?: string | null
+  ai_check_result?: Record<string, unknown> | null
 }
 
-/** 机构（供成果提交选择） */
+/** 机构（对齐后端 InstitutionOutSchema，供成果提交选择） */
 export interface InstitutionItem {
   id?: number
   name?: string
   type?: string
-  level?: string
-  region?: string
-  address?: string
+  level?: string | null
+  region?: string | null
+  address?: string | null
+  contact?: string | null
+  contact_phone?: string | null
+  status?: number
 }
 
-/** 我的发放/津贴（对应后端 mini/payout 返回） */
+/** 我的发放/津贴（对齐后端 mini/payout 返回） */
 export interface PayoutSummary {
   user_id?: number
   period?: string
@@ -128,6 +165,7 @@ export interface PayoutSummary {
     from_period?: string
     amount?: number
     status?: string
+    paid_at?: string | null
   }[]
 }
 

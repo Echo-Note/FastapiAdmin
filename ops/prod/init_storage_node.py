@@ -9,6 +9,7 @@
     COS_REGION         区域（默认 ap-chongqing）
     COS_APPID          AppId（默认 1516998879）
     COS_NODE_NAME      存储源节点名（默认「COS 生产存储」）
+    COS_DESCRIPTION    存储源节点描述（默认「生产 COS 存储（子账号 foxwork）」）
     COS_AS_DEFAULT     是否设为默认存储源，1/0（默认 1）
 
 执行（后端容器内）：
@@ -26,6 +27,7 @@ from base import async_db_session, env
 
 async def main() -> None:
     node_name = env("COS_NODE_NAME", "COS 生产存储")
+    description = env("COS_DESCRIPTION", "生产 COS 存储（子账号 foxwork）")
     secret_id = env("COS_SECRET_ID", "")
     secret_key = env("COS_SECRET_KEY", "")
     bucket = env("COS_BUCKET", "foxwork-prod-1516998879")
@@ -57,7 +59,7 @@ async def main() -> None:
                 advanced_config={"appid": appid},
                 is_default=False,
                 status=0,
-                description="生产 COS 存储（子账号 foxwork）",
+                description=description,
             )
             db.add(node)
             print(f"新建存储源节点：{node_name}")

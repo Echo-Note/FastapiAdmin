@@ -8,9 +8,7 @@
     "backgroundColorTop": "@bgColorTop",
     "backgroundColorBottom": "@bgColorBottom",
     "enablePullDownRefresh": false,
-    "onReachBottomDistance": 50,
-    "animationType": "pop-in",
-    "animationDuration": 300
+    "onReachBottomDistance": 50
   },
   "pages": [
     // #ifdef APP || H5 || MP-WEIXIN

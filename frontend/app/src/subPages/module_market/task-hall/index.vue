@@ -1,47 +1,62 @@
 <script setup lang="ts">
-import type { TaskItem } from '@/api/module_market'
 import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
-import { TASK_KIND_MAP, statusMeta } from '@/constants'
 import { useMarketListPage } from '@/composables/useMarketListPage'
 
 definePage({ name: 'market-task-hall', style: { navigationBarTitleText: '任务大厅', enablePullDownRefresh: true } })
+
+/** 任务大厅列表项（对齐后端 TaskOutSchema：name 为 C 端显示名） */
+interface HallTaskItem {
+  id?: number
+  task_no?: string
+  name?: string
+  period?: string
+  project_id?: number
+  template_id?: number
+  assign_mode?: string
+  status?: string
+  published_at?: string | null
+  template?: {
+    id?: number
+    name?: string
+    config?: {
+      unit?: string
+      price?: number | null
+    } | null
+  } | null
+}
+
+/** 分配方式本地映射（direct 定向分派 / open 公开大厅） */
+const ASSIGN_MODE_LABEL: Record<string, string> = {
+  direct: '定向分派',
+  open: '公开大厅',
+}
 
 const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
 
-const { list, total, loading, loadData, refreshData, loadNext } = useMarketListPage<TaskItem>({
-  fetcher: p => MarketAPI.getTaskHall({ ...p }),
+const { list, total, loading, loadData, refreshData, loadNext } = useMarketListPage<HallTaskItem>({
+  fetcher: p => MarketAPI.getTaskHall({ ...p }) as any,
   onError: () => toast.error(t('common.loadFailed')),
 })
 
-function amountText(item: TaskItem) {
-  return `¥${Number((item.unit_price ?? 0) * (item.exec_qty ?? 0)).toFixed(2)}`
+/** 单价（取自模板 config.price） */
+function priceText(item: HallTaskItem) {
+  const price = item.template?.config?.price
+  if (price == null)
+    return '—'
+  return `¥${Number(price).toFixed(2)}`
 }
 
-function deadlineText(item: TaskItem) {
-  return (item.exec_time_end || '').slice(0, 16)
-}
-
-function kindInfo(item: TaskItem) {
-  return statusMeta(TASK_KIND_MAP, item.task_kind)
-}
-
-function remainText(item: TaskItem) {
-  // 仅定额任务按总份数限量展示剩余份数；周期性任务不限总份数
-  if (item.task_kind !== 'quota')
-    return ''
-  const limit = item.exec_qty
-  if (limit == null)
-    return ''
-  const remain = limit - (item.claimed_count ?? 0)
-  return remain > 0 ? `${t('market.remain')} ${remain}` : t('market.claimedFull')
+/** 分配方式文案 */
+function assignModeText(item: HallTaskItem) {
+  return ASSIGN_MODE_LABEL[item.assign_mode ?? ''] ?? item.assign_mode ?? '—'
 }
 
 /** 卡片点击统一跳任务详情页（详情页内完成接单） */
-function goDetail(item: TaskItem) {
+function goDetail(item: HallTaskItem) {
   router.push({
     name: 'market-task-detail',
     query: { task_id: String(item.id) },
@@ -79,21 +94,16 @@ onLoad(() => loadData())
             <view class="flex items-start justify-between gap-2">
               <view class="min-w-0 flex-1">
                 <view class="flex items-center gap-2">
-                  <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task_no ?? ''" />
-                  <wd-tag :type="kindInfo(item).type" plain :title="kindInfo(item).label" />
+                  <wd-text class="wot-text-text-main text-4 font-medium" :text="item.name ?? item.task_no ?? ''" />
+                  <wd-tag type="primary" plain :title="assignModeText(item)" />
                 </view>
                 <view class="mt-1 flex items-center gap-3">
                   <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.period ?? '-'}`" />
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.unitPrice')} ¥${Number(item.unit_price ?? 0).toFixed(2)}`" />
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.execQty')} ${item.exec_qty ?? 0}`" />
-                </view>
-                <view class="mt-1 flex items-center gap-3">
-                  <wd-text v-if="item.exec_time_end" class="wot-text-text-auxiliary text-2.5" :text="`${t('market.deadline')} ${deadlineText(item)}`" />
-                  <wd-text v-if="remainText(item)" class="wot-text-warning-main text-2.5" :text="remainText(item)" />
+                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.unitPrice')} ${priceText(item)}`" />
                 </view>
               </view>
               <view class="flex flex-col items-end gap-2">
-                <wd-text class="wot-text-error-main text-4 font-semibold" :text="amountText(item)" />
+                <wd-text class="wot-text-error-main text-4 font-semibold" :text="priceText(item)" />
                 <wd-icon name="arrow-right" size="18px" custom-class="wot-text-text-secondary" />
               </view>
             </view>

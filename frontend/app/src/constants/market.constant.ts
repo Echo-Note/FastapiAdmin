@@ -27,12 +27,6 @@ export const TASK_STATUS_MAP: Record<string, MarketStatusMeta> = {
   ARCHIVED: { label: '已归档', type: 'info' },
 }
 
-/** 任务分类（task_kind：周期性 / 定额） */
-export const TASK_KIND_MAP: Record<string, MarketStatusMeta> = {
-  periodic: { label: '周期性', type: 'info' },
-  quota: { label: '定额', type: 'warning' },
-}
-
 /** 分派/接收状态机 */
 export const ASSIGNMENT_STATUS_MAP: Record<string, MarketStatusMeta> = {
   PENDING: { label: '待接收', type: 'info' },
@@ -73,11 +67,4 @@ export function statusMeta(map: Record<string, MarketStatusMeta>, status?: strin
   if (!status)
     return { label: '-', type: 'info' }
   return map[status] ?? { label: status, type: 'info' }
-}
-
-/**
- * 任务分类文案（任务大厅 / 我的任务共用）。
- */
-export function taskKindText(kind?: string): string {
-  return TASK_KIND_MAP[kind ?? '']?.label ?? '周期性'
 }

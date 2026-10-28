@@ -1,6 +1,12 @@
 # ============================================================
 # FoxWork Caddyfile（TLS 自动签发 + 反向代理 + 静态站点）
 #
+# 安全基线：对齐 Caddy 最佳实践 + 等保三级（GB/T 22239-2019）
+#   传输保密 —— 全站强制 HTTPS、HSTS、仅 TLS 1.2/1.3（禁用 1.0/1.1 与弱套件）
+#   入侵防范 —— 安全响应头、请求体限长、防慢速攻击读头超时
+#   安全审计 —— 结构化 JSON 访问日志（含真实来源 IP），错误日志走 stderr 与访问日志分离
+#   访问控制 —— 仅服务授权域名，未配置域名 SNI 握手即拒绝（Caddy 默认行为）
+#
 # 前提：admin.xfoxlab.com.cn / wxh5.xfoxlab.com.cn 的 A 记录已指向本机公网 IP，
 #       且 80/443 端口可从公网访问（80 用于 ACME http-01 校验）。
 # 证书由 Caddy 自动向 Let's Encrypt 申请并续期，无需手动维护。
@@ -9,16 +15,66 @@
 {
     # ACME 证书通知邮箱（仅用于证书到期提醒）
     email service@xfoxlab.com.cn
-    # 关闭 Caddy 管理端点（纯反代用途不需要）
+
+    # 关闭 Caddy 管理端点（纯反代用途不需要，避免本地 2019 端口被探测/滥用）
     admin off
+
+    # 全局服务器策略
+    servers {
+        # 启用 HTTP/1.1、HTTP/2、HTTP/3（QUIC，需安全组放行 UDP 443）
+        protocols h1 h2 h3
+
+        # 防慢速攻击：限制读取请求头的最长时间（Slowloris 防护）。
+        # 刻意不设 read_body / write 超时：后端存在大文件上传与 SSE 长连接，
+        # 过短的读写超时会误伤正常业务；连接空闲由 Caddy 默认值兜底。
+        timeouts {
+            read_header 10s
+        }
+    }
+}
+
+# ==================== 通用安全响应头（等保入侵防范）====================
+(security_headers) {
+    header {
+        # 严格传输安全：强制浏览器 1 年内仅走 HTTPS，含子域（等保传输保密 + 防降级攻击）
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # 禁止 MIME 类型嗅探（防上传内容被浏览器当作脚本执行）
+        X-Content-Type-Options "nosniff"
+        # 防点击劫持：仅同源页面可嵌入（运营后台 / 管理页面）
+        X-Frame-Options "SAMEORIGIN"
+        # 引用来源策略：同源携带完整 URL，跨源仅携带源，降级时不携带
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # 权限策略：默认关闭摄像头 / 麦克风 / 定位 / 支付等敏感能力
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        # 隐藏服务器软件标识（防版本信息泄露）
+        -Server
+    }
+}
+
+# ==================== 站点通用配置 ====================
+(common) {
+    # 压缩：gzip（如需更优压缩可追加 zstd，但需 Caddy ≥ 2.8，为兼容旧镜像这里仅用 gzip）
+    encode gzip
+
+    # 限制请求体大小，防大包 DoS（含后端文件上传，上限 100MB）
+    request_body {
+        max_size 100MB
+    }
+
+    # TLS 基线：仅 TLS 1.2 / 1.3（Caddy 默认即安全密码套件，此处显式声明供审计核对）
+    tls {
+        protocols tls1.2 tls1.3
+    }
 }
 
 # ==================== 运营后台（Vue3 SPA）====================
 # 前端产物 base=/web/，产物根为 /srv/web（即 nginx/web/dist）
 admin.xfoxlab.com.cn {
-    encode gzip
+    import security_headers
+    import common
 
     # 后端 API 反向代理（WebSocket 由 Caddy 自动升级）
+    # Caddy 默认透传 Host 并自动追加 X-Forwarded-For / X-Forwarded-Proto / X-Forwarded-Host
     handle /api/v1/* {
         reverse_proxy backend:8001
     }
@@ -35,16 +91,19 @@ admin.xfoxlab.com.cn {
         redir / /web/ 308
     }
 
+    # 结构化访问日志（等保安全审计：含时间 / 真实来源 IP / 方法 / URI / 状态 / 耗时）
+    # 持久化（≥6 个月）由宿主机日志采集系统（docker logging driver + ELK/Loki）保证
     log {
         output stdout
-        format console
+        format json
     }
 }
 
 # ==================== 小程序 H5（uni-app）====================
 # 前端产物 base=/app/，产物根为 /srv/app（即 nginx/app/dist/build/h5）
 wxh5.xfoxlab.com.cn {
-    encode gzip
+    import security_headers
+    import common
 
     # 后端 API 反向代理
     handle /api/v1/* {
@@ -65,6 +124,6 @@ wxh5.xfoxlab.com.cn {
 
     log {
         output stdout
-        format console
+        format json
     }
 }
