@@ -6,20 +6,19 @@ from app.modules.ai.chat.controller import ChatRouter
 from app.modules.common.file.controller import FileRouter
 from app.modules.dbconsole.controller import DbConsoleRouter
 from app.modules.generator.gencode.controller import GenRouter
-from app.modules.market.assignment.controller import AssignmentRouter
-from app.modules.market.company.controller import CompanyRouter
 from app.modules.market.dashboard.controller import DashboardRouter
-from app.modules.market.import_center.controller import ImportRouter
-from app.modules.market.institution.controller import InstitutionRouter
+from app.modules.market.institution.controller import InstitutionImageRouter, InstitutionRouter
 from app.modules.market.mini_controller import MiniRouter
-from app.modules.market.payout.controller import PayoutRouter
-from app.modules.market.project.controller import ProjectRouter
-from app.modules.market.report.controller import ReportRouter
-from app.modules.market.service_item.controller import ServiceItemRouter
-from app.modules.market.settlement.controller import SettlementRouter
-from app.modules.market.submission.controller import SubmissionRouter
-from app.modules.market.task.controller import TaskRouter, TaskTypeRouter
-from app.modules.market.template.controller import TemplateRouter
+from app.modules.market.payout.controller import PayoutRouter, SettlementRouter
+from app.modules.market.project.controller import CompanyRouter, ProjectRouter, ReportRouter
+from app.modules.market.task.controller import (
+    AssignmentRouter,
+    SubmissionRouter,
+    TaskCategoryRouter,
+    TaskItemRouter,
+    TaskRouter,
+    TaskTemplateRouter,
+)
 from app.modules.monitor.cache.controller import CacheRouter
 from app.modules.monitor.health.controller import HealthRouter
 from app.modules.monitor.online.controller import OnlineRouter
@@ -79,20 +78,20 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
     "/common": [FileRouter],
     "/market": [
         MiniRouter,
-        CompanyRouter,
         DashboardRouter,
-        InstitutionRouter,
-        ImportRouter,
-        TemplateRouter,
-        TaskTypeRouter,
-        TaskRouter,
+        CompanyRouter,
         ProjectRouter,
+        ReportRouter,
+        TaskCategoryRouter,
+        TaskTemplateRouter,
+        TaskItemRouter,
+        TaskRouter,
         AssignmentRouter,
         SubmissionRouter,
-        ServiceItemRouter,
         SettlementRouter,
-        ReportRouter,
         PayoutRouter,
+        InstitutionRouter,
+        InstitutionImageRouter,
     ],
     "/dbconsole": [DbConsoleRouter],
     "/ops": [SshRouter],

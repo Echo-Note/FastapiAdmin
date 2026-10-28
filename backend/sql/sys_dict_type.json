@@ -10,5 +10,89 @@
         "dict_type": "sys_notice_type",
         "status": 0,
         "description": "通知类型列表"
+    },
+    {
+        "dict_name": "市场任务状态",
+        "dict_type": "market_task_status",
+        "status": 0,
+        "description": "市场管理-任务实例状态机"
+    },
+    {
+        "dict_name": "市场项目状态",
+        "dict_type": "market_project_status",
+        "status": 0,
+        "description": "市场管理-项目状态机"
+    },
+    {
+        "dict_name": "市场分派状态",
+        "dict_type": "market_assignment_status",
+        "status": 0,
+        "description": "市场管理-任务分派/接收状态机"
+    },
+    {
+        "dict_name": "市场成果状态",
+        "dict_type": "market_submission_status",
+        "status": 0,
+        "description": "市场管理-成果提交状态机"
+    },
+    {
+        "dict_name": "市场结算状态",
+        "dict_type": "market_settlement_status",
+        "status": 0,
+        "description": "市场管理-结算单状态机"
+    },
+    {
+        "dict_name": "市场报告状态",
+        "dict_type": "market_report_status",
+        "status": 0,
+        "description": "市场管理-月度报告状态机"
+    },
+    {
+        "dict_name": "市场津贴状态",
+        "dict_type": "market_allowance_status",
+        "status": 0,
+        "description": "市场管理-个人任务津贴明细状态"
+    },
+    {
+        "dict_name": "市场机构类型",
+        "dict_type": "market_institution_type",
+        "status": 0,
+        "description": "市场管理-机构类型（等级医院/基层医疗/民营医疗/零售药店/商业公司）"
+    },
+    {
+        "dict_name": "市场采集对象类型",
+        "dict_type": "market_subject_type",
+        "status": 0,
+        "description": "市场管理-成果采集对象类型（机构/医务人员/患者/会议）"
+    },
+    {
+        "dict_name": "市场计价方式",
+        "dict_type": "market_pricing_mode",
+        "status": 0,
+        "description": "市场管理-任务计价方式（固定单价/按票据）"
+    },
+    {
+        "dict_name": "市场提交节奏",
+        "dict_type": "market_submit_cadence",
+        "status": 0,
+        "description": "市场管理-周期内重复提交节奏（每月/单次/不限）"
+    },
+    {
+        "dict_name": "市场分配方式",
+        "dict_type": "market_assign_mode",
+        "status": 0,
+        "description": "市场管理-任务分配方式（定向分派/公开大厅）"
+    },
+    {
+        "dict_name": "市场任务来源",
+        "dict_type": "market_assignment_source",
+        "status": 0,
+        "description": "市场管理-任务实例来源（运营分派/大厅接单）"
+    },
+    {
+        "dict_name": "市场启用状态",
+        "dict_type": "market_enable_status",
+        "status": 0,
+        "description": "市场管理-医药公司/机构启用状态（启用/停用）"
     }
 ]

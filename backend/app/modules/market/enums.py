@@ -21,11 +21,28 @@ class TaskStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
-class TaskKind(StrEnum):
-    """任务分类：周期性（单用户单月一次）/ 定额（限时限量，单月可重复提交）。"""
+class SubjectType(StrEnum):
+    """采集对象类型（成果提交针对的对象）。"""
 
-    PERIODIC = "periodic"  # 周期性任务（如巡店、管理采集）
-    QUOTA = "quota"  # 定额任务（如问卷/访谈调研）
+    INSTITUTION = "institution"  # 机构（医院/药店/商业公司）
+    STAFF = "staff"  # 医务人员/店员
+    PATIENT = "patient"  # 患者/非医务人员
+    MEETING = "meeting"  # 会议
+
+
+class PricingMode(StrEnum):
+    """计价方式：固定单价 / 按票据实际结算。"""
+
+    FIXED = "fixed"  # 固定单价（元/月/家、元/份、元/次）
+    ACTUAL = "actual"  # 按票据实际结算（如会议服务）
+
+
+class SubmitCadence(StrEnum):
+    """提交节奏（周期内 C 端重复提交成果的节奏）。"""
+
+    MONTHLY = "monthly"  # 每月提交（机构管理/调研/宣传）
+    ONCE = "once"  # 单次提交
+    UNLIMITED = "unlimited"  # 不限（会议服务）
 
 
 class AssignmentStatus(StrEnum):

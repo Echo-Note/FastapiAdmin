@@ -1,7 +1,8 @@
 """市场管理域 —— 微信小程序端聚合路由。
 
-统一挂载小程序端接口：任务大厅、我的任务、接收任务、提交成果、我的成果、我的额度、机构列表。
-认证使用 get_current_user（登录用户），不要求运营端 RBAC 权限码。
+统一挂载小程序端接口：任务大厅、任务单详情、我的任务、分派单详情、接收任务、大厅接单、
+提交成果、我的成果、我的发放/津贴、机构列表。
+认证使用 ``get_current_user``（登录用户），不要求运营端 RBAC 权限码。
 """
 
 from typing import Annotated
@@ -16,15 +17,19 @@ from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryPa
 from app.core.dependencies import db_getter, get_current_user, redis_getter
 from app.core.router_class import OperationLogRoute
 
-from .assignment.schema import AssignmentOutSchema, AssignmentQueryParam
-from .assignment.service import AssignmentService
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
 from .payout.service import PayoutService
-from .submission.schema import SubmissionCreateSchema, SubmissionOutSchema, SubmissionQueryParam, SubmissionUpdateSchema
-from .submission.service import SubmissionService
-from .task.schema import TaskOutSchema
-from .task.service import TaskService
+from .task.schema import (
+    AssignmentOutSchema,
+    AssignmentQueryParam,
+    SubmissionCreateSchema,
+    SubmissionOutSchema,
+    SubmissionQueryParam,
+    SubmissionUpdateSchema,
+    TaskOutSchema,
+)
+from .task.service import AssignmentService, SubmissionService, TaskService
 
 MiniRouter = APIRouter(route_class=OperationLogRoute, prefix="/mini", tags=["市场-小程序"])
 
@@ -36,9 +41,20 @@ async def mini_task_hall_controller(
     redis: Annotated[Redis, Depends(redis_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
 ) -> JSONResponse:
-    """任务大厅：公开接单任务列表（定向分派任务不在此展示，走「我的任务」）。"""
+    """任务大厅：公开接单任务列表（定向分派任务走「我的任务」）。"""
     result = await TaskService(auth, db).hall_tasks(redis=redis, page_no=page.page_no, page_size=page.page_size)
     return SuccessResponse(data=result, msg="获取任务大厅成功")
+
+
+@MiniRouter.get("/tasks/{id}", summary="任务单详情", response_model=ResponseSchema[TaskOutSchema])
+async def mini_task_detail_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="任务ID", ge=1)],
+) -> JSONResponse:
+    """任务单详情：小程序任务详情页现取模板与单价。"""
+    result = await TaskService(auth, db).detail(id=id)
+    return SuccessResponse(data=result, msg="获取任务详情成功")
 
 
 @MiniRouter.get("/assignments", summary="我的任务", response_model=ResponseSchema[PageResultSchema[AssignmentOutSchema]])
@@ -50,6 +66,17 @@ async def mini_my_assignments_controller(
 ) -> JSONResponse:
     result = await AssignmentService(auth, db).my_assignments(page_no=page.page_no, page_size=page.page_size, search=search)
     return SuccessResponse(data=result, msg="获取我的任务成功")
+
+
+@MiniRouter.get("/assignments/{id}", summary="分派单详情", response_model=ResponseSchema[AssignmentOutSchema])
+async def mini_assignment_detail_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="分派ID", ge=1)],
+) -> JSONResponse:
+    """分派单详情：小程序提交成果页现取模板。"""
+    result = await AssignmentService(auth, db).detail(id=id)
+    return SuccessResponse(data=result, msg="获取分派详情成功")
 
 
 @MiniRouter.post("/assignments/{id}/accept", summary="接收任务", response_model=ResponseSchema[AssignmentOutSchema])
@@ -109,7 +136,7 @@ async def mini_my_submissions_controller(
 async def mini_my_payout_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
-    period: Annotated[str, Query(description="周期(如 2026-10)")],
+    period: Annotated[str, Query(description="周期(如 2026-03)")],
 ) -> JSONResponse:
     result = await PayoutService(auth, db).my_payout(user_id=auth.user.id, period=period)
     return SuccessResponse(data=result, msg="获取我的发放信息成功")
@@ -124,8 +151,7 @@ async def mini_institution_list_controller(
 ) -> JSONResponse:
     """机构列表：供 C 端（小程序）用户提交成果时选择对象机构。
 
-    从 Redis 缓存读取启用机构全量列表后内存分页；认证使用 get_current_user，
-    不要求运营端 RBAC 权限码。
+    从 Redis 缓存读取启用机构全量列表后内存分页；认证使用 get_current_user。
     """
     items = await InstitutionService(auth, db).enabled_list(redis=redis)
     total = len(items)

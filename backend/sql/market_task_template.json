@@ -1,0 +1,690 @@
+[
+  {
+    "code": "grade_hospital_manage",
+    "name": "等级医疗管理",
+    "category_id": 1,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/月/家",
+      "pricing_mode": "fixed",
+      "price": 2000,
+      "exec_standard": "单人/单日不得超过2家进行管理；单月完成5次及以上，视为达成一家合格管理；每次至少完成一项任务；每次需提供一张实地照片（门头照-照片不带水印）",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "max_per_day": 2,
+        "dedup": "单月/单家≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "primary_care_manage",
+    "name": "基层医疗管理",
+    "category_id": 1,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/月/家",
+      "pricing_mode": "fixed",
+      "price": 1500,
+      "exec_standard": "单人/单日不得超过2家；单月完成5次及以上，视为达成一家合格管理；每次至少完成一项任务；每次需提供一张实地照片（门头照-照片不带水印）",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "max_per_day": 2,
+        "dedup": "单月/单家≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "private_medical_manage",
+    "name": "民营医疗管理",
+    "category_id": 1,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/月/家",
+      "pricing_mode": "fixed",
+      "price": 1500,
+      "exec_standard": "单人/单日不得超过2家；单月完成5次及以上，视为达成一家合格管理；每次至少完成一项任务；每次需提供一张实地照片（门头照-照片不带水印）",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "max_per_day": 2,
+        "dedup": "单月/单家≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "retail_pharmacy_manage",
+    "name": "零售药店管理",
+    "category_id": 1,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/月/家",
+      "pricing_mode": "fixed",
+      "price": 1200,
+      "exec_standard": "单人/单日不得超过2家；单月完成6次及以上，视为达成一家合格管理；每次至少完成一项任务；每次需提供一张实地照片（门头照-照片不带水印）",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "max_per_day": 2,
+        "dedup": "单月/单家≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "commercial_company_manage",
+    "name": "商业公司管理",
+    "category_id": 1,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/月/家",
+      "pricing_mode": "fixed",
+      "price": 3000,
+      "exec_standard": "单人/单日不得超过2家进行管理；单月完成5次及以上，视为达成一家合格管理；每次至少完成一项任务；每次需提供一张实地照片（门头照-照片不带水印）",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "max_per_day": 2,
+        "dedup": "单月/单家≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "archive_survey",
+    "name": "市场档案信息调研",
+    "category_id": 2,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/家/次",
+      "pricing_mode": "fixed",
+      "price": 400,
+      "exec_standard": "单月/单家不超过1次；每次提供一张门头照片（门头照-照片不带水印）",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单月/单家≤1次"
+      },
+      "form_schema": [
+        {
+          "code": "basic_info",
+          "name": "基础信息",
+          "fields": {
+            "region": {
+              "label": "区域",
+              "type": "text",
+              "required": true
+            },
+            "org_name": {
+              "label": "商业公司名称",
+              "type": "text",
+              "required": true
+            },
+            "credit_code": {
+              "label": "统一社会信用代码",
+              "type": "text"
+            },
+            "contact": {
+              "label": "联系人",
+              "type": "text"
+            },
+            "contact_phone": {
+              "label": "联系电话",
+              "type": "text"
+            },
+            "address": {
+              "label": "地址",
+              "type": "text"
+            },
+            "executor": {
+              "label": "采集人",
+              "type": "text",
+              "required": true
+            },
+            "exec_date": {
+              "label": "采集日期",
+              "type": "date",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "supporting_materials",
+          "name": "证明材料",
+          "fields": {
+            "door_photo": {
+              "label": "门头照片",
+              "type": "image",
+              "required": true
+            }
+          },
+          "required": true
+        }
+      ],
+      "report_required": true
+    }
+  },
+  {
+    "code": "product_awareness_survey",
+    "name": "产品认知度调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "staff",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": 100,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "recommend_willingness_survey",
+    "name": "推荐意愿度调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "staff",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": 100,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "category_insight_survey",
+    "name": "品类洞察度调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "staff",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": 50,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "disease_awareness_survey",
+    "name": "疾病认知度调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "staff",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": null,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "enterprise_awareness_survey",
+    "name": "企业认知度调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "staff",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": null,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "medication_adherence_survey",
+    "name": "用药依从性调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "patient",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": null,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "price_sensitivity_survey",
+    "name": "价格敏感度调研",
+    "category_id": 3,
+    "enabled": true,
+    "config": {
+      "subject_type": "staff",
+      "unit": "元/份",
+      "pricing_mode": "fixed",
+      "price": null,
+      "exec_standard": "单人/单项目/单月不超过1次",
+      "executor_requirement": "临床协调员",
+      "submit_rule": {
+        "cadence": "monthly",
+        "dedup": "单人/单项目/单月≤1次"
+      },
+      "report_required": true,
+      "form_schema": []
+    }
+  },
+  {
+    "code": "product_promotion",
+    "name": "产品宣传",
+    "category_id": 4,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/次",
+      "pricing_mode": "fixed",
+      "price": null,
+      "exec_standard": "只能针对非处方药，只能在非临床机构进行宣传；显著标明非处方药专用标识（OTC）；显著标明忠告语",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "monthly"
+      },
+      "report_required": true,
+      "form_schema": [
+        {
+          "code": "promotion_info",
+          "name": "宣传信息",
+          "fields": {
+            "region": {
+              "label": "区域",
+              "type": "text",
+              "required": true
+            },
+            "venue": {
+              "label": "宣传地点/平台",
+              "type": "text",
+              "required": true
+            },
+            "mode": {
+              "label": "宣传方式",
+              "type": "radio",
+              "required": true,
+              "options": [
+                {
+                  "label": "户外宣传",
+                  "value": "outdoor"
+                },
+                {
+                  "label": "媒介宣传",
+                  "value": "media"
+                }
+              ]
+            },
+            "executor": {
+              "label": "执行人",
+              "type": "text",
+              "required": true
+            },
+            "exec_date": {
+              "label": "宣传日期",
+              "type": "date",
+              "required": true
+            }
+          },
+          "required": true
+        }
+      ]
+    }
+  },
+  {
+    "code": "health_popularization",
+    "name": "健康科普",
+    "category_id": 4,
+    "enabled": true,
+    "config": {
+      "subject_type": "institution",
+      "unit": "元/次",
+      "pricing_mode": "fixed",
+      "price": null,
+      "exec_standard": "不涉及产品信息，只体现企业品牌",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "monthly"
+      },
+      "report_required": true,
+      "form_schema": [
+        {
+          "code": "science_info",
+          "name": "科普信息",
+          "fields": {
+            "region": {
+              "label": "区域",
+              "type": "text",
+              "required": true
+            },
+            "venue": {
+              "label": "科普地点/平台",
+              "type": "text",
+              "required": true
+            },
+            "mode": {
+              "label": "科普方式",
+              "type": "radio",
+              "required": true,
+              "options": [
+                {
+                  "label": "户外宣传",
+                  "value": "outdoor"
+                },
+                {
+                  "label": "媒介宣传",
+                  "value": "media"
+                }
+              ]
+            },
+            "executor": {
+              "label": "执行人",
+              "type": "text",
+              "required": true
+            },
+            "exec_date": {
+              "label": "科普日期",
+              "type": "date",
+              "required": true
+            }
+          },
+          "required": true
+        }
+      ]
+    }
+  },
+  {
+    "code": "product_training_event",
+    "name": "产品培训活动",
+    "category_id": 6,
+    "enabled": true,
+    "config": {
+      "subject_type": "meeting",
+      "unit": "元/次",
+      "pricing_mode": "actual",
+      "price": null,
+      "exec_standard": "会议照片，需体现公司产品（不带日期）；签到表；按照实际提供票据（不带日期）进行结算；会议预算不超过300元/人",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "unlimited"
+      },
+      "report_required": true,
+      "form_schema": [
+        {
+          "code": "meeting_info",
+          "name": "会议信息",
+          "fields": {
+            "meeting_name": {
+              "label": "会议名称",
+              "type": "text",
+              "required": true
+            },
+            "region": {
+              "label": "区域",
+              "type": "text",
+              "required": true
+            },
+            "attendees": {
+              "label": "参会人数",
+              "type": "number",
+              "required": true
+            },
+            "executor": {
+              "label": "执行人",
+              "type": "text",
+              "required": true
+            },
+            "exec_date": {
+              "label": "会议日期",
+              "type": "date",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "meeting_photos",
+          "name": "会议照片",
+          "fields": {
+            "meeting_photo": {
+              "label": "会议照片",
+              "type": "image",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "sign_in_receipts",
+          "name": "签到与票据",
+          "fields": {
+            "sign_sheet": {
+              "label": "签到表",
+              "type": "file",
+              "required": true
+            },
+            "receipt": {
+              "label": "费用票据",
+              "type": "file",
+              "required": true
+            }
+          },
+          "required": true
+        }
+      ]
+    }
+  },
+  {
+    "code": "product_distribution_event",
+    "name": "商品分销活动",
+    "category_id": 6,
+    "enabled": true,
+    "config": {
+      "subject_type": "meeting",
+      "unit": "元/次",
+      "pricing_mode": "actual",
+      "price": null,
+      "exec_standard": "会议照片，需体现公司产品（不带日期）；签到表；按照实际提供票据（不带日期）进行结算；会议预算不超过300元/人",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "unlimited"
+      },
+      "report_required": true,
+      "form_schema": [
+        {
+          "code": "activity_info",
+          "name": "活动信息",
+          "fields": {
+            "meeting_name": {
+              "label": "活动名称",
+              "type": "text",
+              "required": true
+            },
+            "region": {
+              "label": "区域",
+              "type": "text",
+              "required": true
+            },
+            "attendees": {
+              "label": "参会人数",
+              "type": "number",
+              "required": true
+            },
+            "executor": {
+              "label": "执行人",
+              "type": "text",
+              "required": true
+            },
+            "exec_date": {
+              "label": "活动日期",
+              "type": "date",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "activity_photos",
+          "name": "活动照片",
+          "fields": {
+            "meeting_photo": {
+              "label": "活动照片",
+              "type": "image",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "sign_in_receipts",
+          "name": "签到与票据",
+          "fields": {
+            "sign_sheet": {
+              "label": "签到表",
+              "type": "file",
+              "required": true
+            },
+            "receipt": {
+              "label": "费用票据",
+              "type": "file",
+              "required": true
+            }
+          },
+          "required": true
+        }
+      ]
+    }
+  },
+  {
+    "code": "skill_training_event",
+    "name": "技能培训活动",
+    "category_id": 6,
+    "enabled": true,
+    "config": {
+      "subject_type": "meeting",
+      "unit": "元/次",
+      "pricing_mode": "actual",
+      "price": null,
+      "exec_standard": "会议照片，需体现公司产品（不带日期）；签到表；按照实际提供票据（不带日期）进行结算；会议预算不超过300元/人",
+      "executor_requirement": "市场推广专员",
+      "submit_rule": {
+        "cadence": "unlimited"
+      },
+      "report_required": true,
+      "form_schema": [
+        {
+          "code": "activity_info",
+          "name": "活动信息",
+          "fields": {
+            "meeting_name": {
+              "label": "活动名称",
+              "type": "text",
+              "required": true
+            },
+            "region": {
+              "label": "区域",
+              "type": "text",
+              "required": true
+            },
+            "attendees": {
+              "label": "参会人数",
+              "type": "number",
+              "required": true
+            },
+            "executor": {
+              "label": "执行人",
+              "type": "text",
+              "required": true
+            },
+            "exec_date": {
+              "label": "活动日期",
+              "type": "date",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "activity_photos",
+          "name": "活动照片",
+          "fields": {
+            "meeting_photo": {
+              "label": "活动照片",
+              "type": "image",
+              "required": true
+            }
+          },
+          "required": true
+        },
+        {
+          "code": "sign_in_receipts",
+          "name": "签到与票据",
+          "fields": {
+            "sign_sheet": {
+              "label": "签到表",
+              "type": "file",
+              "required": true
+            },
+            "receipt": {
+              "label": "费用票据",
+              "type": "file",
+              "required": true
+            }
+          },
+          "required": true
+        }
+      ]
+    }
+  }
+]
