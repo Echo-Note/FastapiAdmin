@@ -75,14 +75,41 @@
 
 <script setup lang="ts">
 import InstitutionAPI, { type InstitutionForm, type InstitutionTable } from "@/api/module_market/institution";
-import { ENABLE_STATUS_MAP, ENABLE_STATUS_OPTIONS, INSTITUTION_TYPE_MAP, INSTITUTION_TYPE_OPTIONS } from "@/api/module_market/constants";
+import { useDictStore } from "@stores";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
-import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
+import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
 
 defineOptions({ name: "MarketInstitution", inheritAttrs: false });
+
+const dictStore = useDictStore();
+
+// ── 字典：机构类型 / 启用状态 ──
+const institutionTypeMap = computed<Record<string, { type: StatusType; text: string }>>(() =>
+  Object.fromEntries(
+    (dictStore.getDictData["market_institution_type"] ?? []).map((d) => [
+      d.dict_value!,
+      { type: (d.list_class as StatusType) ?? "info", text: d.dict_label ?? d.dict_value! },
+    ])
+  )
+);
+const institutionTypeOptions = computed<OptionType[]>(() =>
+  (dictStore.getDictArray("market_institution_type") ?? []).map((d) => ({ value: d.dict_value, label: d.dict_label }))
+);
+// 启用状态：后端 status 为 Integer(0/1)，字典值为字符串 "0"/"1"，此处做数值映射
+const enableStatusMap = computed<Record<number, { type: StatusType; text: string }>>(() =>
+  Object.fromEntries(
+    (dictStore.getDictData["market_enable_status"] ?? []).map((d) => [
+      Number(d.dict_value),
+      { type: (d.list_class as StatusType) ?? "info", text: d.dict_label ?? d.dict_value! },
+    ])
+  )
+);
+const enableStatusOptions = computed<OptionType[]>(() =>
+  (dictStore.getDictArray("market_enable_status") ?? []).map((d) => ({ value: Number(d.dict_value), label: d.dict_label }))
+);
 
 const searchForm = ref<{ name?: string; type?: string; region?: string; status?: number }>({ name: undefined, type: undefined, region: undefined, status: undefined });
 const showSearchBar = ref(true);
@@ -90,9 +117,9 @@ const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
 const searchItems = computed<SearchFormItem[]>(() => [
   { label: "机构名称", key: "name", type: "input", placeholder: "请输入机构名称", clearable: true, span: 6 },
-  { label: "机构类型", key: "type", type: "select", props: { placeholder: "请选择机构类型", options: [...INSTITUTION_TYPE_OPTIONS], clearable: true }, span: 6 },
+  { label: "机构类型", key: "type", type: "select", props: { placeholder: "请选择机构类型", options: institutionTypeOptions.value, clearable: true }, span: 6 },
   { label: "所在区域", key: "region", type: "input", placeholder: "请输入所在区域", clearable: true, span: 6 },
-  { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: ENABLE_STATUS_OPTIONS, clearable: true }, span: 6 },
+  { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: enableStatusOptions.value, clearable: true }, span: 6 },
 ]);
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
@@ -121,12 +148,12 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "name", label: "机构名称", minWidth: 160, showOverflowTooltip: true },
-        { prop: "type", label: "机构类型", width: 110, formatter: (row: InstitutionTable) => INSTITUTION_TYPE_MAP[row.type ?? ""]?.text ?? row.type ?? "—" },
+        { prop: "type", label: "机构类型", width: 110, status: institutionTypeMap.value },
         { prop: "level", label: "等级", width: 100, showOverflowTooltip: true },
         { prop: "region", label: "所在区域", width: 120, showOverflowTooltip: true },
         { prop: "contact", label: "联系人", width: 100, showOverflowTooltip: true },
         { prop: "contact_phone", label: "联系电话", width: 140, showOverflowTooltip: true },
-        { prop: "status", label: "状态", width: 88, status: ENABLE_STATUS_MAP },
+        { prop: "status", label: "状态", width: 88, status: enableStatusMap.value },
         { prop: "created_time", label: "创建时间", width: 168, showOverflowTooltip: true },
         { prop: "operation", label: "操作", width: 180, fixed: "right", align: "center", formatter: (row: InstitutionTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ]),
@@ -136,12 +163,12 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 const detailFormData = ref<Partial<InstitutionTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
   { label: "机构名称", prop: "name" },
-  { label: "机构类型", prop: "type", tag: { map: INSTITUTION_TYPE_MAP } },
+  { label: "机构类型", prop: "type", tag: { map: institutionTypeMap.value } },
   { label: "等级", prop: "level" },
   { label: "所在区域", prop: "region" },
   { label: "联系人", prop: "contact" },
   { label: "联系电话", prop: "contact_phone" },
-  { label: "状态", prop: "status", tag: { map: ENABLE_STATUS_MAP } },
+  { label: "状态", prop: "status", tag: { map: enableStatusMap.value } },
   { label: "创建人", prop: "created_by.name" },
   { label: "创建时间", prop: "created_time" },
   { label: "详细地址", prop: "address", span: 4 },
@@ -162,13 +189,13 @@ const rules = reactive({
 
 const formItems = computed<FormItem[]>(() => [
   { label: "机构名称", key: "name", type: "input", span: 24, props: { placeholder: "请输入机构名称", maxlength: 128 } },
-  { label: "机构类型", key: "type", type: "select", span: 24, props: { placeholder: "请选择机构类型", options: [...INSTITUTION_TYPE_OPTIONS] } },
+  { label: "机构类型", key: "type", type: "select", span: 24, props: { placeholder: "请选择机构类型", options: institutionTypeOptions.value } },
   { label: "等级", key: "level", type: "input", span: 24, props: { placeholder: "如 三甲 / 二级（可选）", maxlength: 32 } },
   { label: "所在区域", key: "region", type: "input", span: 24, props: { placeholder: "请输入所在区域", maxlength: 64 } },
   { label: "详细地址", key: "address", type: "input", span: 24, props: { placeholder: "请输入详细地址", maxlength: 255 } },
   { label: "联系人", key: "contact", type: "input", span: 24, props: { placeholder: "请输入联系人", maxlength: 32 } },
   { label: "联系电话", key: "contact_phone", type: "input", span: 24, props: { placeholder: "请输入联系电话", maxlength: 20 } },
-  { label: "状态", key: "status", type: "radiogroup", span: 24, props: { options: [...ENABLE_STATUS_OPTIONS] } },
+  { label: "状态", key: "status", type: "radiogroup", span: 24, props: { options: enableStatusOptions.value } },
   { label: "备注", key: "description", type: "input", span: 24, props: { type: "textarea", rows: 3, maxlength: 200, showWordLimit: true, placeholder: "请输入备注" } },
 ]);
 
@@ -226,4 +253,8 @@ async function handleBatchDelete() {
     batchDeleting.value = false;
   }
 }
+
+onMounted(async () => {
+  await dictStore.getDict(["market_institution_type", "market_enable_status"]);
+});
 </script>

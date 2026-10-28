@@ -11,8 +11,17 @@ from app.core.logger import logger
 from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
-from .crud import InstitutionCRUD
-from .schema import InstitutionCreateSchema, InstitutionOutSchema, InstitutionQueryParam, InstitutionUpdateSchema
+from .crud import InstitutionCRUD, InstitutionImageCRUD
+from .schema import (
+    InstitutionCreateSchema,
+    InstitutionImageCreateSchema,
+    InstitutionImageOutSchema,
+    InstitutionImageQueryParam,
+    InstitutionImageUpdateSchema,
+    InstitutionOutSchema,
+    InstitutionQueryParam,
+    InstitutionUpdateSchema,
+)
 
 
 class InstitutionService:
@@ -84,3 +93,70 @@ class InstitutionService:
             raise CustomException(msg="删除失败，删除对象不能为空")
         await InstitutionCRUD(self.auth, self.db).delete(ids=ids)
         await RedisCURD(redis).delete(self._cache_key())
+
+
+class InstitutionImageService:
+    """机构图片归集服务"""
+
+    def __init__(self, auth: AuthSchema, db: AsyncSession) -> None:
+        self.auth = auth
+        self.db = db
+
+    async def detail(self, id: int) -> InstitutionImageOutSchema:
+        """查询机构图片详情。"""
+        image = await InstitutionImageCRUD(self.auth, self.db).get_or_404(id=id, preload=["institution"])
+        return InstitutionImageOutSchema.model_validate(image)
+
+    async def page(
+        self,
+        page_no: int,
+        page_size: int,
+        search: InstitutionImageQueryParam | None = None,
+        order_by: list[dict[str, str]] | None = None,
+    ) -> PageResultSchema[InstitutionImageOutSchema]:
+        """分页查询机构图片。"""
+        offset = (page_no - 1) * page_size
+        page_result = await InstitutionImageCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=order_by or [{"id": "asc"}],
+            search=search_to_dict(search),
+            out_schema=InstitutionImageOutSchema,
+            preload=["institution"],
+        )
+        return page_result
+
+    async def create(self, data: InstitutionImageCreateSchema) -> InstitutionImageOutSchema:
+        """创建机构图片。"""
+        image = await InstitutionImageCRUD(self.auth, self.db).create(data=data)
+        return InstitutionImageOutSchema.model_validate(image)
+
+    async def update(self, id: int, data: InstitutionImageUpdateSchema) -> InstitutionImageOutSchema:
+        """更新机构图片。"""
+        await InstitutionImageCRUD(self.auth, self.db).get_or_404(id=id)
+        await InstitutionImageCRUD(self.auth, self.db).update(id=id, data=data)
+        return await self.detail(id=id)
+
+    async def delete(self, ids: list[int]) -> None:
+        """删除机构图片。"""
+        if not ids:
+            raise CustomException(msg="删除失败，删除对象不能为空")
+        await InstitutionImageCRUD(self.auth, self.db).delete(ids=ids)
+
+    async def list_by_institution(
+        self,
+        institution_id: int,
+        page_no: int,
+        page_size: int,
+    ) -> PageResultSchema[InstitutionImageOutSchema]:
+        """按机构归集查看图片（供机构管理页）。"""
+        offset = (page_no - 1) * page_size
+        page_result = await InstitutionImageCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=[{"id": "desc"}],
+            search={"institution_id": institution_id},
+            out_schema=InstitutionImageOutSchema,
+            preload=["institution"],
+        )
+        return page_result
