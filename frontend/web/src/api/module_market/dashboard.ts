@@ -44,5 +44,6 @@ export interface DashboardOverview {
   project_count: number;
   company_count: number;
   institution_count: number;
-  service_item_count: number;
+  category_count: number;
+  template_count: number;
 }

@@ -1,4 +1,5 @@
-"""运营工作台统计响应模型。"""
+"""运营工作台（市场数据概览）统计响应模型。"""
+
 from pydantic import BaseModel, Field
 
 
@@ -36,4 +37,13 @@ class DashboardOverviewSchema(BaseModel):
     project_count: int = Field(0, description="项目数")
     company_count: int = Field(0, description="医药公司数")
     institution_count: int = Field(0, description="机构数")
-    service_item_count: int = Field(0, description="服务项目数")
+    category_count: int = Field(0, description="一级任务分类数")
+    template_count: int = Field(0, description="二级任务模板数")
+
+
+__all__ = [
+    "DashboardOverviewSchema",
+    "SettlementStatSchema",
+    "SubmissionStatSchema",
+    "TaskStatSchema",
+]

@@ -47,7 +47,7 @@
           </span>
         </template>
         <ElRow :gutter="20">
-          <ElCol v-for="card in baseCards" :key="card.title" :xs="12" :sm="6" :md="6" class="mb-5">
+          <ElCol v-for="card in baseCards" :key="card.title" :xs="12" :sm="8" :md="8" class="mb-5">
             <FaStatsCard
               :icon="card.icon"
               :icon-style="card.iconStyle"
@@ -81,14 +81,15 @@ const overview = ref<DashboardOverview>({
   project_count: 0,
   company_count: 0,
   institution_count: 0,
-  service_item_count: 0,
+  category_count: 0,
+  template_count: 0,
 });
 
 async function loadOverview() {
   loading.value = true;
   try {
-    const { data } = await DashboardAPI.getOverview();
-    if (data) overview.value = data;
+    const res = await DashboardAPI.getOverview();
+    if (res.data?.data) overview.value = res.data.data;
   } catch (error) {
     ElMessage.error("加载运营工作台数据失败");
   } finally {
@@ -206,11 +207,20 @@ const baseCards = computed<StatCard[]>(() => [
     textColor: "var(--el-text-color-primary)",
   },
   {
-    title: "服务项目",
-    description: "在库服务项目数",
-    count: overview.value.service_item_count,
-    icon: "ri:briefcase-line",
+    title: "一级分类",
+    description: "任务一级分类数",
+    count: overview.value.category_count,
+    icon: "ri:price-tag-3-line",
     iconStyle: "bg-[var(--el-color-danger)]",
+    boxStyle: "",
+    textColor: "var(--el-text-color-primary)",
+  },
+  {
+    title: "二级模板",
+    description: "任务二级模板数",
+    count: overview.value.template_count,
+    icon: "ri:briefcase-line",
+    iconStyle: "bg-[var(--el-color-info)]",
     boxStyle: "",
     textColor: "var(--el-text-color-primary)",
   },

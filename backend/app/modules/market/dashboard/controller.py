@@ -1,3 +1,5 @@
+"""运营工作台（市场数据概览）接口层。"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Security
