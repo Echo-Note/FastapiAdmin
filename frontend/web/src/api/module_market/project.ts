@@ -42,19 +42,19 @@ const ProjectAPI = {
     });
   },
 
-  /** 任务归集到项目（增量，幂等） */
-  addProjectTask(id: number, body: { task_id: number }) {
+  /** 项目关联二级任务模板（幂等） */
+  addProjectTemplate(id: number, body: { template_id: number }) {
     return request<ApiResponse<ProjectTable>>({
-      url: `${API_PATH}/tasks/${id}`,
+      url: `${API_PATH}/templates/${id}`,
       method: "post",
       data: body,
     });
   },
 
-  /** 从项目移除任务归集 */
-  removeProjectTask(id: number, task_id: number) {
+  /** 移除项目关联的二级任务模板 */
+  removeProjectTemplate(id: number, template_id: number) {
     return request<ApiResponse<ProjectTable>>({
-      url: `${API_PATH}/tasks/${id}/${task_id}`,
+      url: `${API_PATH}/templates/${id}/${template_id}`,
       method: "delete",
     });
   },
@@ -65,6 +65,15 @@ const ProjectAPI = {
       url: `${API_PATH}/status/${id}`,
       method: "post",
       data: { status },
+    });
+  },
+
+  /** 发布项目：按关联的二级模板批量生成任务实例 */
+  publishProject(id: number) {
+    return request<ApiResponse<ProjectTable>>({
+      url: `${API_PATH}/publish/${id}`,
+      method: "post",
+      data: {},
     });
   },
 };
@@ -84,18 +93,17 @@ export interface ProjectTable extends BaseType {
   name?: string;
   company_id?: number;
   company?: { id?: number; name?: string } | null;
-  amount?: number;
   period?: string;
   status?: string;
   publisher_id?: number | null;
-  task_ids?: number[];
+  /** 关联的二级任务模板 ID 列表 */
+  template_ids?: number[];
 }
 
 export interface ProjectForm extends BaseFormType {
   code?: string;
   name?: string;
   company_id?: number;
-  amount?: number;
   period?: string;
-  task_ids?: number[];
+  template_ids?: number[];
 }

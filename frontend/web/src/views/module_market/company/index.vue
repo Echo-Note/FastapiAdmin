@@ -75,14 +75,31 @@
 
 <script setup lang="ts">
 import CompanyAPI, { type CompanyForm, type CompanyTable } from "@/api/module_market/company";
-import { ENABLE_STATUS_MAP, ENABLE_STATUS_OPTIONS } from "@/api/module_market/constants";
+import { useDictStore } from "@stores";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
-import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
+import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
 
 defineOptions({ name: "MarketCompany", inheritAttrs: false });
+
+const dictStore = useDictStore();
+
+// ── 字典：启用状态（market_enable_status，dict_value 为 "0"/"1"，后端 status 为 0/1 数字）──
+// 状态标签 map：key 用字符串 "0"/"1"（JS 对象键访问 map[0] 与 map["0"] 等价，可匹配数字 row.status）
+const enableStatusMap = computed<Record<string, { type: StatusType; text: string }>>(() =>
+  Object.fromEntries(
+    (dictStore.getDictData["market_enable_status"] ?? []).map((d) => [
+      d.dict_value!,
+      { type: (d.list_class as StatusType) ?? "info", text: d.dict_label ?? d.dict_value! },
+    ])
+  )
+);
+// 下拉/单选选项：value 转回数字，与后端 status?: number 对齐
+const enableStatusOptions = computed<OptionType[]>(() =>
+  (dictStore.getDictArray("market_enable_status") ?? []).map((d) => ({ value: Number(d.dict_value), label: d.dict_label }))
+);
 
 const searchForm = ref<{ name?: string; status?: number }>({ name: undefined, status: undefined });
 const showSearchBar = ref(true);
@@ -90,7 +107,7 @@ const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
 const searchItems = computed<SearchFormItem[]>(() => [
   { label: "公司名称", key: "name", type: "input", placeholder: "请输入公司名称", clearable: true, span: 6 },
-  { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: ENABLE_STATUS_OPTIONS, clearable: true }, span: 6 },
+  { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: enableStatusOptions.value, clearable: true }, span: 6 },
 ]);
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
@@ -123,7 +140,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "credit_code", label: "统一社会信用代码", minWidth: 180, showOverflowTooltip: true },
         { prop: "contact", label: "联系人", width: 100, showOverflowTooltip: true },
         { prop: "contact_phone", label: "联系电话", width: 140, showOverflowTooltip: true },
-        { prop: "status", label: "状态", width: 88, status: ENABLE_STATUS_MAP },
+        { prop: "status", label: "状态", width: 88, status: enableStatusMap.value },
         { prop: "created_time", label: "创建时间", width: 168, showOverflowTooltip: true },
         { prop: "operation", label: "操作", width: 180, fixed: "right", align: "center", formatter: (row: CompanyTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ]),
@@ -138,7 +155,7 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "联系人", prop: "contact" },
   { label: "联系电话", prop: "contact_phone" },
   { label: "公司地址", prop: "address" },
-  { label: "状态", prop: "status", tag: { map: ENABLE_STATUS_MAP } },
+  { label: "状态", prop: "status", tag: { map: enableStatusMap.value } },
   { label: "创建人", prop: "created_by.name" },
   { label: "创建时间", prop: "created_time" },
   { label: "备注", prop: "description", span: 4 },
@@ -160,7 +177,7 @@ const formItems = computed<FormItem[]>(() => [
   { label: "联系人", key: "contact", type: "input", span: 24, props: { placeholder: "请输入联系人", maxlength: 32 } },
   { label: "联系电话", key: "contact_phone", type: "input", span: 24, props: { placeholder: "请输入联系电话", maxlength: 20 } },
   { label: "公司地址", key: "address", type: "input", span: 24, props: { placeholder: "请输入公司地址", maxlength: 255 } },
-  { label: "状态", key: "status", type: "radiogroup", span: 24, props: { options: [...ENABLE_STATUS_OPTIONS] } },
+  { label: "状态", key: "status", type: "radiogroup", span: 24, props: { options: [...enableStatusOptions.value] } },
   { label: "备注", key: "description", type: "input", span: 24, props: { type: "textarea", rows: 3, maxlength: 200, showWordLimit: true, placeholder: "请输入备注" } },
 ]);
 
@@ -177,6 +194,10 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   detailFormData,
   onCreateSuccess: refreshCreate,
   onUpdateSuccess: refreshUpdate,
+});
+
+onMounted(async () => {
+  await dictStore.getDict(["market_enable_status"]);
 });
 
 async function handleAdd() {

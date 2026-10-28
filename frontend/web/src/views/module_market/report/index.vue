@@ -1,4 +1,4 @@
-<!-- 报告打包：列表 + 生成 + 详情 -->
+<!-- 月度报告：列表 + 手动生成 + 详情（按项目×二级模板×月份汇总） -->
 <template>
   <div class="fa-full-height">
     <FaSearchBar
@@ -18,7 +18,7 @@
       <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
         <template #left>
           <FaTableHeaderLeft
-            :perm-create="['module_market:report:add']"
+            :perm-create="['module_market:report:create']"
             create-text="生成报告"
             @add="openGenerateDialog"
           />
@@ -57,7 +57,9 @@
 
     <!-- 详情对话框 -->
     <ElDialog v-model="detailVisible" title="报告详情" width="720px">
-      <FaDescriptions :column="4" :data="detailData" :items="detailItems" />
+      <FaDescriptions :column="4" :data="detailData" :items="detailItems">
+        <template #templateName="{ value }">{{ value ?? "全项目汇总" }}</template>
+      </FaDescriptions>
       <ElDivider content-position="left">汇总数据</ElDivider>
       <pre class="form-data-pre">{{ formattedSummary }}</pre>
     </ElDialog>
@@ -66,27 +68,44 @@
 
 <script setup lang="ts">
 import ReportAPI, { type ReportTable } from "@/api/module_market/report";
-import CompanyAPI from "@/api/module_market/company";
-import { REPORT_STATUS_MAP } from "@/api/module_market/constants";
+import ProjectAPI from "@/api/module_market/project";
+import TaskTemplateAPI from "@/api/module_market/task-template";
+import { useDictStore } from "@stores";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
-import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
+import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
 
 defineOptions({ name: "MarketReport", inheritAttrs: false });
 
-const searchForm = ref<{ company_id?: number; period?: string; status?: string }>({ company_id: undefined, period: undefined, status: undefined });
+const dictStore = useDictStore();
+
+// ── 字典：报告状态 ──
+const reportStatusMap = computed<Record<string, { type: StatusType; text: string }>>(() =>
+  Object.fromEntries(
+    (dictStore.getDictData["market_report_status"] ?? []).map((d) => [
+      d.dict_value!,
+      { type: (d.list_class as StatusType) ?? "info", text: d.dict_label ?? d.dict_value! },
+    ])
+  )
+);
+const statusOptions = computed<OptionType[]>(() =>
+  (dictStore.getDictArray("market_report_status") ?? []).map((d) => ({ value: d.dict_value, label: d.dict_label }))
+);
+
+const searchForm = ref<{ project_id?: number; template_id?: number; period?: string; status?: string }>({ project_id: undefined, template_id: undefined, period: undefined, status: undefined });
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
-const companyOptions = ref<OptionType[]>([]);
-const statusOptions = computed<OptionType[]>(() => Object.entries(REPORT_STATUS_MAP).map(([value, v]) => ({ value, label: v.text })));
+const projectOptions = ref<OptionType[]>([]);
+const templateOptions = ref<OptionType[]>([]);
 
 const searchItems = computed<SearchFormItem[]>(() => [
-  { label: "委托公司", key: "company_id", type: "select", props: { placeholder: "请选择医药公司", options: companyOptions.value, filterable: true, clearable: true }, span: 8 },
-  { label: "周期", key: "period", type: "input", placeholder: "如 2026-10", clearable: true, span: 8 },
-  { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: statusOptions.value, clearable: true }, span: 8 },
+  { label: "项目", key: "project_id", type: "select", props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "二级模板", key: "template_id", type: "select", props: { placeholder: "请选择模板", options: templateOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "月份", key: "period", type: "input", placeholder: "如 2026-03", clearable: true, span: 6 },
+  { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: statusOptions.value, clearable: true }, span: 6 },
 ]);
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
@@ -106,9 +125,10 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
       apiParams: { page_no: 1, page_size: 10 },
       columnsFactory: resolveStatusColumns<ReportTable>(() => [
         { type: "globalIndex", width: 56, label: "序号" },
-        { prop: "company", label: "委托公司", minWidth: 150, formatter: (row: ReportTable) => row.company?.name ?? "—" },
-        { prop: "period", label: "周期", width: 90 },
-        { prop: "status", label: "状态", width: 92, status: REPORT_STATUS_MAP },
+        { prop: "project", label: "项目", minWidth: 150, formatter: (row: ReportTable) => row.project?.name ?? "—" },
+        { prop: "template", label: "二级模板", minWidth: 150, formatter: (row: ReportTable) => row.template?.name ?? "全项目汇总" },
+        { prop: "period", label: "月份", width: 90 },
+        { prop: "status", label: "状态", width: 92, status: reportStatusMap.value },
         { prop: "attachment", label: "附件", minWidth: 140, showOverflowTooltip: true, formatter: (row: ReportTable) => row.attachment ?? "—" },
         { prop: "created_time", label: "生成时间", width: 168, showOverflowTooltip: true },
         { prop: "operation", label: "操作", width: 90, fixed: "right", align: "center", formatter: (row: ReportTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
@@ -119,9 +139,10 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 const detailVisible = ref(false);
 const detailData = ref<Partial<ReportTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "委托公司", prop: "company.name" },
-  { label: "周期", prop: "period" },
-  { label: "状态", prop: "status", tag: { map: REPORT_STATUS_MAP } },
+  { label: "项目", prop: "project.name" },
+  { label: "二级模板", prop: "template.name", slot: "templateName" },
+  { label: "月份", prop: "period" },
+  { label: "状态", prop: "status", tag: { map: reportStatusMap.value } },
   { label: "附件", prop: "attachment" },
   { label: "生成时间", prop: "created_time" },
 ];
@@ -138,16 +159,17 @@ async function openDetail(id: number) {
 const generateVisible = ref(false);
 const generateSubmitting = ref(false);
 const generateFormRef = ref<InstanceType<typeof FaForm> | null>(null);
-const generateForm = ref<{ company_id?: number; period?: string }>({ company_id: undefined, period: undefined });
+const generateForm = ref<{ project_id?: number; template_id?: number; period?: string }>({ project_id: undefined, template_id: undefined, period: undefined });
 
 const generateFormItems = computed<FormItem[]>(() => [
-  { label: "委托公司", key: "company_id", type: "select", span: 24, props: { placeholder: "请选择医药公司", options: companyOptions.value, filterable: true } },
-  { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "自然月，如 2026-10", maxlength: 16 } },
+  { label: "项目", key: "project_id", type: "select", span: 24, props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true } },
+  { label: "二级模板", key: "template_id", type: "select", span: 24, props: { placeholder: "留空则汇总整个项目", options: templateOptions.value, filterable: true, clearable: true } },
+  { label: "月份", key: "period", type: "input", span: 24, props: { placeholder: "自然月，如 2026-03", maxlength: 16 } },
 ]);
 
 const generateRules = reactive({
-  company_id: [{ required: true, message: "请选择委托公司", trigger: "change" }],
-  period: [{ required: true, message: "请输入周期", trigger: "blur" }],
+  project_id: [{ required: true, message: "请选择项目", trigger: "change" }],
+  period: [{ required: true, message: "请输入月份", trigger: "blur" }],
 });
 
 function openGenerateDialog() {
@@ -155,7 +177,7 @@ function openGenerateDialog() {
 }
 
 function resetGenerateForm() {
-  generateForm.value = { company_id: undefined, period: undefined };
+  generateForm.value = { project_id: undefined, template_id: undefined, period: undefined };
 }
 
 async function handleGenerateSubmit() {
@@ -165,10 +187,10 @@ async function handleGenerateSubmit() {
   } catch {
     return;
   }
-  if (!generateForm.value.company_id || !generateForm.value.period) return;
+  if (!generateForm.value.project_id || !generateForm.value.period) return;
   generateSubmitting.value = true;
   try {
-    await ReportAPI.generateReport({ company_id: generateForm.value.company_id, period: generateForm.value.period });
+    await ReportAPI.generateReport({ project_id: generateForm.value.project_id, template_id: generateForm.value.template_id, period: generateForm.value.period });
     generateVisible.value = false;
     await refreshData();
   } catch {
@@ -179,11 +201,18 @@ async function handleGenerateSubmit() {
 }
 
 async function loadOptions() {
-  const companyRes = await CompanyAPI.listCompany({ page_no: 1, page_size: 100 });
-  companyOptions.value = companyRes.data.data.items.map((c) => ({ value: c.id!, label: c.name ?? "" }));
+  const [projectRes, templateRes] = await Promise.all([
+    ProjectAPI.listProject({ page_no: 1, page_size: 100 }),
+    TaskTemplateAPI.listTemplate({ page_no: 1, page_size: 100 }),
+  ]);
+  projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? p.code ?? "" }));
+  templateOptions.value = templateRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? t.code ?? "" }));
 }
 
-onMounted(loadOptions);
+onMounted(async () => {
+  await dictStore.getDict(["market_report_status"]);
+  await loadOptions();
+});
 
 async function handleSearch(params: Record<string, unknown>) {
   replaceSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);
@@ -191,7 +220,7 @@ async function handleSearch(params: Record<string, unknown>) {
 }
 
 async function onResetSearch() {
-  searchForm.value = { company_id: undefined, period: undefined, status: undefined };
+  searchForm.value = { project_id: undefined, template_id: undefined, period: undefined, status: undefined };
   await resetSearchParams();
 }
 </script>

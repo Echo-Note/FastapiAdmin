@@ -18,7 +18,8 @@ const ReportAPI = {
     });
   },
 
-  generateReport(body: { company_id: number; period: string; service_item_id?: number; task_type_id?: number }) {
+  /** 生成月度报告（运营手动触发） */
+  generateReport(body: { project_id: number; template_id?: number; period: string }) {
     return request<ApiResponse<ReportTable>>({
       url: `${API_PATH}/generate`,
       method: "post",
@@ -30,18 +31,17 @@ const ReportAPI = {
 export default ReportAPI;
 
 export interface ReportPageQuery extends PageQuery, UserByQueryParams {
-  company_id?: number;
-  service_item_id?: number;
-  task_type_id?: number;
+  project_id?: number;
+  template_id?: number;
   period?: string;
   status?: string;
 }
 
 export interface ReportTable extends BaseType {
-  company_id?: number;
-  company?: { id?: number; name?: string } | null;
-  service_item_id?: number | null;
-  task_type_id?: number | null;
+  project_id?: number;
+  project?: { id?: number; name?: string } | null;
+  template_id?: number | null;
+  template?: { id?: number; name?: string } | null;
   period?: string;
   summary?: Record<string, unknown>;
   attachment?: string | null;
