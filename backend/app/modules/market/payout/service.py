@@ -1,41 +1,146 @@
-"""发放额度与个人任务津贴的业务逻辑。"""
+"""发放管理域服务层：归集结算 + 发放额度 + 个人任务津贴。"""
 
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_schema import AuthSchema, PageResultSchema
+from app.core.exceptions import CustomException
 from app.utils.common_util import search_to_dict
 
-from ..enums import AllowanceStatus
-from .crud import AllowanceCRUD, AllowanceDetailCRUD, PayoutConfigCRUD
-from .model import AllowanceModel
+from ..config import TaskConfig
+from ..enums import SettlementStatus, SubmissionStatus, TaskStatus
+from ..task.crud import AssignmentCRUD, SubmissionCRUD, TaskCRUD
+from .crud import AllowanceCRUD, AllowanceDetailCRUD, PayoutConfigCRUD, SettlementCRUD, SettlementItemCRUD
 from .schema import (
     AllowanceDetailOutSchema,
+    AllowanceOutSchema,
     PayoutConfigCreateSchema,
     PayoutConfigOutSchema,
+    PayoutConfigQueryParam,
     PayoutConfigUpdateSchema,
-    PayoutQueryParam,
+    SettlementOutSchema,
+    SettlementQueryParam,
 )
 
 # 每月发放额度默认值（运营可调为 10000/20000）
 DEFAULT_PAYOUT_LIMIT = Decimal("20000")
 
 
-class PayoutService:
-    """发放服务：配置 CRUD + 发放封顶 / 津贴累计算法。"""
+class SettlementService:
+    """归集结算服务"""
 
     def __init__(self, auth: AuthSchema, db: AsyncSession) -> None:
         self.auth = auth
         self.db = db
 
-    # ── 配置 CRUD ──────────────────────────────────────────────────────
+    async def detail(self, id: int) -> SettlementOutSchema:
+        """查询结算单详情。"""
+        settlement = await SettlementCRUD(self.auth, self.db).get_or_404(id=id, preload=["items"])
+        return SettlementOutSchema.model_validate(settlement)
 
     async def page(
         self,
         page_no: int,
         page_size: int,
-        search: PayoutQueryParam | None = None,
+        search: SettlementQueryParam | None = None,
+        order_by: list[dict[str, str]] | None = None,
+    ) -> PageResultSchema[SettlementOutSchema]:
+        """分页查询结算单。"""
+        offset = (page_no - 1) * page_size
+        return await SettlementCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=order_by or [{"id": "desc"}],
+            search=search_to_dict(search),
+            out_schema=SettlementOutSchema,
+            preload=["items"],
+        )
+
+    async def settle(self, task_id: int, period: str) -> list[SettlementOutSchema]:
+        """归集结算：汇总「任务 × 用户」下审核通过的成果，生成结算单 + 明细。
+
+        规则：
+        - 仅「已完成」（运营判定）的任务可归集结算；
+        - 应发金额 payable = 单价 × 通过成果数量（无上限）；
+        - 幂等：同一 task + user + period 已存在结算单则跳过。
+        """
+        task = await TaskCRUD(self.auth, self.db).get_or_404(id=task_id, preload=["template", "template.category"])
+        if task.status != TaskStatus.COMPLETED.value:
+            raise CustomException(msg="仅「已完成」的任务可归集结算（请先判定任务完成）")
+
+        # 解析模板配置（unit/price），供结算明细使用
+        config = TaskConfig.model_validate(task.template.config)
+        unit = config.unit
+        price = config.price if config.price is not None else Decimal("0")
+
+        assignments = await AssignmentCRUD(self.auth, self.db).get_list(search={"task_id": task_id})
+        results: list[SettlementOutSchema] = []
+
+        for assignment in assignments:
+            # 幂等：已存在同 task + user + period 的结算单则跳过
+            if await SettlementCRUD(self.auth, self.db).get(task_id=task_id, user_id=assignment.user_id, period=period):
+                continue
+
+            approved_qty = await SubmissionCRUD(self.auth, self.db).count(
+                assignment_id=assignment.id, status=SubmissionStatus.APPROVED.value, period=period
+            )
+            if approved_qty == 0:
+                continue
+
+            payable = price * approved_qty
+
+            settlement = await SettlementCRUD(self.auth, self.db).create(
+                data={
+                    "task_id": task_id,
+                    "user_id": assignment.user_id,
+                    "period": period,
+                    "qty": approved_qty,
+                    "payable_amount": payable,
+                    "status": SettlementStatus.CALCULATED.value,
+                }
+            )
+            await SettlementItemCRUD(self.auth, self.db).create(
+                data={
+                    "settlement_id": settlement.id,
+                    "category_name": task.template.category.name,
+                    "template_name": task.template.name,
+                    "unit": unit,
+                    "price": price,
+                    "qty": approved_qty,
+                    "amount": payable,
+                }
+            )
+            results.append(await self.detail(id=settlement.id))
+
+        return results
+
+    async def confirm(self, id: int) -> SettlementOutSchema:
+        """确认结算单：PENDING / CALCULATED → CONFIRMED。"""
+        settlement = await SettlementCRUD(self.auth, self.db).get_or_404(id=id)
+        if settlement.status not in {SettlementStatus.PENDING.value, SettlementStatus.CALCULATED.value}:
+            raise CustomException(msg="仅待结算/已计算的结算单可确认")
+        await SettlementCRUD(self.auth, self.db).update(id=id, data={"status": SettlementStatus.CONFIRMED.value})
+        return await self.detail(id=id)
+
+
+class PayoutService:
+    """发放服务：发放额度配置 CRUD + 津贴账户 / 明细查询。"""
+
+    def __init__(self, auth: AuthSchema, db: AsyncSession) -> None:
+        self.auth = auth
+        self.db = db
+
+    async def detail(self, id: int) -> PayoutConfigOutSchema:
+        """查询发放额度配置详情。"""
+        config = await PayoutConfigCRUD(self.auth, self.db).get_or_404(id=id)
+        return PayoutConfigOutSchema.model_validate(config)
+
+    async def page(
+        self,
+        page_no: int,
+        page_size: int,
+        search: PayoutConfigQueryParam | None = None,
         order_by: list[dict[str, str]] | None = None,
     ) -> PageResultSchema[PayoutConfigOutSchema]:
         """分页查询发放额度配置。"""
@@ -48,81 +153,84 @@ class PayoutService:
             out_schema=PayoutConfigOutSchema,
         )
 
-    async def save_config(self, data: PayoutConfigCreateSchema) -> PayoutConfigOutSchema:
-        """创建或更新发放额度配置（按 user_id + period upsert）。"""
-        exist = await PayoutConfigCRUD(self.auth, self.db).get(user_id=data.user_id, period=data.period)
-        if exist:
-            await PayoutConfigCRUD(self.auth, self.db).update(
-                id=exist.id,
-                data=PayoutConfigUpdateSchema(payout_limit=data.payout_limit, enabled=data.enabled),
-            )
-            config = exist
-        else:
-            config = await PayoutConfigCRUD(self.auth, self.db).create(data=data)
+    async def create(self, data: PayoutConfigCreateSchema) -> PayoutConfigOutSchema:
+        """创建发放额度配置。"""
+        if await PayoutConfigCRUD(self.auth, self.db).get(user_id=data.user_id, period=data.period):
+            raise CustomException(msg="该用户该周期已存在发放额度配置")
+        config = await PayoutConfigCRUD(self.auth, self.db).create(data=data)
         return PayoutConfigOutSchema.model_validate(config)
 
-    # ── 算法辅助 ───────────────────────────────────────────────────────
+    async def update(self, id: int, data: PayoutConfigUpdateSchema) -> PayoutConfigOutSchema:
+        """更新发放额度配置。"""
+        await PayoutConfigCRUD(self.auth, self.db).get_or_404(id=id)
+        await PayoutConfigCRUD(self.auth, self.db).update(id=id, data=data)
+        return await self.detail(id=id)
 
-    async def get_effective_payout_limit(self, user_id: int, period: str) -> Decimal:
-        """获取用户某周期生效的每月发放额度；无配置或已停用返回默认 2 万。"""
-        config = await PayoutConfigCRUD(self.auth, self.db).get(user_id=user_id, period=period)
-        if config is None or not config.enabled:
-            return DEFAULT_PAYOUT_LIMIT
-        return Decimal(config.payout_limit)
-
-    async def get_or_create_allowance(self, user_id: int) -> AllowanceModel:
-        """获取或创建用户津贴账户。"""
-        allowance = await AllowanceCRUD(self.auth, self.db).get(user_id=user_id)
-        if allowance is None:
-            allowance = await AllowanceCRUD(self.auth, self.db).create(data={"user_id": user_id, "balance": 0})
-        return allowance
-
-    async def settle_payable(self, user_id: int, period: str, payable: Decimal) -> tuple[Decimal, Decimal]:
-        """发放封顶 + 津贴累计（设计文档 §6.2）。
-
-        规则：
-        - 津贴（上期未发放）优先发放；
-        - 剩余额度再发放本月应发；
-        - 本月未发放部分累计入津贴账户，顺延下月发放。
-
-        返回:
-        - tuple[Decimal, Decimal]: (本月实发总额, 本月新增未发放金额)。
-        """
-        allowance = await self.get_or_create_allowance(user_id=user_id)
-        limit = await self.get_effective_payout_limit(user_id=user_id, period=period)
-
-        balance = Decimal(allowance.balance)
-        paid_balance = min(balance, limit)
-        remaining = limit - paid_balance
-        paid_payable = min(payable, remaining)
-
-        paid = paid_balance + paid_payable
-        carryover_new = payable - paid_payable
-        new_balance = balance - paid_balance + carryover_new
-
-        allowance.balance = new_balance
-        await self.db.flush()
-
-        if carryover_new > 0:
-            await AllowanceDetailCRUD(self.auth, self.db).create(
-                data={"user_id": user_id, "from_period": period, "amount": carryover_new, "status": AllowanceStatus.PENDING.value}
-            )
-
-        return paid, carryover_new
-
-    # ── 查询 ───────────────────────────────────────────────────────────
+    async def delete(self, ids: list[int]) -> None:
+        """删除发放额度配置。"""
+        if not ids:
+            raise CustomException(msg="删除失败，删除对象不能为空")
+        await PayoutConfigCRUD(self.auth, self.db).delete(ids=ids)
 
     async def my_payout(self, user_id: int, period: str) -> dict:
         """查询我的发放情况：发放额度、津贴余额、津贴明细。"""
         allowance = await AllowanceCRUD(self.auth, self.db).get(user_id=user_id)
         config = await PayoutConfigCRUD(self.auth, self.db).get(user_id=user_id, period=period)
         details = await AllowanceDetailCRUD(self.auth, self.db).get_list(
-            search={"user_id": user_id, "status": AllowanceStatus.PENDING.value}, order_by=[{"id": "asc"}]
+            search={"user_id": user_id}, order_by=[{"id": "asc"}]
         )
         return {
             "user_id": user_id,
             "period": period,
             "payout_limit": float(config.payout_limit) if config and config.enabled else float(DEFAULT_PAYOUT_LIMIT),
             "allowance_balance": float(allowance.balance) if allowance else 0.0,
-            "allowance_items": [AllowanceDetailOutSchema.model_validate(d).model_dump() for d in details],
+            "allowance_items": [AllowanceDetailOutSchema.model_validate(d).model_dump(mode="json") for d in details],
         }
+
+
+class AllowanceService:
+    """个人任务津贴服务：账户 / 明细查询。"""
+
+    def __init__(self, auth: AuthSchema, db: AsyncSession) -> None:
+        self.auth = auth
+        self.db = db
+
+    async def detail(self, id: int) -> AllowanceOutSchema:
+        """查询津贴账户详情。"""
+        allowance = await AllowanceCRUD(self.auth, self.db).get_or_404(id=id)
+        return AllowanceOutSchema.model_validate(allowance)
+
+    async def page(
+        self,
+        page_no: int,
+        page_size: int,
+        order_by: list[dict[str, str]] | None = None,
+    ) -> PageResultSchema[AllowanceOutSchema]:
+        """分页查询津贴账户。"""
+        offset = (page_no - 1) * page_size
+        return await AllowanceCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=order_by or [{"id": "desc"}],
+            out_schema=AllowanceOutSchema,
+        )
+
+    async def detail_page(
+        self,
+        page_no: int,
+        page_size: int,
+        user_id: int | None = None,
+        order_by: list[dict[str, str]] | None = None,
+    ) -> PageResultSchema[AllowanceDetailOutSchema]:
+        """分页查询津贴明细。"""
+        offset = (page_no - 1) * page_size
+        search: dict[str, object] = {}
+        if user_id is not None:
+            search["user_id"] = user_id
+        return await AllowanceDetailCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=order_by or [{"id": "desc"}],
+            search=search,
+            out_schema=AllowanceDetailOutSchema,
+        )

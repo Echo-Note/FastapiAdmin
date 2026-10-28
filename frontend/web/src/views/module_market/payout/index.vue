@@ -1,4 +1,4 @@
-<!-- 发放额度配置：列表 + 配置每月发放额度（upsert）+ 发放情况查询 -->
+<!-- 发放管理：发放额度配置 CRUD + 津贴账户/明细查询 -->
 <template>
   <div class="fa-full-height">
     <FaSearchBar
@@ -17,7 +17,15 @@
     <ElCard class="fa-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
       <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
         <template #left>
-          <FaTableHeaderLeft :perm-create="['module_market:payout:edit']" create-text="配置发放额度" @add="openSaveDialog" />
+          <FaTableHeaderLeft
+            :remove-ids="selectedIds"
+            :perm-create="['module_market:payout:create']"
+            :perm-delete="['module_market:payout:delete']"
+            :delete-loading="batchDeleting"
+            @add="handleAdd"
+            @delete="handleBatchDelete"
+          />
+          <ElButton :disabled="false" @click="openAllowanceDialog">津贴账户/明细</ElButton>
         </template>
       </FaTableHeader>
 
@@ -27,18 +35,19 @@
         :data="data"
         :columns="columns"
         :pagination="pagination"
+        @selection-change="onTableSelectionChange"
         @pagination:size-change="handleSizeChange"
         @pagination:current-change="handleCurrentChange"
       />
     </ElCard>
 
-    <!-- 配置发放额度对话框 -->
-    <ElDialog v-model="saveVisible" :title="saveTitle" width="520px" :close-on-click-modal="false" @closed="resetSaveForm">
+    <!-- 新增发放额度配置对话框 -->
+    <ElDialog v-model="createVisible" title="新增发放额度配置" width="520px" :close-on-click-modal="false" @closed="resetCreateForm">
       <FaForm
-        ref="saveFormRef"
-        v-model="saveForm"
-        :items="saveFormItems"
-        :rules="saveRules"
+        ref="createFormRef"
+        v-model="createForm"
+        :items="createFormItems"
+        :rules="createRules"
         label-suffix=":"
         :label-width="110"
         label-position="right"
@@ -46,37 +55,93 @@
         :gutter="16"
       />
       <template #footer>
-        <ElButton @click="saveVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="saveSubmitting" @click="handleSaveSubmit">保存</ElButton>
+        <ElButton @click="createVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="createSubmitting" @click="handleCreateSubmit">保存</ElButton>
       </template>
     </ElDialog>
 
-    <!-- 发放情况查询对话框 -->
-    <ElDialog v-model="usageVisible" title="发放情况详情" width="640px">
-      <FaDescriptions :column="4" :data="usageData" :items="usageItems">
-        <template #userName="{ row }">{{ resolveUserName(row) }}</template>
-      </FaDescriptions>
-      <ElDivider content-position="left">津贴明细（未发放，滚入下月）</ElDivider>
-      <ElTable :data="usageData.allowance_items ?? []" size="small" border max-height="260px">
-        <ElTableColumn type="index" label="#" width="48" />
-        <ElTableColumn prop="from_period" label="来源周期" width="120" />
-        <ElTableColumn prop="amount" label="未发放金额" align="right" />
-        <ElTableColumn prop="status" label="状态" width="100" />
-      </ElTable>
+    <!-- 编辑发放额度配置对话框（仅额度 + 启用可改） -->
+    <ElDialog v-model="editVisible" title="修改发放额度配置" width="520px" :close-on-click-modal="false">
+      <FaForm
+        ref="editFormRef"
+        v-model="editForm"
+        :items="editFormItems"
+        :rules="editRules"
+        label-suffix=":"
+        :label-width="110"
+        label-position="right"
+        :span="24"
+        :gutter="16"
+      />
+      <template #footer>
+        <ElButton @click="editVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="editSubmitting" @click="handleEditSubmit">保存</ElButton>
+      </template>
+    </ElDialog>
+
+    <!-- 津贴账户 / 明细对话框 -->
+    <ElDialog v-model="allowanceVisible" title="个人任务津贴" width="760px">
+      <ElTabs v-model="allowanceTab">
+        <ElTabPane label="津贴账户" name="account">
+          <ElTable :data="allowanceData" v-loading="allowanceLoading" size="small" border max-height="360px">
+            <ElTableColumn type="index" label="#" width="48" />
+            <ElTableColumn prop="user_id" label="用户" min-width="140">
+              <template #default="{ row }">{{ userMap[row.user_id] ?? `#${row.user_id}` }}</template>
+            </ElTableColumn>
+            <ElTableColumn prop="balance" label="累计未发放金额" align="right" min-width="140" />
+            <ElTableColumn prop="created_time" label="创建时间" width="168" />
+          </ElTable>
+        </ElTabPane>
+        <ElTabPane label="津贴明细" name="detail">
+          <ElTable :data="allowanceDetailData" v-loading="allowanceDetailLoading" size="small" border max-height="360px">
+            <ElTableColumn type="index" label="#" width="48" />
+            <ElTableColumn prop="user_id" label="用户" min-width="140">
+              <template #default="{ row }">{{ userMap[row.user_id] ?? `#${row.user_id}` }}</template>
+            </ElTableColumn>
+            <ElTableColumn prop="from_period" label="来源周期" width="120" />
+            <ElTableColumn prop="amount" label="未发放金额" align="right" width="120" />
+            <ElTableColumn prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <FaStatusTag :type="allowanceStatusMap[row.status]?.type ?? 'info'" :label="allowanceStatusMap[row.status]?.text ?? (row.status ?? '—')" />
+              </template>
+            </ElTableColumn>
+            <ElTableColumn prop="paid_at" label="发放时间" width="168">
+              <template #default="{ row }">{{ row.paid_at ?? "—" }}</template>
+            </ElTableColumn>
+          </ElTable>
+        </ElTabPane>
+      </ElTabs>
     </ElDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import PayoutAPI, { type PayoutConfigTable, type PayoutUsageDetail } from "@/api/module_market/payout";
+import PayoutAPI, {
+  type PayoutConfigTable,
+  type AllowanceTable,
+  type AllowanceDetailTable,
+} from "@/api/module_market/payout";
 import UserAPI from "@/api/module_system/user";
+import { useDictStore } from "@stores";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
-import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
+import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
 
 defineOptions({ name: "MarketPayout", inheritAttrs: false });
+
+const dictStore = useDictStore();
+
+// ── 字典：津贴状态 ──
+const allowanceStatusMap = computed<Record<string, { type: StatusType; text: string }>>(() =>
+  Object.fromEntries(
+    (dictStore.getDictData["market_allowance_status"] ?? []).map((d) => [
+      d.dict_value!,
+      { type: (d.list_class as StatusType) ?? "info", text: d.dict_label ?? d.dict_value! },
+    ])
+  )
+);
 
 const searchForm = ref<{ user_id?: number; period?: string }>({ user_id: undefined, period: undefined });
 const showSearchBar = ref(true);
@@ -91,25 +156,27 @@ const searchItems = computed<SearchFormItem[]>(() => [
 ]);
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
+const { selectedRows, selectedIds, batchDeleting, onTableSelectionChange } = useTableSelection<PayoutConfigTable>();
 
 const opCtx = {
-  onUsage: (row: PayoutConfigTable) => void openUsage(row),
-  onEdit: (row: PayoutConfigTable) => void openSaveDialog(row),
+  onEdit: (row: PayoutConfigTable) => void openEditDialog(row),
+  onDelete: deleteRow,
 };
 
 function buildRowActions(row: PayoutConfigTable): TableOperationAction[] {
   return [
-    { key: "usage", label: "发放情况", artType: "view", perm: "module_market:payout:query", run: () => opCtx.onUsage(row) },
-    { key: "edit", label: "编辑", artType: "edit", perm: "module_market:payout:edit", run: () => opCtx.onEdit(row) },
+    { key: "edit", label: "编辑", artType: "edit", perm: "module_market:payout:update", run: () => opCtx.onEdit(row) },
+    { key: "delete", label: "删除", artType: "delete", perm: "module_market:payout:delete", run: () => opCtx.onDelete(row.id!, `${userMap.value[row.user_id!] ?? `#${row.user_id}`}(${row.period})`) },
   ];
 }
 
-const { columns, columnChecks, data, loading, pagination, getData, replaceSearchParams, resetSearchParams, handleSizeChange, handleCurrentChange, refreshData } =
+const { columns, columnChecks, data, loading, pagination, getData, replaceSearchParams, resetSearchParams, handleSizeChange, handleCurrentChange, refreshData, refreshCreate, refreshRemove } =
   useTable({
     core: {
       apiFn: PayoutAPI.listPayout,
       apiParams: { page_no: 1, page_size: 10 },
       columnsFactory: resolveStatusColumns<PayoutConfigTable>(() => [
+        { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "user_id", label: "用户", minWidth: 140, formatter: (row: PayoutConfigTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
         { prop: "period", label: "周期", width: 100 },
@@ -121,79 +188,153 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
     },
   });
 
-// ── 配置发放额度 ──
-const saveVisible = ref(false);
-const saveSubmitting = ref(false);
-const saveFormRef = ref<InstanceType<typeof FaForm> | null>(null);
-const saveForm = ref<{ user_id?: number; period?: string; payout_limit?: number; enabled: boolean }>({ user_id: undefined, period: undefined, payout_limit: undefined, enabled: true });
+// ── 新增发放额度配置 ──
+const createVisible = ref(false);
+const createSubmitting = ref(false);
+const createFormRef = ref<InstanceType<typeof FaForm> | null>(null);
+const createForm = ref<{ user_id?: number; period?: string; payout_limit?: number; enabled: boolean }>({ user_id: undefined, period: undefined, payout_limit: undefined, enabled: true });
 
-const saveTitle = computed(() => (saveForm.value.user_id ? "修改发放额度" : "配置发放额度"));
-
-const saveFormItems = computed<FormItem[]>(() => [
+const createFormItems = computed<FormItem[]>(() => [
   { label: "用户", key: "user_id", type: "select", span: 24, props: { placeholder: "请选择 C 端用户", options: userOptions.value, filterable: true } },
   { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "自然月，如 2026-10", maxlength: 16 } },
   { label: "发放额度", key: "payout_limit", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right", placeholder: "默认 20000，可调 10000/20000" } },
   { label: "是否启用", key: "enabled", type: "switch", span: 24 },
 ]);
 
-const saveRules = reactive({
+const createRules = reactive({
   user_id: [{ required: true, message: "请选择用户", trigger: "change" }],
   period: [{ required: true, message: "请输入周期", trigger: "blur" }],
   payout_limit: [{ required: true, message: "请输入发放额度", trigger: "blur" }],
 });
 
-function openSaveDialog(row?: PayoutConfigTable) {
-  if (row) {
-    saveForm.value = { user_id: row.user_id, period: row.period, payout_limit: row.payout_limit, enabled: row.enabled ?? true };
-  } else {
-    saveForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
-  }
-  saveVisible.value = true;
+function handleAdd() {
+  createForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
+  createVisible.value = true;
 }
 
-function resetSaveForm() {
-  saveForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
+function resetCreateForm() {
+  createForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
 }
 
-async function handleSaveSubmit() {
-  if (!saveFormRef.value) return;
+async function handleCreateSubmit() {
+  if (!createFormRef.value) return;
   try {
-    await saveFormRef.value.validate();
+    await createFormRef.value.validate();
   } catch {
     return;
   }
-  if (!saveForm.value.user_id || !saveForm.value.period || saveForm.value.payout_limit === undefined) return;
-  saveSubmitting.value = true;
+  if (!createForm.value.user_id || !createForm.value.period || createForm.value.payout_limit === undefined) return;
+  createSubmitting.value = true;
   try {
-    await PayoutAPI.savePayout({ user_id: saveForm.value.user_id, period: saveForm.value.period, payout_limit: saveForm.value.payout_limit, enabled: saveForm.value.enabled });
-    saveVisible.value = false;
+    await PayoutAPI.createPayout({ user_id: createForm.value.user_id, period: createForm.value.period, payout_limit: createForm.value.payout_limit, enabled: createForm.value.enabled });
+    createVisible.value = false;
+    await refreshCreate();
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    createSubmitting.value = false;
+  }
+}
+
+// ── 编辑发放额度配置 ──
+const editVisible = ref(false);
+const editSubmitting = ref(false);
+const editFormRef = ref<InstanceType<typeof FaForm> | null>(null);
+const editForm = ref<{ id?: number; user_id?: number; period?: string; payout_limit?: number; enabled: boolean }>({ id: undefined, user_id: undefined, period: undefined, payout_limit: undefined, enabled: true });
+
+const editFormItems = computed<FormItem[]>(() => [
+  { label: "用户", key: "user_id", type: "input", span: 24, props: { disabled: true, placeholder: "用户" } },
+  { label: "周期", key: "period", type: "input", span: 24, props: { disabled: true, placeholder: "周期" } },
+  { label: "发放额度", key: "payout_limit", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right", placeholder: "默认 20000，可调 10000/20000" } },
+  { label: "是否启用", key: "enabled", type: "switch", span: 24 },
+]);
+
+const editRules = reactive({
+  payout_limit: [{ required: true, message: "请输入发放额度", trigger: "blur" }],
+});
+
+function openEditDialog(row: PayoutConfigTable) {
+  editForm.value = { id: row.id, user_id: row.user_id, period: row.period, payout_limit: row.payout_limit, enabled: row.enabled ?? true };
+  editVisible.value = true;
+}
+
+async function handleEditSubmit() {
+  if (!editFormRef.value) return;
+  try {
+    await editFormRef.value.validate();
+  } catch {
+    return;
+  }
+  if (editForm.value.id == null || editForm.value.payout_limit === undefined) return;
+  editSubmitting.value = true;
+  try {
+    await PayoutAPI.updatePayout(editForm.value.id, { payout_limit: editForm.value.payout_limit, enabled: editForm.value.enabled });
+    editVisible.value = false;
     await refreshData();
   } catch {
     // 错误已由拦截器提示
   } finally {
-    saveSubmitting.value = false;
+    editSubmitting.value = false;
   }
 }
 
-// ── 发放情况查询 ──
-const usageVisible = ref(false);
-const usageData = ref<Partial<PayoutUsageDetail>>({});
-const usageItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "用户", prop: "user_id", slot: "userName" },
-  { label: "周期", prop: "period" },
-  { label: "每月发放额度", prop: "payout_limit" },
-  { label: "津贴余额", prop: "allowance_balance" },
-];
-
-async function openUsage(row: PayoutConfigTable) {
-  const res = await PayoutAPI.usagePayout({ user_id: row.user_id!, period: row.period! });
-  usageData.value = res.data.data;
-  usageVisible.value = true;
+async function deleteRow(id: number, name: string) {
+  try {
+    await confirmDelete(`确定删除「${name}」的发放额度配置吗？`);
+    await PayoutAPI.deletePayout([id]);
+    faTableRef.value?.elTableRef?.clearSelection();
+    await refreshRemove();
+  } catch {
+    // 用户取消
+  }
 }
 
-function resolveUserName(row: Record<string, unknown> | null): string {
-  const uid = row?.user_id as number | undefined;
-  return uid ? (userMap.value[uid] ?? `#${uid}`) : "—";
+async function handleBatchDelete() {
+  if (selectedIds.value.length === 0) return;
+  try {
+    await confirmBatchDelete(selectedIds.value.length, selectedRows.value.map((r) => `${userMap.value[r.user_id!] ?? `#${r.user_id}`}(${r.period})`));
+    batchDeleting.value = true;
+    await PayoutAPI.deletePayout(selectedIds.value);
+    faTableRef.value?.elTableRef?.clearSelection();
+    await refreshRemove();
+  } catch {
+    // 用户取消
+  } finally {
+    batchDeleting.value = false;
+  }
+}
+
+// ── 津贴账户 / 明细 ──
+const allowanceVisible = ref(false);
+const allowanceTab = ref("account");
+const allowanceLoading = ref(false);
+const allowanceDetailLoading = ref(false);
+const allowanceData = ref<AllowanceTable[]>([]);
+const allowanceDetailData = ref<AllowanceDetailTable[]>([]);
+
+async function loadAllowance() {
+  allowanceLoading.value = true;
+  try {
+    const res = await PayoutAPI.listAllowance({ page_no: 1, page_size: 100 });
+    allowanceData.value = res.data.data.items;
+  } finally {
+    allowanceLoading.value = false;
+  }
+}
+
+async function loadAllowanceDetail() {
+  allowanceDetailLoading.value = true;
+  try {
+    const res = await PayoutAPI.listAllowanceDetail({ page_no: 1, page_size: 100 });
+    allowanceDetailData.value = res.data.data.items;
+  } finally {
+    allowanceDetailLoading.value = false;
+  }
+}
+
+async function openAllowanceDialog() {
+  allowanceVisible.value = true;
+  await Promise.all([loadAllowance(), loadAllowanceDetail()]);
 }
 
 async function loadOptions() {
@@ -202,7 +343,10 @@ async function loadOptions() {
   userMap.value = Object.fromEntries(userRes.data.data.items.map((u) => [u.id!, u.name ?? u.username ?? ""]));
 }
 
-onMounted(loadOptions);
+onMounted(async () => {
+  await dictStore.getDict(["market_allowance_status"]);
+  await loadOptions();
+});
 
 async function handleSearch(params: Record<string, unknown>) {
   replaceSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);

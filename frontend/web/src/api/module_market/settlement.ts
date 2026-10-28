@@ -17,6 +17,24 @@ const SettlementAPI = {
       method: "get",
     });
   },
+
+  /** 归集结算：汇总 task × 周期下审核通过成果，生成结算单 */
+  settle(body: { task_id: number; period: string }) {
+    return request<ApiResponse<SettlementTable[]>>({
+      url: `${API_PATH}/settle`,
+      method: "post",
+      data: body,
+    });
+  },
+
+  /** 确认结算单 */
+  confirmSettlement(id: number) {
+    return request<ApiResponse<SettlementTable>>({
+      url: `${API_PATH}/confirm/${id}`,
+      method: "post",
+      data: {},
+    });
+  },
 };
 
 export default SettlementAPI;
@@ -24,14 +42,14 @@ export default SettlementAPI;
 export interface SettlementPageQuery extends PageQuery, UserByQueryParams {
   task_id?: number;
   user_id?: number;
+  period?: string;
   status?: string;
 }
 
 export interface SettlementItemRow {
   settlement_id?: number;
-  service_type?: string;
-  service_item?: string;
-  service_task?: string;
+  category_name?: string;
+  template_name?: string;
   unit?: string;
   price?: number;
   qty?: number;
@@ -41,6 +59,7 @@ export interface SettlementItemRow {
 export interface SettlementTable extends BaseType {
   task_id?: number;
   user_id?: number;
+  period?: string;
   qty?: number;
   payable_amount?: number;
   paid_amount?: number | null;
