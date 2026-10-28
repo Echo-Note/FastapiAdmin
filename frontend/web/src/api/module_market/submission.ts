@@ -18,7 +18,7 @@ const SubmissionAPI = {
     });
   },
 
-  reviewSubmission(id: number, body: { action: string; comment?: string }) {
+  reviewSubmission(id: number, body: { approved: boolean; review_comment?: string }) {
     return request<ApiResponse<SubmissionTable>>({
       url: `${API_PATH}/review/${id}`,
       method: "post",
@@ -45,6 +45,7 @@ export interface SubmissionTable extends BaseType {
   subject_name?: string | null;
   region?: string | null;
   archive_no?: string | null;
+  period?: string;
   form_data?: Record<string, unknown>;
   status?: string;
   version?: number;

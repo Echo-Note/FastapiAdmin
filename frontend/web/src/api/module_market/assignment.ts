@@ -55,10 +55,9 @@ export interface AssignmentTable extends BaseType {
   task?: {
     id?: number;
     task_no?: string;
-    task_kind?: string;
+    name?: string;
     period?: string;
-    unit_price?: number;
+    assign_mode?: string;
     status?: string;
-    task_type?: { id?: number; name?: string; unit?: string } | null;
   } | null;
 }

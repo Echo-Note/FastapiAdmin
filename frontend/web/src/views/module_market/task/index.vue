@@ -1,4 +1,4 @@
-<!-- 任务管理：CRUD + 发布 + 判定完成 + 归集结算 -->
+<!-- 任务管理：CRUD + 发布 + 状态单向流转 -->
 <template>
   <div class="fa-full-height">
     <!-- 流程轻提示：让运营知道发布后的下一步去向 -->
@@ -8,7 +8,7 @@
       :closable="false"
       show-icon
       title="任务流转提示"
-      description="发布任务后：定向分派请在「分派」页指派用户，公开大厅则用户自行接单；成果在「成果审核」页处理，完成后可「判定完成 → 归集结算」。"
+      description="创建任务后先「发布」，再按需「分派」或公开大厅接单；成果在「成果审核」页处理，任务进度通过「状态流转」单向推进（发布→进行中→已完成→已结算→归档）。"
     />
 
     <FaSearchBar
@@ -62,7 +62,9 @@
     >
       <template v-if="dialogVisible.type === 'detail'">
         <FaDescriptions :column="4" :data="detailFormData" :items="detailItems" max-height="70vh">
-          <template #projectNames="{ row }">{{ resolveProjectNames(row) }}</template>
+          <template #projectName="{ row }">{{ resolveProjectName(row) }}</template>
+          <template #assignMode="{ row }"><component :is="dictTag('market_assign_mode', row?.assign_mode)" /></template>
+          <template #statusTag="{ row }"><component :is="dictTag('market_task_status', row?.status)" /></template>
         </FaDescriptions>
       </template>
       <template v-else>
@@ -82,54 +84,106 @@
         />
       </template>
     </FaDialog>
+
+    <!-- 状态流转对话框 -->
+    <ElDialog v-model="statusDialogVisible" title="任务状态流转" width="480px" :close-on-click-modal="false">
+      <ElAlert type="warning" :closable="false" show-icon title="状态只能单向推进，不可回退" class="status-hint" />
+      <FaForm
+        ref="statusFormRef"
+        v-model="statusForm"
+        :items="statusFormItems"
+        :rules="statusRules"
+        label-suffix=":"
+        :label-width="100"
+        label-position="right"
+        :span="24"
+        :gutter="16"
+      />
+      <template #footer>
+        <ElButton @click="statusDialogVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="statusSubmitting" @click="handleStatusSubmit">确定流转</ElButton>
+      </template>
+    </ElDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { h } from "vue";
 import TaskAPI, { type TaskForm, type TaskTable } from "@/api/module_market/task";
-import TaskTypeAPI from "@/api/module_market/task-type";
 import ProjectAPI from "@/api/module_market/project";
-import { ASSIGN_MODE_MAP, ASSIGN_MODE_OPTIONS, TASK_KIND_MAP, TASK_KIND_OPTIONS, TASK_STATUS_MAP } from "@/api/module_market/constants";
+import TaskTemplateAPI from "@/api/module_market/task-template";
+import { useDictStore } from "@stores";
+import StatusTag from "@/components/display/fa-status-tag/index.vue";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { ElMessageBox } from "element-plus";
-import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction } from "@utils";
+import { renderTableOperationCell, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
 
 defineOptions({ name: "MarketTask", inheritAttrs: false });
 
-const searchForm = ref<{ task_no?: string; task_type_id?: number; task_kind?: string; period?: string; status?: string }>({ task_no: undefined, task_type_id: undefined, task_kind: undefined, period: undefined, status: undefined });
+const dictStore = useDictStore();
+
+// ── 字典：任务状态 / 分配方式 ──
+const taskStatusMap = computed<Record<string, { type: StatusType; text: string }>>(() =>
+  Object.fromEntries(
+    (dictStore.getDictData["market_task_status"] ?? []).map((d) => [
+      d.dict_value!,
+      { type: (d.list_class as StatusType) ?? "info", text: d.dict_label ?? d.dict_value! },
+    ])
+  )
+);
+const assignModeOptions = computed<OptionType[]>(() =>
+  (dictStore.getDictArray("market_assign_mode") ?? []).map((d) => ({ value: d.dict_value, label: d.dict_label }))
+);
+const statusOptions = computed<OptionType[]>(() =>
+  (dictStore.getDictArray("market_task_status") ?? []).map((d) => ({ value: d.dict_value, label: d.dict_label }))
+);
+
+/** 用字典渲染状态标签（实时查 dict_label + list_class，避免字典异步加载导致空 map 快照） */
+function dictTag(dictType: string, val?: unknown) {
+  const strVal = typeof val === "string" ? val : undefined;
+  if (!strVal) return "—";
+  const item = dictStore.getDictLabel(dictType, strVal);
+  if (typeof item === "string") return h(StatusTag, { type: "info" as StatusType, label: item });
+  return h(StatusTag, { type: (item.list_class as StatusType) ?? "info", label: item.dict_label ?? strVal });
+}
+
+const searchForm = ref<{ task_no?: string; name?: string; project_id?: number; template_id?: number; period?: string; assign_mode?: string; status?: string }>({
+  task_no: undefined,
+  name: undefined,
+  project_id: undefined,
+  template_id: undefined,
+  period: undefined,
+  assign_mode: undefined,
+  status: undefined,
+});
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
-const taskTypeOptions = ref<OptionType[]>([]);
 const projectOptions = ref<OptionType[]>([]);
-const statusOptions = computed<OptionType[]>(() => Object.entries(TASK_STATUS_MAP).map(([value, v]) => ({ value, label: v.text })));
+const templateOptions = ref<OptionType[]>([]);
 
 const searchItems = computed<SearchFormItem[]>(() => [
   { label: "任务号", key: "task_no", type: "input", placeholder: "请输入任务号", clearable: true, span: 6 },
-  { label: "任务类型", key: "task_type_id", type: "select", props: { placeholder: "请选择任务类型", options: taskTypeOptions.value, clearable: true }, span: 6 },
-  { label: "任务分类", key: "task_kind", type: "select", props: { placeholder: "请选择任务分类", options: TASK_KIND_OPTIONS, clearable: true }, span: 6 },
+  { label: "显示名", key: "name", type: "input", placeholder: "请输入任务显示名", clearable: true, span: 6 },
+  { label: "项目", key: "project_id", type: "select", props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "模板", key: "template_id", type: "select", props: { placeholder: "请选择模板", options: templateOptions.value, filterable: true, clearable: true }, span: 6 },
   { label: "周期", key: "period", type: "input", placeholder: "如 2026-10", clearable: true, span: 6 },
+  { label: "分配方式", key: "assign_mode", type: "select", props: { placeholder: "请选择分配方式", options: assignModeOptions.value, clearable: true }, span: 6 },
   { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: statusOptions.value, clearable: true }, span: 6 },
 ]);
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
 const { selectedRows, selectedIds, batchDeleting, onTableSelectionChange } = useTableSelection<TaskTable>();
 
-const router = useRouter();
-
 const opCtx = {
   onDetail: (id: number) => void handleOpenDialog("detail", id),
   onEdit: (id: number) => void handleOpenDialog("update", id),
   onDelete: deleteRow,
   onPublish: publishRow,
-  onComplete: completeRow,
-  onSettle: settleRow,
-  // 跨页跳转：任务 → 分派页 / 结算页（透传 task_id 预填筛选）
-  onAssign: (id: number) => void router.push({ name: "MarketAssignment", query: { task_id: String(id) } }),
-  onSettlement: (id: number) => void router.push({ name: "MarketSettlement", query: { task_id: String(id) } }),
+  onChangeStatus: changeStatusRow,
 };
 
 function buildRowActions(row: TaskTable): TableOperationAction[] {
@@ -140,14 +194,8 @@ function buildRowActions(row: TaskTable): TableOperationAction[] {
     actions.push({ key: "edit", label: "编辑", artType: "edit", perm: "module_market:task:update", run: () => opCtx.onEdit(row.id!) });
     actions.push({ key: "publish", label: "发布", artType: "edit", perm: "module_market:task:publish", run: () => opCtx.onPublish(row.id!, row.task_no ?? "") });
     actions.push({ key: "delete", label: "删除", artType: "delete", perm: "module_market:task:delete", run: () => opCtx.onDelete(row.id!, row.task_no ?? "") });
-  } else if (row.status === "PUBLISHED" || row.status === "IN_PROGRESS") {
-    actions.push({ key: "assign", label: "分派", artType: "view", perm: "module_market:assignment:assign", run: () => opCtx.onAssign(row.id!) });
-    actions.push({ key: "complete", label: "判定完成", artType: "edit", perm: "module_market:task:complete", run: () => opCtx.onComplete(row.id!, row.task_no ?? "") });
-  } else if (row.status === "COMPLETED") {
-    actions.push({ key: "settle", label: "归集结算", artType: "edit", perm: "module_market:settlement:run", run: () => opCtx.onSettle(row.id!, row.task_no ?? "") });
-  }
-  if (row.status === "SETTLING" || row.status === "SETTLED") {
-    actions.push({ key: "settlement", label: "结算单", artType: "view", perm: "module_market:settlement:query", run: () => opCtx.onSettlement(row.id!) });
+  } else if (["PUBLISHED", "IN_PROGRESS", "COMPLETED", "SETTLED"].includes(row.status ?? "")) {
+    actions.push({ key: "change_status", label: "状态流转", artType: "edit", perm: "module_market:task:update", run: () => opCtx.onChangeStatus(row) });
   }
   return actions;
 }
@@ -157,67 +205,57 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
     core: {
       apiFn: TaskAPI.listTask,
       apiParams: { page_no: 1, page_size: 10 },
-      columnsFactory: resolveStatusColumns<TaskTable>(() => [
+      columnsFactory: () => [
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "task_no", label: "任务号", minWidth: 120, showOverflowTooltip: true },
-        { prop: "task_type", label: "任务类型", minWidth: 140, formatter: (row: TaskTable) => row.task_type?.name ?? "—" },
-        { prop: "task_kind", label: "任务分类", width: 92, status: TASK_KIND_MAP },
+        { prop: "name", label: "显示名", minWidth: 180, showOverflowTooltip: true },
+        { prop: "template", label: "任务模板", minWidth: 140, formatter: (row: TaskTable) => row.template?.name ?? "—" },
         { prop: "period", label: "周期", width: 90 },
-        { prop: "unit_price", label: "单价", width: 90, align: "right" },
-        { prop: "exec_qty", label: "执行数量", width: 90, align: "right" },
-        { prop: "assign_mode", label: "分配方式", width: 100, status: ASSIGN_MODE_MAP },
-        { prop: "claimed_count", label: "已接单数", width: 90, align: "right" },
-        { prop: "status", label: "状态", width: 92, status: TASK_STATUS_MAP },
-        { prop: "operation", label: "操作", width: 270, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
-      ]),
+        { prop: "assign_mode", label: "分配方式", width: 100, formatter: (row: TaskTable) => dictTag("market_assign_mode", row.assign_mode) },
+        { prop: "status", label: "状态", width: 92, formatter: (row: TaskTable) => dictTag("market_task_status", row.status) },
+        { prop: "published_at", label: "发布时间", width: 168, showOverflowTooltip: true },
+        { prop: "operation", label: "操作", width: 220, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
+      ],
     },
   });
 
 const detailFormData = ref<Partial<TaskTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
   { label: "任务号", prop: "task_no" },
-  { label: "任务类型", prop: "task_type.name" },
-  { label: "任务分类", prop: "task_kind", tag: { map: TASK_KIND_MAP } },
+  { label: "显示名", prop: "name" },
+  { label: "任务模板", prop: "template.name" },
+  { label: "项目", prop: "project_id", slot: "projectName" },
   { label: "周期", prop: "period" },
-  { label: "本期单价", prop: "unit_price" },
-  { label: "执行数量", prop: "exec_qty" },
-  { label: "分配方式", prop: "assign_mode", tag: { map: ASSIGN_MODE_MAP } },
-  { label: "已接单数", prop: "claimed_count" },
-  { label: "限定时间-开始", prop: "exec_time_start" },
-  { label: "限定时间-结束", prop: "exec_time_end" },
-  { label: "状态", prop: "status", tag: { map: TASK_STATUS_MAP } },
+  { label: "分配方式", prop: "assign_mode", slot: "assignMode" },
+  { label: "状态", prop: "status", slot: "statusTag" },
+  { label: "发布人", prop: "publisher_id" },
   { label: "发布时间", prop: "published_at" },
-  { label: "完成判定时间", prop: "completed_at" },
-  { label: "归集项目", prop: "project_ids", slot: "projectNames" },
   { label: "创建人", prop: "created_by.name" },
+  { label: "创建时间", prop: "created_time" },
 ];
 
-const formData = ref<TaskForm>({ id: undefined, task_no: undefined, task_type_id: undefined, task_kind: undefined, period: undefined, unit_price: undefined, exec_qty: undefined, assign_mode: "direct", exec_time_start: undefined, exec_time_end: undefined, project_ids: undefined });
+const formData = ref<TaskForm>({ id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "direct" });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: TaskForm = { id: undefined, task_no: undefined, task_type_id: undefined, task_kind: undefined, period: undefined, unit_price: undefined, exec_qty: undefined, assign_mode: "direct", exec_time_start: undefined, exec_time_end: undefined, project_ids: undefined };
+const initialFormData: TaskForm = { id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "direct" };
 
 const rules = reactive({
-  task_no: [{ required: true, message: "请输入任务号", trigger: "blur" }],
-  task_type_id: [{ required: true, message: "请选择任务类型", trigger: "change" }],
+  project_id: [{ required: true, message: "请选择项目", trigger: "change" }],
+  template_id: [{ required: true, message: "请选择任务模板", trigger: "change" }],
+  name: [{ required: true, message: "请输入任务显示名", trigger: "blur" }],
   period: [{ required: true, message: "请输入周期", trigger: "blur" }],
-  exec_qty: [{ required: true, message: "请输入执行数量", trigger: "blur" }],
+  assign_mode: [{ required: true, message: "请选择分配方式", trigger: "change" }],
 });
 
 const formItems = computed<FormItem[]>(() => [
-  { label: "任务号", key: "task_no", type: "input", span: 24, props: { placeholder: "如 1-4、5-17…", maxlength: 32 } },
-  { label: "任务类型", key: "task_type_id", type: "select", span: 24, props: { placeholder: "请选择任务类型模板", options: taskTypeOptions.value } },
-  { label: "任务分类", key: "task_kind", type: "select", span: 24, props: { placeholder: "请选择任务分类（缺省取模板默认）", options: TASK_KIND_OPTIONS, clearable: true } },
-  { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "自然月，如 2026-10", maxlength: 16 } },
-  { label: "本期单价", key: "unit_price", type: "number", span: 24, props: { min: 0, precision: 2, controlsPosition: "right", placeholder: "缺省取模板默认单价" } },
-  { label: "执行数量", key: "exec_qty", type: "number", span: 24, props: { min: 1, controlsPosition: "right", placeholder: "定额任务为总份数限量" } },
-  { label: "分配方式", key: "assign_mode", type: "select", span: 24, props: { placeholder: "请选择分配方式", options: ASSIGN_MODE_OPTIONS } },
-  { label: "限定时间-开始", key: "exec_time_start", type: "datetime", span: 24, props: { placeholder: "定额任务必填" } },
-  { label: "限定时间-结束", key: "exec_time_end", type: "datetime", span: 24, props: { placeholder: "定额任务必填" } },
-  { label: "归集项目", key: "project_ids", type: "select", span: 24, props: { placeholder: "请选择归集项目（可多选）", options: projectOptions.value, multiple: true, clearable: true } },
+  { label: "项目", key: "project_id", type: "select", span: 24, props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true } },
+  { label: "任务模板", key: "template_id", type: "select", span: 24, props: { placeholder: "请选择二级任务模板", options: templateOptions.value, filterable: true } },
+  { label: "显示名", key: "name", type: "input", span: 24, props: { placeholder: "如 一心坦-等级医院管理", maxlength: 256 } },
+  { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "继承项目周期，如 2026-10", maxlength: 16 } },
+  { label: "分配方式", key: "assign_mode", type: "select", span: 24, props: { placeholder: "请选择分配方式", options: assignModeOptions.value } },
 ]);
 
 const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = useCrudForm<TaskForm>({
@@ -236,24 +274,27 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
 });
 
 async function loadOptions() {
-  const [typeRes, projectRes] = await Promise.all([
-    TaskTypeAPI.listTaskType({ page_no: 1, page_size: 100 }),
+  const [projectRes, templateRes] = await Promise.all([
     ProjectAPI.listProject({ page_no: 1, page_size: 100 }),
+    TaskTemplateAPI.listTemplate({ page_no: 1, page_size: 100 }),
   ]);
-  taskTypeOptions.value = typeRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? "" }));
-  projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? "" }));
+  projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? p.code ?? "" }));
+  templateOptions.value = templateRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? t.code ?? "" }));
 }
 
-onMounted(loadOptions);
-
-function resolveProjectNames(row: Record<string, unknown> | null): string {
-  const ids = (row?.project_ids as number[] | undefined) ?? [];
-  if (ids.length === 0) return "—";
-  return ids.map((id) => projectOptions.value.find((o) => o.value === id)?.label ?? `#${id}`).join("、");
-}
+onMounted(async () => {
+  await dictStore.getDict(["market_task_status", "market_assign_mode"]);
+  await loadOptions();
+});
 
 async function handleAdd() {
   await handleOpenDialog("create");
+}
+
+function resolveProjectName(row: Record<string, unknown> | null): string {
+  const id = row?.project_id as number | undefined;
+  if (id == null) return "—";
+  return projectOptions.value.find((o) => o.value === id)?.label ?? `#${id}`;
 }
 
 async function handleSearch(params: Record<string, unknown>) {
@@ -262,7 +303,7 @@ async function handleSearch(params: Record<string, unknown>) {
 }
 
 async function onResetSearch() {
-  searchForm.value = { task_no: undefined, task_type_id: undefined, task_kind: undefined, period: undefined, status: undefined };
+  searchForm.value = { task_no: undefined, name: undefined, project_id: undefined, template_id: undefined, period: undefined, assign_mode: undefined, status: undefined };
   await resetSearchParams();
 }
 
@@ -294,7 +335,7 @@ async function handleBatchDelete() {
 
 async function publishRow(id: number, taskNo: string) {
   try {
-    await ElMessageBox.confirm(`确定发布任务「${taskNo}」吗？`, "发布任务", { type: "warning" });
+    await ElMessageBox.confirm(`确定发布任务「${taskNo}」吗？发布后任务将进入任务大厅/可被分派。`, "发布任务", { type: "warning" });
     await TaskAPI.publishTask(id);
     await refreshData();
   } catch {
@@ -302,29 +343,58 @@ async function publishRow(id: number, taskNo: string) {
   }
 }
 
-async function completeRow(id: number, taskNo: string) {
-  try {
-    await ElMessageBox.confirm(`确定判定任务「${taskNo}」为已完成吗？完成后可触发归集结算。`, "判定完成", { type: "warning" });
-    await TaskAPI.completeTask(id);
-    await refreshData();
-  } catch {
-    // 用户取消
-  }
+// ── 状态单向流转 ──
+const statusDialogVisible = ref(false);
+const statusSubmitting = ref(false);
+const statusFormRef = ref<InstanceType<typeof FaForm> | null>(null);
+const statusForm = ref<{ id?: number; task_no?: string; status?: string; target_status?: string }>({ id: undefined, task_no: undefined, status: undefined, target_status: undefined });
+// 单向流转顺序（去掉 DRAFT 起点）
+const STATUS_FLOW = ["PUBLISHED", "IN_PROGRESS", "COMPLETED", "SETTLED", "ARCHIVED"] as const;
+
+const statusFormItems = computed<FormItem[]>(() => {
+  const cur = statusForm.value.status ?? "";
+  const curIdx = STATUS_FLOW.indexOf(cur as (typeof STATUS_FLOW)[number]);
+  const next = curIdx >= 0 ? STATUS_FLOW.slice(curIdx + 1) : [];
+  return [
+    { label: "任务号", key: "task_no", type: "input", span: 24, props: { disabled: true } },
+    { label: "当前状态", key: "status", type: "input", span: 24, props: { disabled: true } },
+    { label: "流转到", key: "target_status", type: "select", span: 24, props: { placeholder: "请选择目标状态", options: next.map((s) => ({ value: s, label: taskStatusMap.value[s]?.text ?? s })) } },
+  ];
+});
+
+const statusRules = reactive({ target_status: [{ required: true, message: "请选择目标状态", trigger: "change" }] });
+
+function changeStatusRow(row: TaskTable) {
+  statusForm.value = { id: row.id, task_no: row.task_no, status: row.status, target_status: undefined };
+  statusDialogVisible.value = true;
 }
 
-async function settleRow(id: number, taskNo: string) {
+async function handleStatusSubmit() {
+  if (!statusFormRef.value || statusForm.value.id == null) return;
   try {
-    await ElMessageBox.confirm(`确定对任务「${taskNo}」触发归集结算吗？系统将汇总全部审核通过的成果并生成结算单。`, "归集结算", { type: "warning" });
-    await TaskAPI.settleTask(id);
+    await statusFormRef.value.validate();
+  } catch {
+    return;
+  }
+  if (!statusForm.value.target_status) return;
+  statusSubmitting.value = true;
+  try {
+    await TaskAPI.changeStatusTask(statusForm.value.id, { status: statusForm.value.target_status });
+    statusDialogVisible.value = false;
     await refreshData();
   } catch {
-    // 用户取消
+    // 错误已由拦截器提示
+  } finally {
+    statusSubmitting.value = false;
   }
 }
 </script>
 
 <style scoped>
 .market-flow-hint {
+  margin-bottom: 12px;
+}
+.status-hint {
   margin-bottom: 12px;
 }
 </style>
