@@ -7,7 +7,7 @@ class TestCompany:
     def test_create(self, test_client: TestClient, auth_headers: dict) -> None:
         resp = test_client.post(
             "/market/companies/create",
-            json={"name": "测试医药公司A", "code": "TST-A", "credit_code": "91110000A"},
+            json={"name": "测试医药公司A", "credit_code": "91110000A"},
             headers=auth_headers,
         )
         assert resp.status_code == 200
@@ -16,8 +16,8 @@ class TestCompany:
         assert body["data"]["name"] == "测试医药公司A"
 
     def test_create_duplicate_name_fails(self, test_client: TestClient, auth_headers: dict) -> None:
-        test_client.post("/market/companies/create", json={"name": "重复公司", "code": "DUP-1"}, headers=auth_headers)
-        resp = test_client.post("/market/companies/create", json={"name": "重复公司", "code": "DUP-2"}, headers=auth_headers)
+        test_client.post("/market/companies/create", json={"name": "重复公司"}, headers=auth_headers)
+        resp = test_client.post("/market/companies/create", json={"name": "重复公司"}, headers=auth_headers)
         assert resp.json()["success"] is False
 
     def test_list_and_detail(self, test_client: TestClient, auth_headers: dict) -> None:
@@ -53,7 +53,7 @@ class TestCompany:
         assert resp.json()["success"] is False
 
     def test_delete(self, test_client: TestClient, auth_headers: dict) -> None:
-        test_client.post("/market/companies/create", json={"name": "待删除公司", "code": "DEL-1"}, headers=auth_headers)
+        test_client.post("/market/companies/create", json={"name": "待删除公司"}, headers=auth_headers)
         resp = test_client.get("/market/companies/list", params={"name": "待删除公司"}, headers=auth_headers)
         company_id = resp.json()["data"]["items"][0]["id"]
         resp = test_client.request("DELETE", "/market/companies/delete", json=[company_id], headers=auth_headers)
