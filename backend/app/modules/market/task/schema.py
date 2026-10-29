@@ -5,7 +5,7 @@
 ``UserByQueryParam``，配合 ``json_schema_extra={"q": ...}`` 控制操作符。
 """
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -175,10 +175,11 @@ class TaskOutSchema(BaseSchema, UserBySchema):
     template: TaskTemplateOutSchema | None = Field(default=None, description="所属二级模板(含分类)")
     name: str = Field(description="C端显示名")
     period: DateStr = Field(description="截止日期(继承项目截止日期)")
-    assign_mode: str = Field(default="direct", description="分配方式(direct 定向分派/open 公开大厅)")
+    assign_mode: str = Field(default="open", description="分配方式(direct 定向分派/open 公开大厅)")
     status: str = Field(default="DRAFT", description="任务状态")
     publisher_id: int | None = Field(default=None, description="发布人ID")
     published_at: DateTimeStr | None = Field(default=None, description="发布时间")
+    assignment_count: int = Field(default=0, description="已分派/接收人数(列表聚合字段)")
 
 
 class TaskCreateSchema(BaseModel):
@@ -188,7 +189,7 @@ class TaskCreateSchema(BaseModel):
     template_id: int = Field(gt=0, description="所属二级模板ID")
     name: str = Field(min_length=1, max_length=256, description="C端显示名(如 一心坦-等级医院管理)")
     period: DateStr = Field(description="截止日期(继承项目截止日期，如 2026-12-31)")
-    assign_mode: Literal["direct", "open"] = Field(default="direct", description="分配方式(direct 定向分派/open 公开大厅)")
+    assign_mode: Literal["direct", "open"] = Field(default="open", description="分配方式(direct 定向分派/open 公开大厅)")
 
 
 class TaskUpdateSchema(BaseModel):
@@ -241,10 +242,24 @@ class AssignmentCreateSchema(BaseModel):
     source: Literal["assigned", "claimed"] = Field(default="assigned", description="来源(assigned 运营分派/claimed 大厅接单)")
 
 
-class TaskPublishSchema(BaseModel):
-    """发布任务参数（定向分派任务须指定分派人员）"""
+class AssignmentBatchCreateSchema(BaseModel):
+    """批量分配（多任务 × 多用户交叉创建分派，跳过已存在）"""
 
-    assignee_ids: list[int] | None = Field(default=None, description="定向分派人员ID列表(分配方式为 direct 时必填，open 时忽略)")
+    task_ids: list[int] = Field(min_length=1, description="任务ID列表")
+    user_ids: list[int] = Field(min_length=1, description="执行用户ID列表")
+
+
+class TaskBatchPublishSchema(BaseModel):
+    """批量发布任务参数（仅状态流转，不处理分派）"""
+
+    ids: list[int] = Field(min_length=1, description="任务ID列表")
+
+
+class TaskBatchPublishResultSchema(BaseModel):
+    """批量发布结果"""
+
+    published: int = Field(description="成功发布数量")
+    failed: list[dict[str, Any]] = Field(default_factory=list, description="失败明细(含 id 与 msg)")
 
 
 class AssignmentUpdateSchema(BaseModel):
@@ -276,14 +291,14 @@ class SubmissionOutSchema(BaseSchema, UserBySchema):
     region: str | None = Field(default=None, description="所在区域")
     archive_no: str | None = Field(default=None, description="档案编号")
     period: str = Field(description="提交月份(如 2026-03)")
-    form_data: dict = Field(description="采集表单数据")
+    form_data: dict[str, Any] = Field(description="采集表单数据")
     status: str = Field(default="DRAFT", description="成果状态")
     version: int = Field(default=1, description="版本号(驳回重提 +1)")
     reviewer_id: int | None = Field(default=None, description="审核人ID")
     review_comment: str | None = Field(default=None, description="审核意见")
     reviewed_at: DateTimeStr | None = Field(default=None, description="审核时间")
     ai_check_status: str | None = Field(default=None, description="AI 预检状态")
-    ai_check_result: dict | None = Field(default=None, description="AI 预检结果")
+    ai_check_result: dict[str, Any] | None = Field(default=None, description="AI 预检结果")
 
 
 class SubmissionCreateSchema(BaseModel):
@@ -296,7 +311,7 @@ class SubmissionCreateSchema(BaseModel):
     region: str | None = Field(default=None, max_length=64, description="所在区域")
     archive_no: str | None = Field(default=None, max_length=64, description="档案编号")
     period: str = Field(min_length=1, max_length=16, description="提交月份(如 2026-03)")
-    form_data: dict = Field(description="采集表单数据")
+    form_data: dict[str, Any] = Field(description="采集表单数据")
 
 
 class SubmissionUpdateSchema(BaseModel):
@@ -308,7 +323,7 @@ class SubmissionUpdateSchema(BaseModel):
     region: str | None = Field(default=None, max_length=64, description="所在区域")
     archive_no: str | None = Field(default=None, max_length=64, description="档案编号")
     period: str | None = Field(default=None, min_length=1, max_length=16, description="提交月份")
-    form_data: dict | None = Field(default=None, description="采集表单数据")
+    form_data: dict[str, Any] | None = Field(default=None, description="采集表单数据")
 
 
 class SubmissionQueryParam(BaseQueryParam, UserByQueryParam):

@@ -91,7 +91,7 @@ class TaskModel(ModelMixin, UserMixin):
     )
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True, comment="C端显示名(如 一心坦-等级医院管理)")
     period: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="截止日期(继承项目截止日期)")
-    assign_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="direct", index=True, comment="分配方式(direct 定向分派/open 公开大厅)")
+    assign_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="open", index=True, comment="分配方式(direct 定向分派/open 公开大厅)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="任务状态")
     publisher_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, index=True, comment="发布人ID"

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from redis.asyncio.client import Redis
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.enums import RedisInitKeyConfig
@@ -22,7 +23,7 @@ from ..institution.service import InstitutionService, extract_institution_info, 
 from ..numbering import NumberPrefix, next_code
 from ..project.crud import ProjectCRUD
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
-from .model import TaskItemModel, TaskTemplateModel
+from .model import AssignmentModel, TaskItemModel, TaskTemplateModel
 from .schema import (
     AssignmentCreateSchema,
     AssignmentOutSchema,
@@ -303,9 +304,9 @@ class TaskService:
         search: TaskQueryParam | None = None,
         order_by: list[dict[str, str]] | None = None,
     ) -> PageResultSchema[TaskOutSchema]:
-        """分页查询任务。"""
+        """分页查询任务，并聚合各任务的已分派/接收人数。"""
         offset = (page_no - 1) * page_size
-        return await TaskCRUD(self.auth, self.db).page(
+        result = await TaskCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
             order_by=order_by or [{"id": "desc"}],
@@ -313,6 +314,25 @@ class TaskService:
             out_schema=TaskOutSchema,
             preload=_TASK_PRELOAD,
         )
+        await self._attach_assignment_counts(result)
+        return result
+
+    async def _attach_assignment_counts(self, result: PageResultSchema[TaskOutSchema]) -> None:
+        """为任务分页结果回填 assignment_count（按 task_id 分组统计分派/接收记录数）。"""
+        if not result.items:
+            return
+        task_ids = [item.id for item in result.items if item.id is not None]
+        if not task_ids:
+            return
+        rows = await self.db.execute(
+            select(AssignmentModel.task_id, func.count(AssignmentModel.id))
+            .where(AssignmentModel.task_id.in_(task_ids))
+            .group_by(AssignmentModel.task_id)
+        )
+        count_map: dict[int, int] = {int(task_id): int(cnt) for task_id, cnt in rows.all()}
+        for item in result.items:
+            if item.id is not None:
+                item.assignment_count = count_map.get(item.id, 0)
 
     async def create(self, data: TaskCreateSchema) -> TaskOutSchema:
         """创建任务（草稿状态，编号自动生成）。"""
@@ -344,23 +364,15 @@ class TaskService:
                 raise CustomException(msg=f"任务[{task.task_no}]非草稿状态，不能删除")
         await TaskCRUD(self.auth, self.db).delete(ids=ids)
 
-    async def publish(self, id: int, assignee_ids: list[int] | None = None) -> TaskOutSchema:
+    async def publish(self, id: int) -> TaskOutSchema:
         """发布任务：DRAFT → PUBLISHED，写入发布人与发布时间。
 
-        分配方式为 ``direct``（定向分派）时，必须指定分派人员 ``assignee_ids``，
-        发布即批量创建分派记录（跳过已分派用户），否则任务无人执行、C 端不可见。
-        分配方式为 ``open``（公开大厅）时忽略 ``assignee_ids``，任务进入大厅供自行接单。
+        发布与分派解耦：发布仅做状态流转，不处理分派；定向分派由独立的分配动作
+        （单个「添加分派」/ 列表「批量分配」）完成，分派时自动将任务改为 direct。
         """
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status != TaskStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的任务可发布")
-
-        if task.assign_mode == AssignMode.DIRECT.value:
-            if not assignee_ids:
-                raise CustomException(msg="定向分派任务必须指定分派人员")
-            await AssignmentService(self.auth, self.db).batch_assign(
-                task_id=id, user_ids=assignee_ids, source=AssignmentSource.ASSIGNED.value
-            )
 
         update_data: dict[str, Any] = {
             "status": TaskStatus.PUBLISHED.value,
@@ -369,6 +381,18 @@ class TaskService:
         }
         await TaskCRUD(self.auth, self.db).update(id=id, data=update_data)
         return await self.detail(id=id)
+
+    async def batch_publish(self, ids: list[int]) -> dict[str, Any]:
+        """批量发布任务：逐个发布（仅状态流转），单任务失败不影响其余，返回成功数与失败明细。"""
+        published = 0
+        failed: list[dict[str, Any]] = []
+        for task_id in dict.fromkeys(ids):
+            try:
+                await self.publish(id=task_id)
+                published += 1
+            except CustomException as exc:
+                failed.append({"id": task_id, "msg": exc.msg})
+        return {"published": published, "failed": failed}
 
     async def change_status(self, id: int, data: TaskStatusUpdateSchema) -> TaskOutSchema:
         """任务状态单向流转：PUBLISHED → IN_PROGRESS → COMPLETED → SETTLED → ARCHIVED。"""
@@ -442,8 +466,14 @@ class AssignmentService:
         return await self.batch_assign(task_id=data.task_id, user_ids=data.user_ids, source=data.source)
 
     async def batch_assign(self, task_id: int, user_ids: list[int], source: str) -> list[AssignmentOutSchema]:
-        """批量创建分派记录：用户去重、跳过已分派，返回本次新建的分派列表。"""
+        """批量创建分派记录：用户去重、跳过已分派，返回本次新建的分派列表。
+
+        运营定向分派（``source=assigned``）时，自动将任务的分配方式改为 ``direct``，
+        避免「已指定执行人但任务仍为公开大厅」的矛盾状态（大厅接单 ``claim`` 不走此方法）。
+        """
         created: list[AssignmentOutSchema] = []
+        if source == AssignmentSource.ASSIGNED.value:
+            await TaskCRUD(self.auth, self.db).update(id=task_id, data={"assign_mode": AssignMode.DIRECT.value})
         for user_id in dict.fromkeys(user_ids):
             existing = await AssignmentCRUD(self.auth, self.db).get_list(
                 search={"task_id": task_id, "user_id": user_id}
@@ -455,6 +485,17 @@ class AssignmentService:
             )
             created.append(await self.detail(id=assignment.id))
         return created
+
+    async def batch_assign_multi(self, task_ids: list[int], user_ids: list[int]) -> int:
+        """批量分配：多任务 × 多用户交叉创建分派（跳过已存在），返回本次新建数量。"""
+        created_count = 0
+        for task_id in dict.fromkeys(task_ids):
+            await TaskCRUD(self.auth, self.db).get_or_404(id=task_id, msg="任务不存在")
+            created = await self.batch_assign(
+                task_id=task_id, user_ids=user_ids, source=AssignmentSource.ASSIGNED.value
+            )
+            created_count += len(created)
+        return created_count
 
     async def update(self, id: int, data: AssignmentUpdateSchema) -> AssignmentOutSchema:
         """更新分派。"""

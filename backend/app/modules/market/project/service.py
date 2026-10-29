@@ -194,7 +194,7 @@ class ProjectService:
 
         任务实例字段按新设计（``market_task``）：``task_no`` 用 ``TK-XXX`` 编号自动生成，
         ``name=f"{project.name}-{template.name}"``，``period=project.period``，
-        ``assign_mode="direct"``，``status="DRAFT"``；已存在同 project+template 的任务则跳过（幂等）。
+        ``assign_mode="open"``，``status="DRAFT"``；已存在同 project+template 的任务则跳过（幂等）。
         """
         from ..task.crud import TaskCRUD
 
@@ -215,7 +215,7 @@ class ProjectService:
                     "template_id": template.id,
                     "name": f"{project.name}-{template.name}",
                     "period": project.period,
-                    "assign_mode": "direct",
+                    "assign_mode": "open",
                     "status": "DRAFT",
                 }
             )

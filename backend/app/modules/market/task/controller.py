@@ -15,6 +15,7 @@ from app.core.dependencies import AuthPermission, db_getter
 from app.core.router_class import OperationLogRoute
 
 from .schema import (
+    AssignmentBatchCreateSchema,
     AssignmentCreateSchema,
     AssignmentOutSchema,
     AssignmentQueryParam,
@@ -23,6 +24,8 @@ from .schema import (
     SubmissionQueryParam,
     SubmissionReviewSchema,
     SubmissionUpdateSchema,
+    TaskBatchPublishResultSchema,
+    TaskBatchPublishSchema,
     TaskCategoryCreateSchema,
     TaskCategoryOutSchema,
     TaskCategoryQueryParam,
@@ -34,7 +37,6 @@ from .schema import (
     TaskItemQueryParam,
     TaskItemUpdateSchema,
     TaskOutSchema,
-    TaskPublishSchema,
     TaskQueryParam,
     TaskStatusUpdateSchema,
     TaskTemplateCreateSchema,
@@ -287,10 +289,19 @@ async def publish_task_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:publish"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
-    data: Annotated[TaskPublishSchema, Body(description="发布任务参数(定向分派须指定分派人员)")] = TaskPublishSchema(),
 ) -> JSONResponse:
-    result = await TaskService(auth, db).publish(id=id, assignee_ids=data.assignee_ids)
+    result = await TaskService(auth, db).publish(id=id)
     return SuccessResponse(data=result, msg="发布任务成功")
+
+
+@TaskRouter.post("/batch-publish", summary="批量发布任务", response_model=ResponseSchema[TaskBatchPublishResultSchema])
+async def batch_publish_task_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:publish"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    data: Annotated[TaskBatchPublishSchema, Body(description="批量发布参数")],
+) -> JSONResponse:
+    result = await TaskService(auth, db).batch_publish(ids=data.ids)
+    return SuccessResponse(data=result, msg="批量发布任务成功")
 
 
 @TaskRouter.post("/status/{id}", summary="任务状态流转", response_model=ResponseSchema[TaskOutSchema])
@@ -336,6 +347,16 @@ async def create_assignment_controller(
 ) -> JSONResponse:
     result = await AssignmentService(auth, db).create(data=data)
     return SuccessResponse(data=result, msg="创建分派成功")
+
+
+@AssignmentRouter.post("/batch-create", summary="批量分配", response_model=ResponseSchema[int])
+async def batch_create_assignment_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:assignment:create"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    data: Annotated[AssignmentBatchCreateSchema, Body(description="批量分配参数")],
+) -> JSONResponse:
+    result = await AssignmentService(auth, db).batch_assign_multi(task_ids=data.task_ids, user_ids=data.user_ids)
+    return SuccessResponse(data=result, msg="批量分配成功")
 
 
 @AssignmentRouter.put("/update/{id}", summary="修改分派", response_model=ResponseSchema[AssignmentOutSchema])
