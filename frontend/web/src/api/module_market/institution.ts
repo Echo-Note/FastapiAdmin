@@ -18,14 +18,6 @@ const InstitutionAPI = {
     });
   },
 
-  createInstitution(body: InstitutionForm) {
-    return request<ApiResponse<InstitutionTable>>({
-      url: `${API_PATH}/create`,
-      method: "post",
-      data: body,
-    });
-  },
-
   updateInstitution(id: number, body: InstitutionForm) {
     return request<ApiResponse<InstitutionTable>>({
       url: `${API_PATH}/update/${id}`,

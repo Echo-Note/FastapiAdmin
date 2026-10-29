@@ -1,4 +1,4 @@
-<!-- 机构主数据（医院/药店/商业公司）：CRUD -->
+<!-- 机构主数据（医院/药店/商业公司）：C 端提交成果归集产生，运营端仅查询/修正/删除 -->
 <template>
   <div class="fa-full-height">
     <FaSearchBar
@@ -19,10 +19,8 @@
         <template #left>
           <FaTableHeaderLeft
             :remove-ids="selectedIds"
-            :perm-create="['module_market:institution:create']"
             :perm-delete="['module_market:institution:delete']"
             :delete-loading="batchDeleting"
-            @add="handleAdd"
             @delete="handleBatchDelete"
           />
         </template>
@@ -139,7 +137,7 @@ function buildRowActions(row: InstitutionTable): TableOperationAction[] {
   ];
 }
 
-const { columns, columnChecks, data, loading, pagination, getData, replaceSearchParams, resetSearchParams, handleSizeChange, handleCurrentChange, refreshData, refreshCreate, refreshUpdate, refreshRemove } =
+const { columns, columnChecks, data, loading, pagination, getData, replaceSearchParams, resetSearchParams, handleSizeChange, handleCurrentChange, refreshData, refreshUpdate, refreshRemove } =
   useTable({
     core: {
       apiFn: InstitutionAPI.listInstitution,
@@ -206,17 +204,11 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   dataFormRef,
   formRenderKey,
   detailApi: InstitutionAPI.detailInstitution,
-  createApi: InstitutionAPI.createInstitution,
   updateApi: InstitutionAPI.updateInstitution,
-  titles: { create: "新增机构", update: "修改机构", detail: "机构详情" },
+  titles: { update: "修改机构", detail: "机构详情" },
   detailFormData,
-  onCreateSuccess: refreshCreate,
   onUpdateSuccess: refreshUpdate,
 });
-
-async function handleAdd() {
-  await handleOpenDialog("create");
-}
 
 async function handleSearch(params: { name?: string; type?: string; region?: string; status?: number }) {
   replaceSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);
