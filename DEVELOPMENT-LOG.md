@@ -1481,6 +1481,51 @@
 
 ---
 
+### 2026-10-29 — C 端移动端 4 个查询接口 403：放宽为仅登录可读
+
+#### 1. 原因
+
+C 端移动端（uni-app H5）首页/工作/我的页调用管理端接口 `/system/ticket/list`、`/system/ticket/stats`、`/system/notice/list`、`/monitor/online/stats`，这些接口挂了 `AuthPermission` 权限码校验。C 端账号 `user`（角色 USER，非超管）登录时仅绑定 5 个 `scope=app` 菜单且 `permission` 全空，会话 `permissions=[]`，鉴权通过但权限为空 → 403。前端虽用 `catch { /* silent */ }` 兜住不崩，但 C 端首页/我的页统计显示为「- / 空」。
+
+#### 2. 修改内容
+
+按用户拍板「后端放宽权限」，把这 4 个查询接口从 `AuthPermission([...])` 降为 `get_current_user`（仅要求登录）：
+
+- `system/ticket/controller.py`：`/stats`、`/list` 由 `AuthPermission(["module_system:ticket:query"])` → `get_current_user`（并补 `get_current_user` 导入）。
+- `system/notice/controller.py`：`/list` 由 `AuthPermission(["module_system:notice:query"])` → `get_current_user`。
+- `monitor/online/controller.py`：`/stats` 由 `AuthPermission(["module_monitor:dashboard:query"])` → `get_current_user`。
+
+写操作（create/update/delete/batch/export 等）保持原权限码不变。
+
+#### 3. 关键口径
+
+- 数据安全靠 `data_scope` 兜底：`CRUDBase._build_conditions` 统一挂 `Permission._permission_condition()`，USER 角色 `data_scope=1`（仅本人）会把工单查询追加 `created_id == user.id`，放开入口权限后 C 端用户仍只能看到自己的工单，不泄漏他人数据。
+- `notice/list` 与 `online/stats` 无数据范围过滤，属「登录即可读」的全局数据（用户明确要求放宽，非遗漏）。
+
+---
+
+### 2026-10-29 — C 端市场任务页面视觉重构 + 分页/详情接口修复
+
+#### 1. 原因
+
+C 端市场任务 5 个页面（任务大厅/我的任务/任务详情/提交成果/我的收益）沿用模板化白卡片（`bg-white` + `bg-gray-50`），与首页/login 的品牌语言不一致；且存在两处体验问题：
+
+- `MarketAPI` 的 `http.Get(url, params)` 把分页对象直接当 alova 的 config 传，`page_no/page_size` 未拼入 URL，后端只返回默认前 10 条。
+- 详情页/提交页用「拉 100 条列表再 find」而非后端已有的 `/mini/tasks/{id}`、`/mini/assignments/{id}` 单详情接口，列表超 10 条时 find 失败 → 详情「加载失败」。
+
+#### 2. 修改内容
+
+- API 层：GET 统一改 `{ params }` 传递；新增 `getTaskDetail(id)`、`getAssignmentDetail(id)`；补 `TaskTemplateItem.items`（三级任务）与 `TaskItemDetail` 类型。
+- 详情页/提交页：改用单详情接口（一次直达，消除 find 失败）。
+- 视觉统一为项目既有语言：品牌渐变 Hero（`linear-gradient(135deg, primary-6→primary-4)`）、`wot-bg-filled-oppo` 卡片、品牌蓝金额、状态语义色条、克制阴影、按压态 `scale(0.98)`、骨架屏；子表原生 `input` 改 `wd-input`，上传占位改品牌虚线框。
+
+#### 3. 关键口径
+
+- 设计令牌以 `design-system/default/MASTER.md` 与 wot token 为准：页面底 `wot-bg-filled-bottom`、卡片 `wot-bg-filled-oppo`、品牌蓝 `--wot-primary-6`，支持暗黑模式。
+- 金额统一品牌蓝大字；红色（`wot-text-error-main`）仅用于「删除/异常」等负面语义，津贴余额/待发放用 warning 橙语义。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
