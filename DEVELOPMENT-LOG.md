@@ -1380,6 +1380,107 @@
 
 ---
 
+### 2026-10-29 — 任务与任务分派合并（分派内嵌任务详情抽屉）
+
+#### 1. 原因
+
+用户反馈「任务管理里的任务和任务分派太隔离」——两个平级菜单、两个独立页面，运营分派时要在「任务」与「任务分派」页之间来回跳。数据上 `market_assignment` 本就是 `market_task` 的接收记录（`task_id` 外键），拆成平级页面割裂感强。方案（用户拍板）：以任务为中心，分派作为任务的子明细内嵌；不保留全局分派记录视图。
+
+#### 2. 修改内容
+
+**后端**
+- `task/schema.py`：`TaskOutSchema` 新增 `assignment_count`（已分派/接收人数，列表聚合字段）。
+- `task/service.py`：`TaskService.page` 查询后按 `task_id` 分组 `COUNT` 回填 `assignment_count`（一次 `GROUP BY`，非 N+1）。
+
+**前端**
+- `views/module_market/task/index.vue`：新增「接收人数」列、行操作「分派」；新增 `FaDrawer` 详情抽屉（任务信息 `FaDescriptions` + 分派明细 `ElTable`），抽屉内支持「添加分派」（`assignment:create`）与「撤销」（`assignment:delete`，仅 PENDING）；`onMounted` 补载 `market_assignment_status` 字典。
+- `api/module_market/task.ts`：`TaskTable` 增加 `assignment_count` 类型。
+- 删除 `views/module_market/assignment/index.vue`（`assignment.ts` API 保留，供抽屉调用）。
+
+**菜单**
+- `sql/sys_menu.json`：删除「任务分派」二级菜单，其 `assignment:create/update/delete` 三个权限点并入「任务」菜单（重命名「分派/修改分派/撤销分派」），RBAC 授权能力不丢失。
+
+#### 3. 关键口径
+
+- 分派明细按 `task_id` 过滤查询（`AssignmentAPI.listAssignment({ task_id })`），抽屉内一次性拉取（`page_size=100`）。
+- 分派来源 `assigned/claimed` 是本地常量（无字典），状态走 `market_assignment_status` 字典。
+- 菜单是 `sys_menu.json` 种子数据，改动后需重建库（或 reseed）才生效；本次直接 `DROP DATABASE + CREATE DATABASE` 重建，后端启动 `init_db` 全量 seed。
+
+#### 4. 验证
+
+- 前端 `task/index.vue`、`task.ts` 零 lint 错误；`sys_menu.json` JSON 语法校验通过。
+- 重建库后：`sys_menu` 已无 `MarketAssignment` 路由，「任务」菜单下 7 个按钮权限点（含 3 个 assignment 权限）正确；`market_assignment_status` 六态齐全；后端启动 `postgres/Redis/调度器` 均就绪。
+
+---
+
+### 2026-10-29 — 修正：任务默认分配方式改为公开大厅（direct → open）
+
+#### 1. 原因
+
+用户反馈「项目发布后任务的默认分配方式应该是公开大厅，不应该是定向分派」。原默认值 `direct` 导致新建任务/发布项目生成的批量任务默认走定向分派，发布时还强制要求指定分派人员，不符合「公开大厅接单」的主流场景。
+
+#### 2. 修改内容
+
+- `task/schema.py`：`TaskOutSchema` / `TaskCreateSchema` 的 `assign_mode` 默认值 `direct` → `open`。
+- `task/model.py`：`TaskModel.assign_mode` 列默认值 `direct` → `open`。
+- `project/service.py`：`publish` 发布项目批量生成任务时 `assign_mode="open"`（原 `"direct"`）。
+- 前端 `task/index.vue`：新增任务表单 `assign_mode` 初始值 `direct` → `open`。
+- 测试 `test_market_task_publish.py`：direct 流程改为显式创建任务（新增 `_create_task` helper），新增 `test_publish_project_creates_open_task` 验证发布项目默认生成 open 任务。
+
+#### 3. 关键口径
+
+- 纯 Python/前端默认值改动，不涉及 DB schema（`default=` 非 `server_default`），**无需重建数据库**，后端 reload 自动生效。
+
+---
+
+### 2026-10-29 — 任务批量分配与批量发布
+
+#### 1. 原因
+
+运营在任务列表需一次性处理多个任务：批量给多个任务分派执行人、批量发布草稿任务，避免逐条操作。方案（用户拍板）：批量分配 = 多任务 × 多用户交叉分派；批量发布 = 统一弹窗选分派人员（公开大厅任务忽略，定向分派任务用它建分派）。
+
+#### 2. 修改内容
+
+**后端**
+- `task/schema.py`：新增 `TaskBatchPublishSchema`（ids + assignee_ids）、`TaskBatchPublishResultSchema`（published + failed）、`AssignmentBatchCreateSchema`（task_ids + user_ids）。
+- `task/service.py`：`TaskService.batch_publish`（逐个 publish，单任务失败不影响其余，返回成功/失败明细）；`AssignmentService.batch_assign_multi`（多任务 × 多用户交叉，跳过已存在，返回新建数量）。
+- `task/controller.py`：新增 `POST /market/tasks/batch-publish`（`task:publish` 权限）、`POST /market/assignments/batch-create`（`assignment:create` 权限）。
+
+**前端**
+- `api/module_market/task.ts`：新增 `batchPublishTask` + `TaskBatchPublishResult`。
+- `api/module_market/assignment.ts`：新增 `batchCreateAssignment`。
+- `views/module_market/task/index.vue`：工具栏新增「批量分配」「批量发布」按钮（勾选后出现）；新增两个弹窗：批量分配（选多用户）、批量发布（含 direct 任务时选分派人员，全 open 直接发布）。
+
+#### 3. 关键口径
+
+- 批量发布逐个调用 `publish`，部分失败不阻断整体，返回 `{published, failed[]}` 供前端提示。
+- 批量分配复用 `batch_assign`（单任务多用户），外层遍历 task_ids 去重。
+- 权限沿用既有 `task:publish` / `assignment:create`，无新增权限点。
+
+#### 4. 验证
+
+- 后端三个文件 lint 无新增错误（仅既有 implicit-import 提示）；路由已注册（openapi 含 `/market/tasks/batch-publish`、`/market/assignments/batch-create`）；reload 无报错、无模型变更迁移。
+- 前端零 lint 错误。
+
+---
+
+### 2026-10-29 — 修正：定向分派时自动把任务分配方式改为定向
+
+#### 1. 原因
+
+用户反馈「批量分配（及抽屉添加分派）后任务仍是公开大厅模式」——`batch_assign` 只创建分派记录，未回写任务 `assign_mode`，导致「已指定执行人但任务仍可被大厅接单」的矛盾状态。
+
+#### 2. 修改内容
+
+- `task/service.py`：`AssignmentService.batch_assign` 在运营定向分派（`source=assigned`）时，自动将任务 `assign_mode` 改为 `direct`（幂等）。大厅接单 `claim` 不走此方法，不受影响。
+- 测试 `test_market_task_publish.py`：新增 `test_assign_open_task_switches_to_direct`，验证 open 任务分派后变为 direct。
+
+#### 3. 关键口径
+
+- 改 `assign_mode` 的时机统一收敛在 `batch_assign`，覆盖单任务分派（`create`）、批量分配（`batch_assign_multi`）、发布定向任务（`publish`）三类场景；仅 `source=assigned` 时改写，`claimed`（大厅接单）不改。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
