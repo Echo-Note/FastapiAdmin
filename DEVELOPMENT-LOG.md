@@ -1168,6 +1168,48 @@
 
 ---
 
+### 2026-10-29 — 机构管理数据来源纠正：C 端提交成果归集，运营端去除手动新增
+
+#### 1. 原因
+
+用户纠正：市场管理里「机构管理」及医院相关数据**不是运营人员添加的**，而是 **C 端人员提交的成果数据归集**而来。原实现机构（`market_institution`，含等级医院/基层医疗/民营医疗/零售药店/商业公司）由运营端手动 CRUD，C 端提交成果时从运营预置的机构列表「选择」，方向反了。
+
+#### 2. 修改内容
+
+**后端**
+- `institution/schema.py`：删除 `InstitutionCreateSchema`（机构不再由运营端创建）。
+- `institution/crud.py`：`InstitutionCRUD` 泛型 CreateSchemaType 改为 `dict[str, Any]`（归集创建走 dict）。
+- `institution/service.py`：删除 `create` 方法；新增 `collect`（按名称归集：同名复用、否则创建）、`extract_institution_info`（从 form_data 提取机构名称/区域/等级）、`map_institution_type`（二级模板名 → 机构类型）。
+- `institution/controller.py`：删除 `POST /institutions/create` 路由。
+- `task/service.py` `SubmissionService.create`：采集对象类型以模板 `TaskConfig.subject_type` 为准；对象为机构时从 form_data 归集机构并回填 `institution_id`。
+
+**前端 web**
+- `institution/index.vue`：去掉「新增」按钮与 `createApi`，仅保留查询/编辑/删除（运营可修正归集来的机构信息）。
+- `api/module_market/institution.ts`：删除 `createInstitution`。
+
+**前端 app（小程序）**
+- `submission-form/index.vue`：移除「机构选择器」，机构信息由采集表单字段提交、后端归集。
+- `api/module_market/index.ts`：删除 `InstitutionItem`/`getInstitutions`。
+
+**测试**
+- `test_market_company_institution.py`：`TestInstitution` 移除 `test_create`，新增 `test_create_route_removed`（验证 POST /institutions/create 404），其余用例改「同步 Session 直接落库」准备机构数据。
+- 新增 `test_market_institution_collect.py`（7 用例）：覆盖 `extract_institution_info` 与 `map_institution_type`。
+
+#### 3. 关键口径
+
+- **机构类型由任务模板权威映射**：`map_institution_type` 按二级模板名映射（等级医疗管理→grade_hospital 等）；宣传/科普/会议类模板采集对象非机构主数据，不归集。
+- **机构名称字段候选**：`hospital_name`（商务类）/ `org_name`（档案调研类）/ `institution_name`，跨分节按字段名匹配，兼容不同任务的采集表单。
+- **查重维度 = 机构名称**：同名复用、否则创建；归集时机为提交成果即归集（草稿也归集）。
+- **运营端权限**：仅保留「编辑/删除」修正能力；`module_market:institution:create` 权限码保留给「图片归集」页新增图片按钮复用，菜单 seed 未动（避免重建库）。
+
+#### 4. 验证
+
+- `ruff check`：institution/task 模块 + 测试 All checks passed。
+- `pytest`：market 域 4 个测试文件 29 passed + 新增归集单元 7 passed。
+- 模块导入正常（无循环导入）。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -1233,3 +1275,7 @@
 16. **编号计数器表被 `TRUNCATE` 清空后未对齐 seed → 自动编号撞预置编号唯一约束**（2026-10-29）
    - 现象：market 域编号改用计数器表 `market_number_counter` 原子自增，但 `reseed_market.py` 的 `_market_tables()` 会收集所有 `market_` 前缀表（含计数器表）一并 `TRUNCATE`，重播种后计数器为空；下次创建分类 `next_code(CAT)` 从 1 重新开始，与 seed 预置的 `CAT-001` 撞唯一约束。
    - 结论：凡「预置编号 + 计数器自增」并存，seed/reseed 后必须用 `sync_counter`（`INSERT ... ON CONFLICT DO UPDATE SET current_value = GREATEST(current_value, :seq)`）把计数器对齐到预置编号的最大序号；`GREATEST` 保证只增不减、幂等。与踩坑 6（seed 用硬编码 ID 依赖空库自增）同源：market 域的种子与计数器都要和 `TRUNCATE ... RESTART IDENTITY` 的语义保持一致。
+
+17. **同步测试里用 `asyncio.run` 操作全局 `async_db_session` → `Event loop is closed`**（2026-10-29）
+   - 现象：集成测试 `TestInstitution` 需要先落库准备机构数据，用 `asyncio.run(_run())` 里 `async with async_db_session()` 直接插入，运行时报 `RuntimeError: Event loop is closed`——模块级 `async_engine` 的连接池绑定在 TestClient lifespan 的事件循环上，`asyncio.run` 新建的临时循环与引擎循环不一致，池内连接已随旧循环关闭。
+   - 结论：同步测试（`def test_xxx`）里不要用 `asyncio.run` 碰全局 `async_db_session`/`async_engine`；改用**同步引擎** `engine`（`create_sync_engine` 已在 `database.py` 暴露）配 `Session(engine)` 直接落库。真正的异步逻辑测试再走 pytest-asyncio（`asyncio_mode=auto`），且需和引擎生命周期对齐。
