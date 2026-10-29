@@ -35,6 +35,26 @@
             @add="handleAdd"
             @delete="handleBatchDelete"
           />
+          <ElButton
+            v-if="selectedIds.length > 0"
+            v-hasPerm="'module_market:assignment:create'"
+            type="success"
+            plain
+            :icon="UserFilled"
+            @click="openBatchAssign"
+          >
+            批量分配 ({{ selectedIds.length }})
+          </ElButton>
+          <ElButton
+            v-if="selectedIds.length > 0"
+            v-hasPerm="'module_market:task:publish'"
+            type="primary"
+            plain
+            :icon="Promotion"
+            @click="openBatchPublish"
+          >
+            批量发布 ({{ selectedIds.length }})
+          </ElButton>
         </template>
       </FaTableHeader>
 
@@ -105,14 +125,55 @@
       </template>
     </ElDialog>
 
-    <!-- 定向分派任务发布：指定分派人员 -->
-    <ElDialog v-model="publishDialogVisible" title="发布任务（定向分派）" width="520px" :close-on-click-modal="false">
-      <ElAlert type="info" :closable="false" show-icon title="定向分派任务须指定分派人员，发布后任务将进入所选人员的「我的任务」。" class="status-hint" />
+    <!-- 任务详情抽屉：任务信息 + 分派明细（分派内嵌于任务，消除跨页跳转） -->
+    <FaDrawer v-model="assignDrawerVisible" :title="`任务详情 · ${drawerTask?.task_no ?? ''}`" size="720px" destroy-on-close>
+      <div class="task-drawer">
+        <FaDescriptions :column="2" :data="drawerTask ?? {}" :items="detailItems" class="task-drawer__info">
+          <template #projectName="{ row }">{{ resolveProjectName(row) }}</template>
+          <template #assignMode="{ row }"><component :is="dictTag('market_assign_mode', row?.assign_mode)" /></template>
+          <template #statusTag="{ row }"><component :is="dictTag('market_task_status', row?.status)" /></template>
+        </FaDescriptions>
+
+        <div class="task-drawer__assign">
+          <div class="task-drawer__assign-head">
+            <span class="task-drawer__assign-title">分派情况（{{ assignmentData.length }}）</span>
+            <ElButton v-hasPerm="'module_market:assignment:create'" type="primary" plain :icon="Plus" size="small" @click="openAssignDialog">
+              添加分派
+            </ElButton>
+          </div>
+          <ElTable v-loading="assignmentLoading" :data="assignmentData" size="small" empty-text="暂无分派记录">
+            <ElTableColumn type="index" label="序号" width="56" align="center" />
+            <ElTableColumn label="接收用户" min-width="120">
+              <template #default="{ row }">{{ resolveUserName(row.user_id) }}</template>
+            </ElTableColumn>
+            <ElTableColumn label="来源" width="100" align="center">
+              <template #default="{ row }"><component :is="sourceTag(row.source)" /></template>
+            </ElTableColumn>
+            <ElTableColumn label="状态" width="96" align="center">
+              <template #default="{ row }"><component :is="dictTag('market_assignment_status', row.status)" /></template>
+            </ElTableColumn>
+            <ElTableColumn prop="accepted_at" label="接收时间" width="168" show-overflow-tooltip />
+            <ElTableColumn prop="submitted_at" label="首次提交" width="168" show-overflow-tooltip />
+            <ElTableColumn label="操作" width="80" align="center" fixed="right">
+              <template #default="{ row }">
+                <ElButton v-if="row.status === 'PENDING'" v-hasPerm="'module_market:assignment:delete'" link type="danger" @click="revokeAssignment(row)">
+                  撤销
+                </ElButton>
+              </template>
+            </ElTableColumn>
+          </ElTable>
+        </div>
+      </div>
+    </FaDrawer>
+
+    <!-- 添加分派：为当前任务指派 C 端用户 -->
+    <ElDialog v-model="assignDialogVisible" :title="`添加分派 · ${drawerTask?.task_no ?? ''}`" width="520px" :close-on-click-modal="false">
+      <ElAlert type="info" :closable="false" show-icon title="为当前任务指派接收用户（可多选），已分派的用户将自动跳过。" class="status-hint" />
       <FaForm
-        ref="publishFormRef"
-        v-model="publishForm"
-        :items="publishFormItems"
-        :rules="publishRules"
+        ref="assignFormRef"
+        v-model="assignForm"
+        :items="assignFormItems"
+        :rules="assignRules"
         label-suffix=":"
         :label-width="100"
         label-position="right"
@@ -120,8 +181,37 @@
         :gutter="16"
       />
       <template #footer>
-        <ElButton @click="publishDialogVisible = false">取消</ElButton>
-        <ElButton type="primary" :loading="publishSubmitting" @click="handlePublishSubmit">确定发布</ElButton>
+        <ElButton @click="assignDialogVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="assignSubmitting" @click="handleAssignSubmit">确定分派</ElButton>
+      </template>
+    </ElDialog>
+
+    <!-- 批量分配：多任务 × 多用户交叉分派 -->
+    <ElDialog v-model="batchAssignDialogVisible" :title="`批量分配（${selectedIds.length} 个任务）`" width="520px" :close-on-click-modal="false">
+      <ElAlert type="info" :closable="false" show-icon title="为选中的每个任务 × 每个所选用户创建分派记录，已分派的将自动跳过。" class="status-hint" />
+      <FaForm
+        ref="batchAssignFormRef"
+        v-model="batchAssignForm"
+        :items="batchAssignFormItems"
+        :rules="batchAssignRules"
+        label-suffix=":"
+        :label-width="100"
+        label-position="right"
+        :span="24"
+        :gutter="16"
+      />
+      <template #footer>
+        <ElButton @click="batchAssignDialogVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="batchAssignSubmitting" @click="handleBatchAssignSubmit">确定分配</ElButton>
+      </template>
+    </ElDialog>
+
+    <!-- 批量发布：仅状态流转，不处理分派 -->
+    <ElDialog v-model="batchPublishDialogVisible" :title="`批量发布（${selectedIds.length} 个任务）`" width="520px" :close-on-click-modal="false">
+      <ElAlert type="info" :closable="false" show-icon title="发布仅将任务状态流转为「已发布」，不处理分派；如需定向分派请先使用「批量分配」。" class="status-hint" />
+      <template #footer>
+        <ElButton @click="batchPublishDialogVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="batchPublishSubmitting" @click="handleBatchPublishSubmit">确定发布</ElButton>
       </template>
     </ElDialog>
   </div>
@@ -130,6 +220,7 @@
 <script setup lang="ts">
 import { h } from "vue";
 import TaskAPI, { type TaskForm, type TaskTable } from "@/api/module_market/task";
+import AssignmentAPI, { type AssignmentTable } from "@/api/module_market/assignment";
 import ProjectAPI from "@/api/module_market/project";
 import TaskTemplateAPI from "@/api/module_market/task-template";
 import UserAPI from "@/api/module_system/user";
@@ -139,7 +230,9 @@ import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue"
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
-import { ElMessageBox } from "element-plus";
+import FaDrawer from "@/components/modal/fa-drawer/index.vue";
+import { Plus, Promotion, UserFilled } from "@element-plus/icons-vue";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { renderTableOperationCell, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
 
 defineOptions({ name: "MarketTask", inheritAttrs: false });
@@ -205,11 +298,13 @@ const opCtx = {
   onDelete: deleteRow,
   onPublish: publishRow,
   onChangeStatus: changeStatusRow,
+  onAssign: openAssignDrawer,
 };
 
 function buildRowActions(row: TaskTable): TableOperationAction[] {
   const actions: TableOperationAction[] = [
     { key: "detail", label: "详情", artType: "view", perm: "module_market:task:query", run: () => opCtx.onDetail(row.id!) },
+    { key: "assign", label: "分派", artType: "view", perm: "module_market:assignment:query", run: () => opCtx.onAssign(row) },
   ];
   if (row.status === "DRAFT") {
     actions.push({ key: "edit", label: "编辑", artType: "edit", perm: "module_market:task:update", run: () => opCtx.onEdit(row.id!) });
@@ -235,8 +330,9 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "period", label: "周期", width: 90 },
         { prop: "assign_mode", label: "分配方式", width: 100, formatter: (row: TaskTable) => dictTag("market_assign_mode", row.assign_mode) },
         { prop: "status", label: "状态", width: 92, formatter: (row: TaskTable) => dictTag("market_task_status", row.status) },
+        { prop: "assignment_count", label: "接收人数", width: 96, align: "center", formatter: (row: TaskTable) => h(StatusTag, { type: row.assignment_count ? "primary" : "info", label: `${row.assignment_count ?? 0} 人` }) },
         { prop: "published_at", label: "发布时间", width: 168, showOverflowTooltip: true },
-        { prop: "operation", label: "操作", width: 220, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
+        { prop: "operation", label: "操作", width: 260, fixed: "right", align: "center", formatter: (row: TaskTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ],
     },
   });
@@ -256,12 +352,12 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "创建时间", prop: "created_time" },
 ];
 
-const formData = ref<TaskForm>({ id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "direct" });
+const formData = ref<TaskForm>({ id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "open" });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: TaskForm = { id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "direct" };
+const initialFormData: TaskForm = { id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "open" };
 
 const rules = reactive({
   project_id: [{ required: true, message: "请选择项目", trigger: "change" }],
@@ -307,7 +403,7 @@ async function loadOptions() {
 }
 
 onMounted(async () => {
-  await dictStore.getDict(["market_task_status", "market_assign_mode"]);
+  await dictStore.getDict(["market_task_status", "market_assign_mode", "market_assignment_status"]);
   await loadOptions();
 });
 
@@ -358,11 +454,6 @@ async function handleBatchDelete() {
 }
 
 async function publishRow(row: TaskTable) {
-  // 定向分派任务发布前必须指定分派人员
-  if (row.assign_mode !== "open") {
-    openPublishDialog(row);
-    return;
-  }
   try {
     await ElMessageBox.confirm(`确定发布任务「${row.task_no}」吗？发布后任务将进入任务大厅供 C 端接单。`, "发布任务", { type: "warning" });
     await TaskAPI.publishTask(row.id!);
@@ -372,46 +463,8 @@ async function publishRow(row: TaskTable) {
   }
 }
 
-// ── 定向分派任务发布：指定分派人员 ──
-const publishDialogVisible = ref(false);
-const publishSubmitting = ref(false);
-const publishFormRef = ref<InstanceType<typeof FaForm> | null>(null);
-const publishForm = ref<{ id?: number; task_no?: string; assignee_ids: number[] }>({ id: undefined, task_no: undefined, assignee_ids: [] });
+// 用户下拉选项（添加分派 / 批量分配共用）
 const userOptions = ref<OptionType[]>([]);
-
-const publishFormItems = computed<FormItem[]>(() => [
-  { label: "任务编号", key: "task_no", type: "input", span: 24, props: { disabled: true } },
-  { label: "分派人员", key: "assignee_ids", type: "select", span: 24, props: { placeholder: "请选择分派人员（可多选）", options: userOptions.value, filterable: true, multiple: true, collapseTags: true, collapseTagsTooltip: true } },
-]);
-
-const publishRules = reactive({
-  assignee_ids: [{ required: true, type: "array", min: 1, message: "请至少选择一名分派人员", trigger: "change" }],
-});
-
-function openPublishDialog(row: TaskTable) {
-  publishForm.value = { id: row.id, task_no: row.task_no, assignee_ids: [] };
-  publishDialogVisible.value = true;
-}
-
-async function handlePublishSubmit() {
-  if (!publishFormRef.value) return;
-  try {
-    await publishFormRef.value.validate();
-  } catch {
-    return;
-  }
-  if (publishForm.value.id == null || publishForm.value.assignee_ids.length === 0) return;
-  publishSubmitting.value = true;
-  try {
-    await TaskAPI.publishTask(publishForm.value.id, { assignee_ids: publishForm.value.assignee_ids });
-    publishDialogVisible.value = false;
-    await refreshData();
-  } catch {
-    // 错误已由拦截器提示
-  } finally {
-    publishSubmitting.value = false;
-  }
-}
 
 // ── 状态单向流转 ──
 const statusDialogVisible = ref(false);
@@ -458,6 +511,175 @@ async function handleStatusSubmit() {
     statusSubmitting.value = false;
   }
 }
+
+// ── 任务详情抽屉：分派明细（分派内嵌于任务，消除跨页跳转） ──
+const SOURCE_MAP: Record<string, { type: StatusType; text: string }> = {
+  assigned: { type: "primary", text: "运营分派" },
+  claimed: { type: "warning", text: "大厅接单" },
+};
+
+const assignDrawerVisible = ref(false);
+const drawerTask = ref<TaskTable | null>(null);
+const assignmentData = ref<AssignmentTable[]>([]);
+const assignmentLoading = ref(false);
+
+/** 分派来源标签（本地常量：运营分派 / 大厅接单） */
+function sourceTag(source?: string) {
+  if (!source) return "—";
+  const item = SOURCE_MAP[source];
+  return h(StatusTag, { type: item?.type ?? "info", label: item?.text ?? source });
+}
+
+/** 由用户 ID 解析显示名（复用 loadOptions 已加载的用户下拉选项） */
+function resolveUserName(userId?: number): string {
+  if (userId == null) return "—";
+  return userOptions.value.find((o) => o.value === userId)?.label ?? `#${userId}`;
+}
+
+/** 加载当前任务的分派明细 */
+async function loadAssignments(taskId: number) {
+  assignmentLoading.value = true;
+  try {
+    const res = await AssignmentAPI.listAssignment({ page_no: 1, page_size: 100, task_id: taskId });
+    assignmentData.value = res.data.data.items;
+  } catch {
+    assignmentData.value = [];
+  } finally {
+    assignmentLoading.value = false;
+  }
+}
+
+/** 打开分派详情抽屉 */
+function openAssignDrawer(row: TaskTable) {
+  drawerTask.value = row;
+  assignDrawerVisible.value = true;
+  void loadAssignments(row.id!);
+}
+
+/** 撤销分派（仅待接收状态可撤销） */
+async function revokeAssignment(row: AssignmentTable) {
+  try {
+    await confirmDelete(`确定撤销对「${resolveUserName(row.user_id)}」的分派吗？仅待接收状态可撤销。`);
+    await AssignmentAPI.deleteAssignment([row.id!]);
+    if (drawerTask.value?.id != null) {
+      await loadAssignments(drawerTask.value.id);
+    }
+    await refreshData();
+  } catch {
+    // 用户取消
+  }
+}
+
+// ── 添加分派 ──
+const assignDialogVisible = ref(false);
+const assignSubmitting = ref(false);
+const assignFormRef = ref<InstanceType<typeof FaForm> | null>(null);
+const assignForm = ref<{ user_ids: number[] }>({ user_ids: [] });
+
+const assignFormItems = computed<FormItem[]>(() => [
+  { label: "接收用户", key: "user_ids", type: "select", span: 24, props: { placeholder: "请选择接收用户（可多选）", options: userOptions.value, filterable: true, multiple: true, collapseTags: true, collapseTagsTooltip: true } },
+]);
+
+const assignRules = reactive({
+  user_ids: [{ required: true, type: "array", min: 1, message: "请至少选择一名接收用户", trigger: "change" }],
+});
+
+function openAssignDialog() {
+  assignForm.value = { user_ids: [] };
+  assignDialogVisible.value = true;
+}
+
+async function handleAssignSubmit() {
+  if (!assignFormRef.value || drawerTask.value?.id == null) return;
+  try {
+    await assignFormRef.value.validate();
+  } catch {
+    return;
+  }
+  if (assignForm.value.user_ids.length === 0) return;
+  assignSubmitting.value = true;
+  try {
+    await AssignmentAPI.createAssignment({ task_id: drawerTask.value.id, user_ids: assignForm.value.user_ids });
+    assignDialogVisible.value = false;
+    await loadAssignments(drawerTask.value.id);
+    await refreshData();
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    assignSubmitting.value = false;
+  }
+}
+
+// ── 批量分配（多任务 × 多用户交叉分派） ──
+const batchAssignDialogVisible = ref(false);
+const batchAssignSubmitting = ref(false);
+const batchAssignFormRef = ref<InstanceType<typeof FaForm> | null>(null);
+const batchAssignForm = ref<{ user_ids: number[] }>({ user_ids: [] });
+
+const batchAssignFormItems = computed<FormItem[]>(() => [
+  { label: "接收用户", key: "user_ids", type: "select", span: 24, props: { placeholder: "请选择接收用户（可多选）", options: userOptions.value, filterable: true, multiple: true, collapseTags: true, collapseTagsTooltip: true } },
+]);
+
+const batchAssignRules = reactive({
+  user_ids: [{ required: true, type: "array", min: 1, message: "请至少选择一名接收用户", trigger: "change" }],
+});
+
+function openBatchAssign() {
+  if (selectedIds.value.length === 0) return;
+  batchAssignForm.value = { user_ids: [] };
+  batchAssignDialogVisible.value = true;
+}
+
+async function handleBatchAssignSubmit() {
+  if (!batchAssignFormRef.value) return;
+  try {
+    await batchAssignFormRef.value.validate();
+  } catch {
+    return;
+  }
+  if (batchAssignForm.value.user_ids.length === 0) return;
+  batchAssignSubmitting.value = true;
+  try {
+    const res = await AssignmentAPI.batchCreateAssignment({ task_ids: selectedIds.value, user_ids: batchAssignForm.value.user_ids });
+    batchAssignDialogVisible.value = false;
+    ElMessage.success(`批量分配完成，新建 ${res.data.data} 条分派记录`);
+    faTableRef.value?.elTableRef?.clearSelection();
+    await refreshData();
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    batchAssignSubmitting.value = false;
+  }
+}
+
+// ── 批量发布（仅状态流转，不处理分派） ──
+const batchPublishDialogVisible = ref(false);
+const batchPublishSubmitting = ref(false);
+
+function openBatchPublish() {
+  if (selectedIds.value.length === 0) return;
+  batchPublishDialogVisible.value = true;
+}
+
+async function handleBatchPublishSubmit() {
+  batchPublishSubmitting.value = true;
+  try {
+    const res = await TaskAPI.batchPublishTask({ ids: selectedIds.value });
+    const { published, failed } = res.data.data;
+    batchPublishDialogVisible.value = false;
+    if (failed.length > 0) {
+      ElMessage.warning(`批量发布完成：成功 ${published} 个，失败 ${failed.length} 个（${failed.map((f) => `#${f.id} ${f.msg}`).join("；")}）`);
+    } else {
+      ElMessage.success(`批量发布完成，成功 ${published} 个任务`);
+    }
+    faTableRef.value?.elTableRef?.clearSelection();
+    await refreshData();
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    batchPublishSubmitting.value = false;
+  }
+}
 </script>
 
 <style scoped>
@@ -466,5 +688,23 @@ async function handleStatusSubmit() {
 }
 .status-hint {
   margin-bottom: 12px;
+}
+.task-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+.task-drawer__assign-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.task-drawer__assign-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 </style>

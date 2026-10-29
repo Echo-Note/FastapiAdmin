@@ -27,6 +27,15 @@ const AssignmentAPI = {
     });
   },
 
+  /** 批量分配：多任务 × 多用户交叉创建分派（跳过已存在），返回新建数量 */
+  batchCreateAssignment(body: { task_ids: number[]; user_ids: number[] }) {
+    return request<ApiResponse<number>>({
+      url: `${API_PATH}/batch-create`,
+      method: "post",
+      data: body,
+    });
+  },
+
   deleteAssignment(body: number[]) {
     return request<ApiResponse>({
       url: `${API_PATH}/delete`,

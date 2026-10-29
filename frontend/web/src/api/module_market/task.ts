@@ -43,10 +43,18 @@ const TaskAPI = {
     });
   },
 
-  /** 发布任务（DRAFT → PUBLISHED；定向分派须传 assignee_ids 指定分派人员） */
-  publishTask(id: number, body: { assignee_ids?: number[] } = {}) {
+  /** 发布任务（DRAFT → PUBLISHED；发布与分派解耦，仅状态流转） */
+  publishTask(id: number) {
     return request<ApiResponse<TaskTable>>({
       url: `${API_PATH}/publish/${id}`,
+      method: "post",
+    });
+  },
+
+  /** 批量发布任务（仅状态流转，不处理分派） */
+  batchPublishTask(body: { ids: number[] }) {
+    return request<ApiResponse<TaskBatchPublishResult>>({
+      url: `${API_PATH}/batch-publish`,
       method: "post",
       data: body,
     });
@@ -104,6 +112,8 @@ export interface TaskTable extends BaseType {
   status?: string;
   publisher_id?: number | null;
   published_at?: string | null;
+  /** 已分派/接收人数（后端列表聚合字段） */
+  assignment_count?: number;
 }
 
 export interface TaskForm extends BaseFormType {
@@ -113,4 +123,10 @@ export interface TaskForm extends BaseFormType {
   period?: string;
   assign_mode?: string;
   status?: string;
+}
+
+/** 批量发布结果 */
+export interface TaskBatchPublishResult {
+  published: number;
+  failed: Array<{ id: number; msg: string }>;
 }
