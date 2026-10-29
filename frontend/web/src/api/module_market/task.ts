@@ -43,12 +43,12 @@ const TaskAPI = {
     });
   },
 
-  /** 发布任务（DRAFT → PUBLISHED） */
-  publishTask(id: number) {
+  /** 发布任务（DRAFT → PUBLISHED；定向分派须传 assignee_ids 指定分派人员） */
+  publishTask(id: number, body: { assignee_ids?: number[] } = {}) {
     return request<ApiResponse<TaskTable>>({
       url: `${API_PATH}/publish/${id}`,
       method: "post",
-      data: {},
+      data: body,
     });
   },
 

@@ -344,11 +344,24 @@ class TaskService:
                 raise CustomException(msg=f"任务[{task.task_no}]非草稿状态，不能删除")
         await TaskCRUD(self.auth, self.db).delete(ids=ids)
 
-    async def publish(self, id: int) -> TaskOutSchema:
-        """发布任务：DRAFT → PUBLISHED，写入发布人与发布时间。"""
+    async def publish(self, id: int, assignee_ids: list[int] | None = None) -> TaskOutSchema:
+        """发布任务：DRAFT → PUBLISHED，写入发布人与发布时间。
+
+        分配方式为 ``direct``（定向分派）时，必须指定分派人员 ``assignee_ids``，
+        发布即批量创建分派记录（跳过已分派用户），否则任务无人执行、C 端不可见。
+        分配方式为 ``open``（公开大厅）时忽略 ``assignee_ids``，任务进入大厅供自行接单。
+        """
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status != TaskStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的任务可发布")
+
+        if task.assign_mode == AssignMode.DIRECT.value:
+            if not assignee_ids:
+                raise CustomException(msg="定向分派任务必须指定分派人员")
+            await AssignmentService(self.auth, self.db).batch_assign(
+                task_id=id, user_ids=assignee_ids, source=AssignmentSource.ASSIGNED.value
+            )
+
         update_data: dict[str, Any] = {
             "status": TaskStatus.PUBLISHED.value,
             "publisher_id": self.auth.user.id,
@@ -401,8 +414,8 @@ class AssignmentService:
         self.db = db
 
     async def detail(self, id: int) -> AssignmentOutSchema:
-        """查询分派详情。"""
-        assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(id=id)
+        """查询分派详情（预加载任务链，避免异步懒加载）。"""
+        assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(id=id, preload=_ASSIGNMENT_PRELOAD)
         return AssignmentOutSchema.model_validate(assignment)
 
     async def page(
@@ -412,7 +425,7 @@ class AssignmentService:
         search: AssignmentQueryParam | None = None,
         order_by: list[dict[str, str]] | None = None,
     ) -> PageResultSchema[AssignmentOutSchema]:
-        """分页查询分派。"""
+        """分页查询分派（预加载任务链）。"""
         offset = (page_no - 1) * page_size
         return await AssignmentCRUD(self.auth, self.db).page(
             offset=offset,
@@ -420,16 +433,28 @@ class AssignmentService:
             order_by=order_by or [{"id": "desc"}],
             search=search_to_dict(search),
             out_schema=AssignmentOutSchema,
+            preload=_ASSIGNMENT_PRELOAD,
         )
 
-    async def create(self, data: AssignmentCreateSchema) -> AssignmentOutSchema:
-        """创建分派（运营定向分派）。"""
+    async def create(self, data: AssignmentCreateSchema) -> list[AssignmentOutSchema]:
+        """批量创建分派（运营定向分派，一个任务指派给多个用户，跳过已分派）。"""
         await TaskCRUD(self.auth, self.db).get_or_404(id=data.task_id, msg="任务不存在")
-        existing = await AssignmentCRUD(self.auth, self.db).get_list(search={"task_id": data.task_id, "user_id": data.user_id})
-        if existing:
-            raise CustomException(msg="该用户已被分派此任务")
-        assignment = await AssignmentCRUD(self.auth, self.db).create(data=data)
-        return await self.detail(id=assignment.id)
+        return await self.batch_assign(task_id=data.task_id, user_ids=data.user_ids, source=data.source)
+
+    async def batch_assign(self, task_id: int, user_ids: list[int], source: str) -> list[AssignmentOutSchema]:
+        """批量创建分派记录：用户去重、跳过已分派，返回本次新建的分派列表。"""
+        created: list[AssignmentOutSchema] = []
+        for user_id in dict.fromkeys(user_ids):
+            existing = await AssignmentCRUD(self.auth, self.db).get_list(
+                search={"task_id": task_id, "user_id": user_id}
+            )
+            if existing:
+                continue
+            assignment = await AssignmentCRUD(self.auth, self.db).create(
+                data={"task_id": task_id, "user_id": user_id, "source": source}
+            )
+            created.append(await self.detail(id=assignment.id))
+        return created
 
     async def update(self, id: int, data: AssignmentUpdateSchema) -> AssignmentOutSchema:
         """更新分派。"""
@@ -456,6 +481,7 @@ class AssignmentService:
             order_by=[{"id": "desc"}],
             search=cond,
             out_schema=AssignmentOutSchema,
+            preload=_ASSIGNMENT_PRELOAD,
         )
 
     async def accept(self, id: int) -> AssignmentOutSchema:

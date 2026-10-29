@@ -34,6 +34,7 @@ from .schema import (
     TaskItemQueryParam,
     TaskItemUpdateSchema,
     TaskOutSchema,
+    TaskPublishSchema,
     TaskQueryParam,
     TaskStatusUpdateSchema,
     TaskTemplateCreateSchema,
@@ -286,8 +287,9 @@ async def publish_task_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:publish"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
+    data: Annotated[TaskPublishSchema, Body(description="发布任务参数(定向分派须指定分派人员)")] = TaskPublishSchema(),
 ) -> JSONResponse:
-    result = await TaskService(auth, db).publish(id=id)
+    result = await TaskService(auth, db).publish(id=id, assignee_ids=data.assignee_ids)
     return SuccessResponse(data=result, msg="发布任务成功")
 
 
@@ -326,7 +328,7 @@ async def get_assignment_detail_controller(
     return SuccessResponse(data=result, msg="获取分派详情成功")
 
 
-@AssignmentRouter.post("/create", status_code=status.HTTP_201_CREATED, summary="创建分派", response_model=ResponseSchema[AssignmentOutSchema])
+@AssignmentRouter.post("/create", status_code=status.HTTP_201_CREATED, summary="创建分派", response_model=ResponseSchema[list[AssignmentOutSchema]])
 async def create_assignment_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:assignment:create"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],

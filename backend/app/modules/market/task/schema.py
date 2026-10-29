@@ -234,11 +234,17 @@ class AssignmentOutSchema(BaseSchema, UserBySchema):
 
 
 class AssignmentCreateSchema(BaseModel):
-    """创建任务分配"""
+    """创建任务分配（批量：一个任务指派给多个 C 端用户）"""
 
     task_id: int = Field(gt=0, description="任务ID")
-    user_id: int = Field(gt=0, description="执行用户ID")
+    user_ids: list[int] = Field(min_length=1, description="执行用户ID列表")
     source: Literal["assigned", "claimed"] = Field(default="assigned", description="来源(assigned 运营分派/claimed 大厅接单)")
+
+
+class TaskPublishSchema(BaseModel):
+    """发布任务参数（定向分派任务须指定分派人员）"""
+
+    assignee_ids: list[int] | None = Field(default=None, description="定向分派人员ID列表(分配方式为 direct 时必填，open 时忽略)")
 
 
 class AssignmentUpdateSchema(BaseModel):

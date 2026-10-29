@@ -104,6 +104,26 @@
         <ElButton type="primary" :loading="statusSubmitting" @click="handleStatusSubmit">确定流转</ElButton>
       </template>
     </ElDialog>
+
+    <!-- 定向分派任务发布：指定分派人员 -->
+    <ElDialog v-model="publishDialogVisible" title="发布任务（定向分派）" width="520px" :close-on-click-modal="false">
+      <ElAlert type="info" :closable="false" show-icon title="定向分派任务须指定分派人员，发布后任务将进入所选人员的「我的任务」。" class="status-hint" />
+      <FaForm
+        ref="publishFormRef"
+        v-model="publishForm"
+        :items="publishFormItems"
+        :rules="publishRules"
+        label-suffix=":"
+        :label-width="100"
+        label-position="right"
+        :span="24"
+        :gutter="16"
+      />
+      <template #footer>
+        <ElButton @click="publishDialogVisible = false">取消</ElButton>
+        <ElButton type="primary" :loading="publishSubmitting" @click="handlePublishSubmit">确定发布</ElButton>
+      </template>
+    </ElDialog>
   </div>
 </template>
 
@@ -112,6 +132,7 @@ import { h } from "vue";
 import TaskAPI, { type TaskForm, type TaskTable } from "@/api/module_market/task";
 import ProjectAPI from "@/api/module_market/project";
 import TaskTemplateAPI from "@/api/module_market/task-template";
+import UserAPI from "@/api/module_system/user";
 import { useDictStore } from "@stores";
 import StatusTag from "@/components/display/fa-status-tag/index.vue";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
@@ -192,7 +213,7 @@ function buildRowActions(row: TaskTable): TableOperationAction[] {
   ];
   if (row.status === "DRAFT") {
     actions.push({ key: "edit", label: "编辑", artType: "edit", perm: "module_market:task:update", run: () => opCtx.onEdit(row.id!) });
-    actions.push({ key: "publish", label: "发布", artType: "edit", perm: "module_market:task:publish", run: () => opCtx.onPublish(row.id!, row.task_no ?? "") });
+    actions.push({ key: "publish", label: "发布", artType: "edit", perm: "module_market:task:publish", run: () => opCtx.onPublish(row) });
     actions.push({ key: "delete", label: "删除", artType: "delete", perm: "module_market:task:delete", run: () => opCtx.onDelete(row.id!, row.task_no ?? "") });
   } else if (["PUBLISHED", "IN_PROGRESS", "COMPLETED", "SETTLED"].includes(row.status ?? "")) {
     actions.push({ key: "change_status", label: "状态流转", artType: "edit", perm: "module_market:task:update", run: () => opCtx.onChangeStatus(row) });
@@ -274,12 +295,14 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
 });
 
 async function loadOptions() {
-  const [projectRes, templateRes] = await Promise.all([
+  const [projectRes, templateRes, userRes] = await Promise.all([
     ProjectAPI.listProject({ page_no: 1, page_size: 100 }),
     TaskTemplateAPI.listTemplate({ page_no: 1, page_size: 100 }),
+    UserAPI.listUser({ page_no: 1, page_size: 100 }),
   ]);
   projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? p.code ?? "" }));
   templateOptions.value = templateRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? t.code ?? "" }));
+  userOptions.value = userRes.data.data.items.map((u) => ({ value: u.id!, label: u.name ?? u.username ?? "" }));
 }
 
 onMounted(async () => {
@@ -333,13 +356,59 @@ async function handleBatchDelete() {
   }
 }
 
-async function publishRow(id: number, taskNo: string) {
+async function publishRow(row: TaskTable) {
+  // 定向分派任务发布前必须指定分派人员
+  if (row.assign_mode !== "open") {
+    openPublishDialog(row);
+    return;
+  }
   try {
-    await ElMessageBox.confirm(`确定发布任务「${taskNo}」吗？发布后任务将进入任务大厅/可被分派。`, "发布任务", { type: "warning" });
-    await TaskAPI.publishTask(id);
+    await ElMessageBox.confirm(`确定发布任务「${row.task_no}」吗？发布后任务将进入任务大厅供 C 端接单。`, "发布任务", { type: "warning" });
+    await TaskAPI.publishTask(row.id!);
     await refreshData();
   } catch {
     // 用户取消
+  }
+}
+
+// ── 定向分派任务发布：指定分派人员 ──
+const publishDialogVisible = ref(false);
+const publishSubmitting = ref(false);
+const publishFormRef = ref<InstanceType<typeof FaForm> | null>(null);
+const publishForm = ref<{ id?: number; task_no?: string; assignee_ids: number[] }>({ id: undefined, task_no: undefined, assignee_ids: [] });
+const userOptions = ref<OptionType[]>([]);
+
+const publishFormItems = computed<FormItem[]>(() => [
+  { label: "任务编号", key: "task_no", type: "input", span: 24, props: { disabled: true } },
+  { label: "分派人员", key: "assignee_ids", type: "select", span: 24, props: { placeholder: "请选择分派人员（可多选）", options: userOptions.value, filterable: true, multiple: true, collapseTags: true, collapseTagsTooltip: true } },
+]);
+
+const publishRules = reactive({
+  assignee_ids: [{ required: true, type: "array", min: 1, message: "请至少选择一名分派人员", trigger: "change" }],
+});
+
+function openPublishDialog(row: TaskTable) {
+  publishForm.value = { id: row.id, task_no: row.task_no, assignee_ids: [] };
+  publishDialogVisible.value = true;
+}
+
+async function handlePublishSubmit() {
+  if (!publishFormRef.value) return;
+  try {
+    await publishFormRef.value.validate();
+  } catch {
+    return;
+  }
+  if (publishForm.value.id == null || publishForm.value.assignee_ids.length === 0) return;
+  publishSubmitting.value = true;
+  try {
+    await TaskAPI.publishTask(publishForm.value.id, { assignee_ids: publishForm.value.assignee_ids });
+    publishDialogVisible.value = false;
+    await refreshData();
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    publishSubmitting.value = false;
   }
 }
 
