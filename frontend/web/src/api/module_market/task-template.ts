@@ -75,7 +75,6 @@ export interface TaskTemplateTable extends BaseType {
 }
 
 export interface TaskTemplateForm extends BaseFormType {
-  code?: string;
   name?: string;
   category_id?: number;
   config?: TaskConfig;

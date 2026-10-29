@@ -113,7 +113,7 @@ const templateOptions = ref<OptionType[]>([]);
 const templateMap = ref<Record<number, string>>({});
 
 const searchItems = computed<SearchFormItem[]>(() => [
-  { label: "项目编码", key: "code", type: "input", placeholder: "请输入项目编码", clearable: true, span: 6 },
+  { label: "项目编号", key: "code", type: "input", placeholder: "请输入项目编号", clearable: true, span: 6 },
   { label: "项目名", key: "name", type: "input", placeholder: "请输入项目名", clearable: true, span: 6 },
   { label: "委托方", key: "company_id", type: "select", props: { placeholder: "请选择医药公司", options: companyOptions.value, filterable: true, clearable: true }, span: 6 },
   { label: "周期", key: "period", type: "input", placeholder: "如 2026-10", clearable: true, span: 6 },
@@ -156,7 +156,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
       columnsFactory: resolveStatusColumns<ProjectTable>(() => [
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
-        { prop: "code", label: "项目编码", minWidth: 120, showOverflowTooltip: true },
+        { prop: "code", label: "项目编号", minWidth: 120, showOverflowTooltip: true },
         { prop: "name", label: "项目名", minWidth: 150, showOverflowTooltip: true },
         { prop: "company", label: "委托方", minWidth: 150, formatter: (row: ProjectTable) => row.company?.name ?? "—" },
         { prop: "period", label: "周期", width: 90 },
@@ -169,7 +169,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 
 const detailFormData = ref<Partial<ProjectTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "项目编码", prop: "code" },
+  { label: "项目编号", prop: "code" },
   { label: "项目名", prop: "name" },
   { label: "委托方", prop: "company.name" },
   { label: "周期", prop: "period" },
@@ -179,22 +179,20 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "创建时间", prop: "created_time" },
 ];
 
-const formData = ref<ProjectForm>({ id: undefined, code: undefined, name: undefined, company_id: undefined, period: undefined, template_ids: undefined });
+const formData = ref<ProjectForm>({ id: undefined, name: undefined, company_id: undefined, period: undefined, template_ids: undefined });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: ProjectForm = { id: undefined, code: undefined, name: undefined, company_id: undefined, period: undefined, template_ids: undefined };
+const initialFormData: ProjectForm = { id: undefined, name: undefined, company_id: undefined, period: undefined, template_ids: undefined };
 
 const rules = reactive({
-  code: [{ required: true, message: "请输入项目编码", trigger: "blur" }],
   name: [{ required: true, message: "请输入项目名", trigger: "blur" }],
   company_id: [{ required: true, message: "请选择委托方", trigger: "change" }],
   period: [{ required: true, message: "请输入周期", trigger: "blur" }],
 });
 
 const formItems = computed<FormItem[]>(() => [
-  { label: "项目编码", key: "code", type: "input", span: 24, props: { placeholder: "唯一编码", maxlength: 64 } },
   { label: "项目名", key: "name", type: "input", span: 24, props: { placeholder: "项目名称", maxlength: 128 } },
   { label: "委托方", key: "company_id", type: "select", span: 24, props: { placeholder: "请选择医药公司", options: companyOptions.value, filterable: true } },
   { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "项目周期，如 2026 全年", maxlength: 16 } },

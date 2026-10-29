@@ -136,7 +136,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "name", label: "公司名称", minWidth: 160, showOverflowTooltip: true },
-        { prop: "code", label: "公司编码", minWidth: 120, showOverflowTooltip: true },
+        { prop: "code", label: "公司编号", minWidth: 120, showOverflowTooltip: true },
         { prop: "credit_code", label: "统一社会信用代码", minWidth: 180, showOverflowTooltip: true },
         { prop: "contact", label: "联系人", width: 100, showOverflowTooltip: true },
         { prop: "contact_phone", label: "联系电话", width: 140, showOverflowTooltip: true },
@@ -150,7 +150,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 const detailFormData = ref<Partial<CompanyTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
   { label: "公司名称", prop: "name" },
-  { label: "公司编码", prop: "code" },
+  { label: "公司编号", prop: "code" },
   { label: "统一社会信用代码", prop: "credit_code" },
   { label: "联系人", prop: "contact" },
   { label: "联系电话", prop: "contact_phone" },
@@ -161,18 +161,17 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "备注", prop: "description", span: 4 },
 ];
 
-const formData = ref<CompanyForm>({ id: undefined, name: undefined, code: undefined, credit_code: undefined, contact: undefined, contact_phone: undefined, address: undefined, status: 0, description: undefined });
+const formData = ref<CompanyForm>({ id: undefined, name: undefined, credit_code: undefined, contact: undefined, contact_phone: undefined, address: undefined, status: 0, description: undefined });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: CompanyForm = { id: undefined, name: undefined, code: undefined, credit_code: undefined, contact: undefined, contact_phone: undefined, address: undefined, status: 0, description: undefined };
+const initialFormData: CompanyForm = { id: undefined, name: undefined, credit_code: undefined, contact: undefined, contact_phone: undefined, address: undefined, status: 0, description: undefined };
 
 const rules = reactive({ name: [{ required: true, message: "请输入公司名称", trigger: "blur" }] });
 
 const formItems = computed<FormItem[]>(() => [
   { label: "公司名称", key: "name", type: "input", span: 24, props: { placeholder: "请输入公司名称", maxlength: 128 } },
-  { label: "公司编码", key: "code", type: "input", span: 24, props: { placeholder: "请输入公司编码", maxlength: 64 } },
   { label: "统一社会信用代码", key: "credit_code", type: "input", span: 24, props: { placeholder: "请输入统一社会信用代码", maxlength: 32 } },
   { label: "联系人", key: "contact", type: "input", span: 24, props: { placeholder: "请输入联系人", maxlength: 32 } },
   { label: "联系电话", key: "contact_phone", type: "input", span: 24, props: { placeholder: "请输入联系电话", maxlength: 20 } },

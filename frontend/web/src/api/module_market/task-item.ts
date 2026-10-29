@@ -73,7 +73,6 @@ export interface TaskItemTable extends BaseType {
 }
 
 export interface TaskItemForm extends BaseFormType {
-  code?: string;
   name?: string;
   template_id?: number;
   config?: TaskItemConfig;

@@ -272,7 +272,7 @@ const { columns, columnChecks } = useTableColumns<CatalogRow>(() => [
     align: "center",
     formatter: (row: CatalogRow) => ({ category: "分类", template: "模板", item: "任务" }[nodeType(row)]),
   },
-  { prop: "code", label: "编码", minWidth: 160, showOverflowTooltip: true, formatter: (row: CatalogRow) => row.code ?? "—" },
+  { prop: "code", label: "编号", minWidth: 160, showOverflowTooltip: true, formatter: (row: CatalogRow) => row.code ?? "—" },
   {
     prop: "subject_type",
     label: "采集对象",
@@ -351,22 +351,20 @@ const categoryDialogMode = ref<"create" | "update">("create");
 const categorySubmitting = ref(false);
 const categoryEditId = ref<number | null>(null);
 const categoryFormRef = ref<InstanceType<typeof FaForm> | null>(null);
-const categoryForm = ref<TaskCategoryForm>({ id: undefined, code: undefined, name: undefined, sort: 0, description: undefined });
+const categoryForm = ref<TaskCategoryForm>({ id: undefined, name: undefined, sort: 0, description: undefined });
 
 const categoryRules = reactive({
-  code: [{ required: true, message: "请输入分类编码", trigger: "blur" }],
   name: [{ required: true, message: "请输入分类名", trigger: "blur" }],
 });
 
 const categoryFormItems: import("@/components/forms/fa-form/index.vue").FormItem[] = [
-  { label: "分类编码", key: "code", type: "input", span: 24, props: { placeholder: "如 business_management", maxlength: 64 } },
   { label: "分类名", key: "name", type: "input", span: 24, props: { placeholder: "如 商务管理服务", maxlength: 128 } },
   { label: "排序", key: "sort", type: "number", span: 24, props: { min: 0, controlsPosition: "right", placeholder: "越小越靠前" } },
   { label: "描述", key: "description", type: "input", span: 24, props: { type: "textarea", rows: 3, maxlength: 255, showWordLimit: true, placeholder: "分类描述（可选）" } },
 ];
 
 function resetCategoryForm() {
-  categoryForm.value = { id: undefined, code: undefined, name: undefined, sort: 0, description: undefined };
+  categoryForm.value = { id: undefined, name: undefined, sort: 0, description: undefined };
   categoryEditId.value = null;
 }
 
@@ -379,7 +377,7 @@ function openCategoryCreate() {
 function openCategoryEdit(row: CategoryNode) {
   categoryDialogMode.value = "update";
   categoryEditId.value = row.id!;
-  categoryForm.value = { id: row.id, code: row.code, name: row.name, sort: row.sort ?? 0, description: row.description ?? undefined };
+  categoryForm.value = { id: row.id, name: row.name, sort: row.sort ?? 0, description: row.description ?? undefined };
   categoryDialogVisible.value = true;
 }
 
@@ -418,7 +416,6 @@ async function deleteCategoryRow(row: CategoryNode) {
 
 // ── 二级模板 CRUD ──
 interface TemplateEditForm {
-  code?: string;
   name?: string;
   category_id?: number;
   enabled?: boolean;
@@ -441,7 +438,6 @@ const templateForm = ref<TemplateEditForm>({});
 
 function blankTemplateForm(): TemplateEditForm {
   return {
-    code: undefined,
     name: undefined,
     category_id: undefined,
     enabled: true,
@@ -491,7 +487,6 @@ const PRICING_MODE_OPTIONS: OptionType[] = [
 ];
 
 const templateRules = reactive({
-  code: [{ required: true, message: "请输入模板编码", trigger: "blur" }],
   name: [{ required: true, message: "请输入模板名", trigger: "blur" }],
   category_id: [{ required: true, message: "请选择分类", trigger: "change" }],
   subject_type: [{ required: true, message: "请选择采集对象", trigger: "change" }],
@@ -500,7 +495,6 @@ const templateRules = reactive({
 });
 
 const templateFormItems: import("@/components/forms/fa-form/index.vue").FormItem[] = [
-  { label: "模板编码", key: "code", type: "input", span: 12, props: { placeholder: "如 grade_hospital_manage", maxlength: 64 } },
   { label: "模板名", key: "name", type: "input", span: 12, props: { placeholder: "如 等级医疗管理", maxlength: 128 } },
   { label: "一级分类", key: "category_id", type: "select", span: 12, props: { placeholder: "请选择分类", options: categoryOptions.value, filterable: true } },
   { label: "是否启用", key: "enabled", type: "switch", span: 12 },
@@ -527,7 +521,6 @@ async function openTemplateEdit(row: TemplateNode) {
   templateDialogMode.value = "update";
   templateEditId.value = row.id!;
   templateForm.value = blankTemplateForm();
-  templateForm.value.code = tpl.code;
   templateForm.value.name = tpl.name;
   templateForm.value.category_id = tpl.category_id;
   templateForm.value.enabled = tpl.enabled ?? true;
@@ -545,7 +538,6 @@ async function handleTemplateSubmit() {
   templateSubmitting.value = true;
   try {
     const payload = {
-      code: templateForm.value.code,
       name: templateForm.value.name,
       category_id: templateForm.value.category_id,
       enabled: templateForm.value.enabled,
@@ -577,7 +569,6 @@ async function deleteTemplateRow(row: TemplateNode) {
 
 // ── 三级任务 CRUD ──
 interface ItemEditForm {
-  code?: string;
   name?: string;
   template_id?: number;
   enabled?: boolean;
@@ -597,7 +588,6 @@ const itemForm = ref<ItemEditForm>({});
 
 function blankItemForm(): ItemEditForm {
   return {
-    code: undefined,
     name: undefined,
     template_id: undefined,
     enabled: true,
@@ -615,12 +605,10 @@ function resetItemForm() {
 }
 
 const itemRules = reactive({
-  code: [{ required: true, message: "请输入任务编码", trigger: "blur" }],
   name: [{ required: true, message: "请输入任务名", trigger: "blur" }],
 });
 
 const itemFormItems: import("@/components/forms/fa-form/index.vue").FormItem[] = [
-  { label: "任务编码", key: "code", type: "input", span: 12, props: { placeholder: "如 delivery_coordination", maxlength: 64 } },
   { label: "任务名", key: "name", type: "input", span: 12, props: { placeholder: "如 配送协调", maxlength: 128 } },
   { label: "是否启用", key: "enabled", type: "switch", span: 12 },
   { label: "计价单位", key: "unit", type: "input", span: 12, props: { placeholder: "覆盖模板级，如 元/月/家", maxlength: 32 } },
@@ -643,7 +631,6 @@ async function openItemEdit(row: ItemNode) {
   itemDialogMode.value = "update";
   itemEditId.value = row.id!;
   itemForm.value = blankItemForm();
-  itemForm.value.code = it.code;
   itemForm.value.name = it.name;
   itemForm.value.template_id = it.template_id;
   itemForm.value.enabled = it.enabled ?? true;
@@ -675,7 +662,6 @@ async function handleItemSubmit() {
   itemSubmitting.value = true;
   try {
     const payload: TaskItemForm = {
-      code: itemForm.value.code,
       name: itemForm.value.name,
       template_id: itemForm.value.template_id,
       enabled: itemForm.value.enabled,
@@ -709,7 +695,7 @@ async function deleteItemRow(row: ItemNode) {
 const templateDetailVisible = ref(false);
 const templateDetailData = ref<Partial<TaskTemplateTable>>({});
 const templateDetailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "模板编码", prop: "code" },
+  { label: "模板编号", prop: "code" },
   { label: "模板名", prop: "name" },
   { label: "分类", prop: "category.name" },
   { label: "启用", prop: "enabled" },
@@ -733,7 +719,7 @@ async function openTemplateDetail(id: number) {
 const categoryDetailVisible = ref(false);
 const categoryDetailData = ref<Partial<TaskCategoryTable>>({});
 const categoryDetailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "分类编码", prop: "code" },
+  { label: "分类编号", prop: "code" },
   { label: "分类名", prop: "name" },
   { label: "排序", prop: "sort" },
   { label: "描述", prop: "description", span: 2 },
@@ -749,7 +735,7 @@ function openCategoryDetail(row: CategoryNode) {
 const itemDetailVisible = ref(false);
 const itemDetailData = ref<Partial<TaskItemTable>>({});
 const itemDetailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "任务编码", prop: "code" },
+  { label: "任务编号", prop: "code" },
   { label: "任务名", prop: "name" },
   { label: "排序", prop: "sort" },
   { label: "计价单位", prop: "config.unit" },

@@ -101,7 +101,6 @@ export interface ProjectTable extends BaseType {
 }
 
 export interface ProjectForm extends BaseFormType {
-  code?: string;
   name?: string;
   company_id?: number;
   period?: string;

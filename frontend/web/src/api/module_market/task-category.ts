@@ -68,7 +68,6 @@ export interface TaskCategoryTable extends BaseType {
 }
 
 export interface TaskCategoryForm extends BaseFormType {
-  code?: string;
   name?: string;
   sort?: number;
   description?: string | null;

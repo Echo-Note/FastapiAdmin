@@ -64,7 +64,6 @@ export interface CompanyTable extends BaseType {
 
 export interface CompanyForm extends BaseFormType {
   name?: string;
-  code?: string;
   credit_code?: string;
   contact?: string;
   contact_phone?: string;

@@ -166,7 +166,7 @@ const projectOptions = ref<OptionType[]>([]);
 const templateOptions = ref<OptionType[]>([]);
 
 const searchItems = computed<SearchFormItem[]>(() => [
-  { label: "任务号", key: "task_no", type: "input", placeholder: "请输入任务号", clearable: true, span: 6 },
+  { label: "任务编号", key: "task_no", type: "input", placeholder: "请输入任务编号", clearable: true, span: 6 },
   { label: "显示名", key: "name", type: "input", placeholder: "请输入任务显示名", clearable: true, span: 6 },
   { label: "项目", key: "project_id", type: "select", props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true, clearable: true }, span: 6 },
   { label: "模板", key: "template_id", type: "select", props: { placeholder: "请选择模板", options: templateOptions.value, filterable: true, clearable: true }, span: 6 },
@@ -208,7 +208,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
       columnsFactory: () => [
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
-        { prop: "task_no", label: "任务号", minWidth: 120, showOverflowTooltip: true },
+        { prop: "task_no", label: "任务编号", minWidth: 120, showOverflowTooltip: true },
         { prop: "name", label: "显示名", minWidth: 180, showOverflowTooltip: true },
         { prop: "template", label: "任务模板", minWidth: 140, formatter: (row: TaskTable) => row.template?.name ?? "—" },
         { prop: "period", label: "周期", width: 90 },
@@ -222,7 +222,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 
 const detailFormData = ref<Partial<TaskTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "任务号", prop: "task_no" },
+  { label: "任务编号", prop: "task_no" },
   { label: "显示名", prop: "name" },
   { label: "任务模板", prop: "template.name" },
   { label: "项目", prop: "project_id", slot: "projectName" },
@@ -356,7 +356,7 @@ const statusFormItems = computed<FormItem[]>(() => {
   const curIdx = STATUS_FLOW.indexOf(cur as (typeof STATUS_FLOW)[number]);
   const next = curIdx >= 0 ? STATUS_FLOW.slice(curIdx + 1) : [];
   return [
-    { label: "任务号", key: "task_no", type: "input", span: 24, props: { disabled: true } },
+    { label: "任务编号", key: "task_no", type: "input", span: 24, props: { disabled: true } },
     { label: "当前状态", key: "status", type: "input", span: 24, props: { disabled: true } },
     { label: "流转到", key: "target_status", type: "select", span: 24, props: { placeholder: "请选择目标状态", options: next.map((s) => ({ value: s, label: taskStatusMap.value[s]?.text ?? s })) } },
   ];
