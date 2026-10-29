@@ -3,8 +3,8 @@ import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
-import { ASSIGNMENT_STATUS_MAP, statusMeta } from '@/constants'
 import { useMarketListPage } from '@/composables/useMarketListPage'
+import { ASSIGNMENT_STATUS_MAP, statusMeta } from '@/constants'
 
 definePage({ name: 'market-my-task', style: { navigationBarTitleText: '我的任务', enablePullDownRefresh: true } })
 
@@ -51,6 +51,18 @@ function statusInfo(status?: string) {
   return statusMeta(ASSIGNMENT_STATUS_MAP, status)
 }
 
+/** 状态语义色 → 卡片左侧色条颜色 */
+const STATUS_BAR_COLOR: Record<string, string> = {
+  info: 'var(--wot-grey-6)',
+  primary: 'var(--wot-primary-6)',
+  warning: 'var(--wot-warning-6)',
+  success: 'var(--wot-success-6)',
+  danger: 'var(--wot-danger-6)',
+}
+function barColor(status?: string) {
+  return STATUS_BAR_COLOR[statusInfo(status).type] ?? 'var(--wot-grey-6)'
+}
+
 function handleTabChange(e: { index: number }) {
   activeStatus.value = TAB_OPTIONS[e.index]?.value
   toFirst()
@@ -89,29 +101,82 @@ onLoad(() => loadData())
     <template v-else>
       <view class="px-3 pt-3">
         <wd-empty v-if="!loading && list.length === 0" :tip="t('market.emptyMyTask')" />
-        <view v-else class="flex flex-col gap-3">
-          <view
-            v-for="item in list"
-            :key="item.id"
-            class="rounded-2 bg-white p-4 shadow-sm"
-            @click="goDetail(item)"
-          >
-            <view class="flex items-center justify-between">
-              <wd-text class="wot-text-text-main text-4 font-medium" :text="item.task?.name ?? '-'" />
+        <view
+          v-for="item in list"
+          :key="item.id"
+          class="my-card"
+          hover-class="my-card--active"
+          @click="goDetail(item)"
+        >
+          <view class="my-card__bar" :style="{ background: barColor(item.status) }" />
+          <view class="my-card__body">
+            <view class="flex items-center justify-between gap-2">
+              <view class="my-card__title">
+                {{ item.task?.name ?? '-' }}
+              </view>
               <wd-tag :type="statusInfo(item.status).type" plain :title="statusInfo(item.status).label" />
             </view>
-            <view class="mt-2 flex items-center gap-3">
-              <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.task?.period ?? '-'}`" />
-            </view>
-            <view class="mt-3 flex items-center justify-end">
-              <wd-icon name="arrow-right" size="18px" custom-class="wot-text-text-secondary" />
+            <view class="mt-2 flex flex-wrap items-center gap-2">
+              <view class="my-card__meta">
+                {{ t('market.period') }} {{ item.task?.period ?? '-' }}
+              </view>
             </view>
           </view>
         </view>
       </view>
       <wd-loading v-if="loading && list.length > 0" size="20px" class="mx-auto my-2 block" />
-      <wd-text v-else-if="total > 0 && list.length >= total" class="wot-text-text-auxiliary my-2 block text-center text-2.5" :text="t('common.noMore')" />
+      <view v-else-if="total > 0 && list.length >= total" class="wot-text-text-auxiliary my-2 text-center text-2.5">
+        {{ t('common.noMore') }}
+      </view>
       <wd-gap height="100rpx" safe-area-bottom />
     </template>
   </view>
 </template>
+
+<style lang="scss" scoped>
+.my-card {
+  display: flex;
+  align-items: stretch;
+  gap: 20rpx;
+  padding: 28rpx 24rpx 28rpx 20rpx;
+  margin-bottom: 20rpx;
+  background: var(--wot-bg-filled-oppo, #fff);
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+  transition: transform 0.15s ease;
+}
+
+.my-card--active {
+  transform: scale(0.98);
+}
+
+.my-card__bar {
+  width: 8rpx;
+  flex-shrink: 0;
+  border-radius: 8rpx;
+}
+
+.my-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.my-card__title {
+  overflow: hidden;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--wot-text-main);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-card__meta {
+  padding: 4rpx 14rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--wot-text-secondary);
+  background: var(--wot-filled-content, #f2f3f5);
+  border-radius: 8rpx;
+}
+</style>

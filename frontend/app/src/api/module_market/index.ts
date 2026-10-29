@@ -72,6 +72,17 @@ export interface TaskItemConfig {
   max_per_month?: number | null
 }
 
+/** 三级任务（对齐后端 TaskItemOutSchema） */
+export interface TaskItemDetail {
+  id?: number
+  code?: string
+  name?: string
+  template_id?: number
+  config?: TaskItemConfig | null
+  sort?: number
+  enabled?: boolean
+}
+
 /** 一级任务分类（对齐后端 TaskCategoryOutSchema） */
 export interface TaskCategoryItem {
   id?: number
@@ -90,6 +101,8 @@ export interface TaskTemplateItem {
   category?: TaskCategoryItem | null
   config?: TaskConfig | null
   enabled?: boolean
+  /** 其下三级任务（对齐后端 TaskTemplateOutSchema.items） */
+  items?: TaskItemDetail[]
 }
 
 /** 任务实例（对齐后端 TaskOutSchema） */
@@ -159,7 +172,12 @@ export interface PayoutSummary {
 export const MarketAPI = {
   /** 任务大厅：公开接单任务列表 */
   getTaskHall(params?: Record<string, any>) {
-    return http.Get<MarketPageResult<TaskItem>>(`${MARKET_BASE}/mini/tasks`, params)
+    return http.Get<MarketPageResult<TaskItem>>(`${MARKET_BASE}/mini/tasks`, { params })
+  },
+
+  /** 任务详情（单条） */
+  getTaskDetail(taskId: number): Promise<TaskItem> {
+    return http.Get(`${MARKET_BASE}/mini/tasks/${taskId}`)
   },
 
   /** 大厅接单：公开任务由用户自行接单 */
@@ -169,7 +187,12 @@ export const MarketAPI = {
 
   /** 我的任务：当前用户的全部任务分派 */
   getMyAssignments(params?: Record<string, any>) {
-    return http.Get<MarketPageResult<AssignmentItem>>(`${MARKET_BASE}/mini/assignments`, params)
+    return http.Get<MarketPageResult<AssignmentItem>>(`${MARKET_BASE}/mini/assignments`, { params })
+  },
+
+  /** 任务分派详情（单条，含 task 内嵌） */
+  getAssignmentDetail(assignmentId: number): Promise<AssignmentItem> {
+    return http.Get(`${MARKET_BASE}/mini/assignments/${assignmentId}`)
   },
 
   /** 接收任务（定向分派） */
@@ -189,13 +212,13 @@ export const MarketAPI = {
 
   /** 我的成果列表 */
   getMySubmissions(params?: Record<string, any>) {
-    return http.Get<MarketPageResult<SubmissionItem>>(`${MARKET_BASE}/mini/submissions`, params)
+    return http.Get<MarketPageResult<SubmissionItem>>(`${MARKET_BASE}/mini/submissions`, { params })
   },
 
   /** 我的发放额度/津贴 */
   getMyPayout(period: string) {
     const params: Record<string, any> = { period }
-    const method = http.Get<PayoutSummary>(`${MARKET_BASE}/mini/payout`, params)
+    const method = http.Get<PayoutSummary>(`${MARKET_BASE}/mini/payout`, { params })
     method.config.cacheFor = 0
     return method
   },

@@ -42,12 +42,15 @@ const { list, total, loading, loadData, refreshData, loadNext } = useMarketListP
   onError: () => toast.error(t('common.loadFailed')),
 })
 
-/** 单价（取自模板 config.price） */
-function priceText(item: HallTaskItem) {
+/** 单价（模板 config.price，仅数字） */
+function amountText(item: HallTaskItem) {
   const price = item.template?.config?.price
-  if (price == null)
-    return '—'
-  return `¥${Number(price).toFixed(2)}`
+  return price == null ? '' : Number(price).toFixed(2)
+}
+
+/** 计价单位 */
+function unitText(item: HallTaskItem) {
+  return item.template?.config?.unit ?? ''
 }
 
 /** 分配方式文案 */
@@ -84,35 +87,114 @@ onLoad(() => loadData())
     <template v-else>
       <view class="px-3 pt-3">
         <wd-empty v-if="!loading && list.length === 0" :tip="t('market.emptyTaskHall')" />
-        <wd-cell-group v-else border custom-class="rounded-2! overflow-hidden">
-          <view
-            v-for="item in list"
-            :key="item.id"
-            class="border-b border-gray-100 bg-white px-4 py-3 last:border-b-0"
-            @click="goDetail(item)"
-          >
-            <view class="flex items-start justify-between gap-2">
-              <view class="min-w-0 flex-1">
-                <view class="flex items-center gap-2">
-                  <wd-text class="wot-text-text-main text-4 font-medium" :text="item.name ?? item.task_no ?? ''" />
-                  <wd-tag type="primary" plain :title="assignModeText(item)" />
-                </view>
-                <view class="mt-1 flex items-center gap-3">
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${item.period ?? '-'}`" />
-                  <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.unitPrice')} ${priceText(item)}`" />
-                </view>
+        <view
+          v-for="item in list"
+          :key="item.id"
+          class="hall-card"
+          hover-class="hall-card--active"
+          @click="goDetail(item)"
+        >
+          <view class="hall-card__bar" />
+          <view class="hall-card__body">
+            <view class="hall-card__title">
+              {{ item.name ?? item.task_no ?? '' }}
+            </view>
+            <view class="mt-2 flex flex-wrap items-center gap-2">
+              <view class="hall-card__meta">
+                {{ t('market.period') }} {{ item.period ?? '-' }}
               </view>
-              <view class="flex flex-col items-end gap-2">
-                <wd-text class="wot-text-error-main text-4 font-semibold" :text="priceText(item)" />
-                <wd-icon name="arrow-right" size="18px" custom-class="wot-text-text-secondary" />
+              <view class="hall-card__meta">
+                {{ assignModeText(item) }}
               </view>
             </view>
           </view>
-        </wd-cell-group>
+          <view class="hall-card__price">
+            <view class="hall-card__amount">
+              <text class="text-3">
+                ¥
+              </text>{{ amountText(item) || '—' }}
+            </view>
+            <view v-if="unitText(item)" class="hall-card__unit">
+              / {{ unitText(item) }}
+            </view>
+          </view>
+        </view>
       </view>
       <wd-loading v-if="loading && list.length > 0" size="20px" class="mx-auto my-2 block" />
-      <wd-text v-else-if="total > 0 && list.length >= total" class="wot-text-text-auxiliary my-2 block text-center text-2.5" :text="t('common.noMore')" />
+      <view v-else-if="total > 0 && list.length >= total" class="wot-text-text-auxiliary my-2 text-center text-2.5">
+        {{ t('common.noMore') }}
+      </view>
       <wd-gap height="100rpx" safe-area-bottom />
     </template>
   </view>
 </template>
+
+<style lang="scss" scoped>
+.hall-card {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 28rpx 24rpx 28rpx 20rpx;
+  margin-bottom: 20rpx;
+  background: var(--wot-bg-filled-oppo, #fff);
+  border-radius: 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(15, 23, 42, 0.04);
+  transition: transform 0.15s ease;
+}
+
+.hall-card--active {
+  transform: scale(0.98);
+}
+
+.hall-card__bar {
+  width: 8rpx;
+  height: 72rpx;
+  flex-shrink: 0;
+  border-radius: 8rpx;
+  background: linear-gradient(180deg, var(--wot-primary-6), var(--wot-primary-4));
+}
+
+.hall-card__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hall-card__title {
+  overflow: hidden;
+  font-size: 32rpx;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--wot-text-main);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hall-card__meta {
+  padding: 4rpx 14rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--wot-text-secondary);
+  background: var(--wot-filled-content, #f2f3f5);
+  border-radius: 8rpx;
+}
+
+.hall-card__price {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.hall-card__amount {
+  font-size: 36rpx;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--wot-primary-6);
+  white-space: nowrap;
+}
+
+.hall-card__unit {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+  color: var(--wot-text-auxiliary);
+}
+</style>

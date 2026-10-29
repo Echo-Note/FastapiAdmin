@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { AssignmentItem, TaskItem } from '@/api/module_market'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -6,31 +7,6 @@ import { MarketAPI } from '@/api/module_market'
 import { ASSIGNMENT_STATUS_MAP, statusMeta } from '@/constants'
 
 definePage({ name: 'market-task-detail', style: { navigationBarTitleText: '任务详情' } })
-
-/** 任务详情（对齐后端 TaskOutSchema：name 为 C 端显示名，config 挂模板） */
-interface DetailTaskItem {
-  id?: number
-  task_no?: string
-  name?: string
-  period?: string
-  assign_mode?: string
-  template?: {
-    id?: number
-    name?: string
-    config?: {
-      unit?: string
-      price?: number | null
-      exec_standard?: string | null
-    } | null
-  } | null
-}
-
-/** 分派单（我的任务入口，含 task 摘要） */
-interface DetailAssignmentItem {
-  id?: number
-  status?: string
-  task?: DetailTaskItem | null
-}
 
 /** 分配方式本地映射 */
 const ASSIGN_MODE_LABEL: Record<string, string> = {
@@ -46,20 +22,20 @@ const router = useRouter()
 const assignmentId = ref<number>()
 const taskId = ref<number>()
 
-const task = ref<DetailTaskItem | null>(null)
+const task = ref<TaskItem | null>(null)
 const assignmentStatus = ref<string>()
 const loading = ref(false)
 const loadFailed = ref(false)
 const acting = ref(false)
 
-/** 单价（模板 config.price） */
-const priceText = computed(() => {
+/** 单价（模板 config.price，仅数字） */
+const amountText = computed(() => {
   const price = task.value?.template?.config?.price
-  return price == null ? '—' : `¥${Number(price).toFixed(2)}`
+  return price == null ? '' : Number(price).toFixed(2)
 })
 
 /** 计价单位 */
-const unitText = computed(() => task.value?.template?.config?.unit ?? '-')
+const unitText = computed(() => task.value?.template?.config?.unit ?? '')
 
 /** 是否为「我的任务」入口（有分派实例） */
 const fromMine = computed(() => assignmentId.value != null)
@@ -77,7 +53,7 @@ const canAccept = computed(() => assignmentStatus.value === 'PENDING')
 const canClaim = computed(() => !fromMine.value && task.value != null)
 
 /** 执行标准（取自模板 config.exec_standard） */
-const execStandard = computed(() => task.value?.template?.config?.exec_standard ?? '-')
+const execStandard = computed(() => task.value?.template?.config?.exec_standard || '-')
 
 /** 分配方式文案 */
 const assignModeLabel = computed(() => ASSIGN_MODE_LABEL[task.value?.assign_mode ?? ''] ?? task.value?.assign_mode ?? '-')
@@ -90,20 +66,14 @@ async function load() {
   loadFailed.value = false
   try {
     if (assignmentId.value != null) {
-      // 我的任务入口：从我的任务列表现取分派实例（含 task 摘要 + 状态）
-      const res = await MarketAPI.getMyAssignments({ page_no: 1, page_size: 100 })
-      const items = (res as any).items as DetailAssignmentItem[] ?? []
-      const found = items.find(i => String(i.id) === String(assignmentId.value))
-      if (found) {
-        task.value = (found.task as DetailTaskItem) ?? null
-        assignmentStatus.value = found.status
-      }
+      // 我的任务入口：直接取分派单详情（含内嵌 task + 状态）
+      const detail: AssignmentItem = await MarketAPI.getAssignmentDetail(assignmentId.value)
+      assignmentStatus.value = detail.status
+      task.value = detail.task ?? null
     }
     else if (taskId.value != null) {
-      // 任务大厅入口：从大厅列表现取任务
-      const res = await MarketAPI.getTaskHall({ page_no: 1, page_size: 100 })
-      const items = (res as any).items as DetailTaskItem[] ?? []
-      task.value = items.find(i => String(i.id) === String(taskId.value)) ?? null
+      // 任务大厅入口：直接取任务详情
+      task.value = await MarketAPI.getTaskDetail(taskId.value)
     }
     if (!task.value)
       loadFailed.value = true
@@ -141,7 +111,7 @@ async function handleClaim() {
   const confirmed = await new Promise<boolean>((resolve) => {
     uni.showModal({
       title: t('common.title'),
-      content: `${t('market.claimConfirm')}\n${task.value?.name ?? task.value?.task_no ?? ''} · ${priceText.value}`,
+      content: `${t('market.claimConfirm')}\n${task.value?.name ?? task.value?.task_no ?? ''} · ¥${amountText.value || '—'}`,
       success: res => resolve(res.confirm),
       fail: () => resolve(false),
     })
@@ -186,65 +156,128 @@ onLoad((query) => {
 <template>
   <view class="page-wraper">
     <view class="px-3 py-3">
-      <wd-loading v-if="loading" class="my-6 block" />
+      <!-- 骨架屏 -->
+      <view v-if="loading" class="space-y-3">
+        <view class="bg-skeleton h-44 rounded-3" />
+        <view class="bg-skeleton h-40 rounded-3" />
+      </view>
 
-      <template v-else-if="loadFailed">
-        <view class="flex flex-col items-center rounded-2 bg-white py-10">
-          <wd-icon name="warn-bold" size="48px" custom-class="mb-3" />
-          <wd-text class="wot-text-text-auxiliary text-3" :text="t('common.loadFailed')" />
-          <wd-button type="primary" size="small" class="mt-4" @click="load">
-            {{ t('common.retry') }}
-          </wd-button>
+      <!-- 加载失败 -->
+      <view v-else-if="loadFailed" class="wot-bg-filled-oppo flex flex-col items-center rounded-3 py-12">
+        <wd-icon name="warn-bold" size="48px" custom-class="mb-3" />
+        <view class="wot-text-text-auxiliary text-3">
+          {{ t('common.loadFailed') }}
         </view>
-      </template>
+        <wd-button type="primary" size="small" class="mt-5" @click="load">
+          {{ t('common.retry') }}
+        </wd-button>
+      </view>
 
-      <template v-else-if="task">
-        <!-- 任务名 + 状态 -->
-        <view class="rounded-2 bg-white p-4">
+      <!-- 空态 -->
+      <view v-else-if="!task" class="wot-bg-filled-oppo flex flex-col items-center rounded-3 py-12">
+        <view class="wot-text-text-auxiliary text-3">
+          {{ t('market.emptyTaskHall') }}
+        </view>
+        <wd-button type="primary" size="small" class="mt-5" @click="goTaskHall">
+          {{ t('market.goTaskHall') }}
+        </wd-button>
+      </view>
+
+      <!-- 任务详情 -->
+      <template v-else>
+        <!-- 头部品牌渐变卡 -->
+        <view class="hero-card relative overflow-hidden rounded-3 px-5 py-6 text-white">
           <view class="flex items-center justify-between">
-            <wd-text class="wot-text-text-main text-5 font-semibold" :text="task.name ?? task.task_no ?? ''" />
-            <wd-tag v-if="fromMine" :type="assignmentStatusInfo.type" plain :title="assignmentStatusInfo.label" />
-            <wd-tag v-else type="primary" plain :title="assignModeLabel" />
+            <view
+              class="rounded-full px-3 py-1 text-2.5 font-medium"
+              style="background: rgba(255,255,255,0.22);"
+            >
+              {{ fromMine ? assignmentStatusInfo.label : assignModeLabel }}
+            </view>
           </view>
-          <view class="mt-2 flex items-center gap-3">
-            <wd-text class="wot-text-text-auxiliary text-2.5" :text="`${t('market.period')} ${task.period ?? '-'}`" />
+          <view class="mt-4 text-5 font-bold leading-snug">
+            {{ task.name ?? task.task_no ?? '' }}
+          </view>
+          <view class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-3" style="opacity: 0.9">
+            <view>{{ t('market.period') }} {{ task.period ?? '-' }}</view>
+            <view v-if="task.task_no">
+              编号 {{ task.task_no }}
+            </view>
           </view>
         </view>
 
-        <!-- 计价与说明 -->
-        <view class="mt-3 rounded-2 bg-white p-4">
-          <wd-cell-group border custom-class="rounded-2! overflow-hidden">
-            <wd-cell :title="t('market.unitPrice')" :value="priceText" value-class="wot-text-error-main!" />
-            <wd-cell title="计价单位" :value="unitText" />
-            <wd-cell :title="t('market.execStandard')" :value="execStandard" :is-link="false" />
-          </wd-cell-group>
+        <!-- 计价与执行标准 -->
+        <view class="wot-bg-filled-oppo mt-3 rounded-3 px-5 py-5">
+          <view class="wot-text-text-auxiliary text-2.5">
+            {{ t('market.unitPrice') }}
+          </view>
+          <view class="mt-2 flex items-baseline gap-1">
+            <text class="wot-text-primary-6 text-3 font-semibold">
+              ¥
+            </text>
+            <text class="wot-text-primary-6 text-7 font-bold">
+              {{ amountText || '—' }}
+            </text>
+            <text v-if="unitText" class="wot-text-text-auxiliary ml-1 text-2.5">
+              / {{ unitText }}
+            </text>
+          </view>
+          <view class="wot-border-border-main mt-4 border-t pt-4">
+            <view class="wot-text-text-auxiliary text-2.5">
+              {{ t('market.execStandard') }}
+            </view>
+            <view class="wot-text-text-main mt-1.5 text-3 leading-relaxed">
+              {{ execStandard }}
+            </view>
+          </view>
         </view>
 
         <!-- 动作条 -->
-        <view class="mt-4">
-          <wd-button v-if="canClaim" block type="primary" :loading="acting" @click="handleClaim">
+        <view class="mt-6">
+          <wd-button v-if="canClaim" block type="primary" size="large" :loading="acting" @click="handleClaim">
             {{ t('market.claim') }}
           </wd-button>
-          <wd-button v-else-if="canAccept" block type="primary" :loading="acting" @click="handleAccept">
+          <wd-button v-else-if="canAccept" block type="primary" size="large" :loading="acting" @click="handleAccept">
             {{ t('market.accept') }}
           </wd-button>
-          <wd-button v-else-if="canSubmit" block type="primary" @click="goSubmit">
+          <wd-button v-else-if="canSubmit" block type="primary" size="large" @click="goSubmit">
             {{ t('market.goSubmit') }}
           </wd-button>
-          <wd-text v-else class="wot-text-text-auxiliary block text-center text-2.5" :text="assignmentStatusInfo.label" />
+          <view v-else class="wot-text-text-auxiliary py-2 text-center text-3">
+            {{ assignmentStatusInfo.label }}
+          </view>
         </view>
       </template>
 
-      <template v-else>
-        <view class="flex flex-col items-center rounded-2 bg-white py-10">
-          <wd-text class="wot-text-text-auxiliary text-3" :text="t('market.emptyTaskHall')" />
-          <wd-button type="primary" size="small" class="mt-4" @click="goTaskHall">
-            {{ t('market.goTaskHall') }}
-          </wd-button>
-        </view>
-      </template>
-
-      <wd-gap height="100rpx" safe-area-bottom />
+      <wd-gap height="120rpx" safe-area-bottom />
     </view>
   </view>
 </template>
+
+<style lang="scss" scoped>
+.hero-card {
+  background: linear-gradient(135deg, var(--wot-primary-6), var(--wot-primary-4));
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.16);
+}
+
+.bg-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--wot-filled-content, #f2f3f5) 25%,
+    var(--wot-filled-oppo, #f7f8fa) 37%,
+    var(--wot-filled-content, #f2f3f5) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.4s ease infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0 50%;
+  }
+}
+</style>

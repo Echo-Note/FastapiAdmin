@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FormSchema, FormSchemaField, TaskItemConfig } from '@/api/module_market'
+import type { FormSchema, FormSchemaField, TaskItemDetail } from '@/api/module_market'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -16,13 +16,8 @@ const taskNo = ref('')
 const formLoading = ref(false)
 const formSchema = ref<FormSchema>([])
 
-/** 三级任务（含任务专属采集字段） */
-interface TaskItemView {
-  code: string
-  name: string
-  config?: TaskItemConfig | null
-}
-const taskItems = ref<TaskItemView[]>([])
+/** 三级任务（含任务专属采集字段，对齐后端 TaskItemOutSchema） */
+const taskItems = ref<TaskItemDetail[]>([])
 
 const period = ref(currentMonth())
 
@@ -32,9 +27,11 @@ function currentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
-/** 完整采集表单分节：三级任务分节已自包含（含继承自模板的通用分节）。
+/**
+ * 完整采集表单分节：三级任务分节已自包含（含继承自模板的通用分节）。
  *  同模板下多个任务都复制了执行信息/管理核实等通用分节，按分节 code 去重只渲染一次；
- *  模板 form_schema 仅作旧数据兜底（分节 code 未被任务覆盖时补充）。 */
+ *  模板 form_schema 仅作旧数据兜底（分节 code 未被任务覆盖时补充）。
+ */
 interface SectionView {
   code: string
   name: string
@@ -279,16 +276,15 @@ async function handleSubmit() {
   }
 }
 
-/** 从「我的任务」现取分派实例以获取 form_schema 与三级任务 */
+/** 直接取分派单详情（含内嵌 task → template → form_schema 与三级任务） */
 async function loadAssignment() {
   formLoading.value = true
   try {
-    const res = await MarketAPI.getMyAssignments({ page_no: 1, page_size: 100 })
-    const list = (res as any).items as Array<{ id?: number; task_no?: string; task?: { name?: string; template?: { config?: { form_schema?: FormSchema } | null; items?: TaskItemView[] | null } | null } | null }> ?? []
-    const found = list.find(i => String(i.id) === String(assignmentId.value))
-    formSchema.value = found?.task?.template?.config?.form_schema ?? []
-    taskItems.value = found?.task?.template?.items ?? []
-    taskNo.value = found?.task?.name ?? found?.task_no ?? ''
+    const detail = await MarketAPI.getAssignmentDetail(assignmentId.value!)
+    const template = detail.task?.template
+    formSchema.value = template?.config?.form_schema ?? []
+    taskItems.value = template?.items ?? []
+    taskNo.value = detail.task?.name ?? detail.task?.task_no ?? ''
   }
   catch {
     formSchema.value = []
@@ -311,11 +307,17 @@ onLoad((query) => {
 <template>
   <view class="page-wraper">
     <view class="px-3 py-3">
-      <wd-cell-group border custom-class="rounded-2! overflow-hidden">
-        <wd-cell :title="taskNo || '提交成果'" :value="t('market.submitResult')" />
-      </wd-cell-group>
+      <!-- 任务名头部 -->
+      <view class="hero-card rounded-3 px-5 py-5 text-white">
+        <view class="text-2.5" style="opacity: 0.85">
+          {{ t('market.submitResult') }}
+        </view>
+        <view class="mt-2 text-4.5 font-semibold leading-snug">
+          {{ taskNo || '—' }}
+        </view>
+      </view>
 
-      <view class="mt-3 rounded-2 bg-white p-4">
+      <view class="wot-bg-filled-oppo mt-3 rounded-3 px-4 py-4">
         <wd-loading v-if="formLoading" class="my-4 block" />
         <wd-form v-if="!formLoading" :model="formData" label-position="left">
           <wd-form-item :label="t('market.period')" required border>
@@ -324,26 +326,45 @@ onLoad((query) => {
 
           <!-- 采集字段：模板通用分节 + 三级任务分节，按分节分组渲染 -->
           <template v-for="section in allSections" :key="section.code">
-            <view class="mt-3 mb-1 flex items-center gap-2">
-              <view class="h-3 w-1 rounded-full bg-blue-500" />
-              <text class="text-sm font-semibold text-gray-800">{{ section.name }}{{ section.required ? '（必填）' : '' }}</text>
+            <view class="mb-1 mt-4 flex items-center gap-2">
+              <view class="wot-bg-primary-6 h-3.5 w-1 rounded-full" />
+              <text class="text-4 font-semibold" style="color: var(--wot-text-main)">
+                {{ section.name }}{{ section.required ? '（必填）' : '' }}
+              </text>
             </view>
 
             <template v-for="(field, fieldName) in section.fields" :key="fieldName">
               <!-- 多行子表字段：按子列渲染行，可增删行 -->
               <view v-if="field.type === 'table'" class="mb-2">
-                <view v-for="(row, rowIndex) in rowsOf(section.code, fieldName)" :key="rowIndex" class="mb-2 rounded-lg bg-gray-50 p-2">
-                  <view class="mb-1 flex items-center justify-between">
-                    <text class="text-xs text-gray-500">{{ field.label }} #{{ rowIndex + 1 }}</text>
-                    <text v-if="rowsOf(section.code, fieldName).length > 1" class="text-xs text-red-500" @click="removeTableRow(section.code, fieldName, rowIndex)">删除行</text>
+                <view
+                  v-for="(row, rowIndex) in rowsOf(section.code, fieldName)"
+                  :key="rowIndex"
+                  class="wot-bg-filled-oppo mb-2 rounded-2 p-3"
+                  style="border: 1rpx solid var(--wot-border-main)"
+                >
+                  <view class="mb-2 flex items-center justify-between">
+                    <text class="text-3 font-medium" style="color: var(--wot-text-main)">
+                      {{ field.label }} #{{ rowIndex + 1 }}
+                    </text>
+                    <text
+                      v-if="rowsOf(section.code, fieldName).length > 1"
+                      class="wot-text-error-main text-2.5"
+                      @click="removeTableRow(section.code, fieldName, rowIndex)"
+                    >
+                      删除行
+                    </text>
                   </view>
-                  <view v-for="col in field.columns ?? []" :key="col.name" class="mb-2 flex items-center gap-2">
-                    <text class="w-20 shrink-0 text-xs text-gray-600">{{ col.label }}</text>
-                    <input v-model="row[col.name]" class="flex-1 rounded bg-white px-2 py-1 text-sm" :placeholder="col.label || ''">
+                  <view v-for="col in field.columns ?? []" :key="col.name" class="mb-2 last:mb-0">
+                    <view class="mb-1 text-2.5" style="color: var(--wot-text-auxiliary)">
+                      {{ col.label }}{{ col.required ? ' *' : '' }}
+                    </view>
+                    <wd-input v-model="row[col.name]" :placeholder="col.placeholder || col.label" />
                   </view>
                 </view>
-                <view class="text-center">
-                  <text class="text-xs text-blue-500" @click="addTableRow(section.code, fieldName, field)">+ 添加一行</text>
+                <view class="py-1 text-center">
+                  <wd-button size="small" type="primary" plain @click="addTableRow(section.code, fieldName, field)">
+                    + {{ field.label }}
+                  </wd-button>
                 </view>
               </view>
 
@@ -364,14 +385,28 @@ onLoad((query) => {
                     mode="aspectFill"
                     class="h-40 w-40 rounded-2 object-cover"
                   />
-                  <view v-else class="flex h-24 items-center justify-center rounded-2 bg-gray-50 text-sm text-gray-400">
-                    {{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '点击上传图片' }}
+                  <view
+                    v-else
+                    class="h-24 flex flex-col items-center justify-center border rounded-2 border-dashed text-2.5"
+                    style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                  >
+                    <view class="text-4">
+                      +
+                    </view>
+                    <view class="mt-1">
+                      {{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '点击上传图片' }}
+                    </view>
                   </view>
                 </view>
                 <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(section.code, fieldName)">
-                  <view class="flex h-12 items-center justify-between rounded-2 bg-gray-50 px-3 text-sm">
-                    <text class="text-gray-600">{{ formData[section.code][fieldName] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
-                    <text class="text-gray-400">{{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '' }}</text>
+                  <view
+                    class="h-12 flex items-center justify-between border rounded-2 border-dashed px-3 text-2.5"
+                    style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                  >
+                    <text>{{ formData[section.code][fieldName] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
+                    <text style="color: var(--wot-text-auxiliary)">
+                      {{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '' }}
+                    </text>
                   </view>
                 </view>
                 <wd-input
@@ -387,12 +422,19 @@ onLoad((query) => {
         <wd-picker :visible="showFieldPicker" :columns="fieldPickerColumns" @confirm="onFieldPickerConfirm" @cancel="showFieldPicker = false" />
       </view>
 
-      <view class="mt-4">
-        <wd-button block type="primary" :loading="submitting" @click="handleSubmit">
+      <view class="mt-5">
+        <wd-button block type="primary" size="large" :loading="submitting" @click="handleSubmit">
           {{ t('market.submit') }}
         </wd-button>
       </view>
-      <wd-gap height="100rpx" safe-area-bottom />
+      <wd-gap height="120rpx" safe-area-bottom />
     </view>
   </view>
 </template>
+
+<style lang="scss" scoped>
+.hero-card {
+  background: linear-gradient(135deg, var(--wot-primary-6), var(--wot-primary-4));
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.16);
+}
+</style>
