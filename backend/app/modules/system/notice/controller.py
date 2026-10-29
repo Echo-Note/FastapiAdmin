@@ -32,7 +32,7 @@ async def get_notice_detail_controller(
 
 @NoticeRouter.get("/list", summary="查询公告", response_model=ResponseSchema[PageResultSchema[NoticeOutSchema]])
 async def get_notice_list_controller(
-    auth: Annotated[AuthSchema, Security(AuthPermission(["module_system:notice:query"]))],
+    auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
     search: Annotated[NoticeQueryParam, Query()],

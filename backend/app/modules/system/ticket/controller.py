@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.response import ResponseSchema, StreamResponse, SuccessResponse
 from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam
-from app.core.dependencies import AuthPermission, db_getter
+from app.core.dependencies import AuthPermission, db_getter, get_current_user
 from app.core.router_class import OperationLogRoute
 from app.utils.common_util import bytes2file_response
 
@@ -18,7 +18,7 @@ TicketRouter = APIRouter(route_class=OperationLogRoute, prefix="/ticket", tags=[
 
 @TicketRouter.get("/stats", summary="工单状态统计", response_model=ResponseSchema[TicketStatsSchema])
 async def ticket_stats_controller(
-    auth: Annotated[AuthSchema, Security(AuthPermission(["module_system:ticket:query"]))],
+    auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
 ) -> JSONResponse:
     result: TicketStatsSchema = await TicketService(auth, db).stats()
@@ -27,7 +27,7 @@ async def ticket_stats_controller(
 
 @TicketRouter.get("/list", summary="工单列表", response_model=ResponseSchema[PageResultSchema[TicketOutSchema]])
 async def ticket_list_controller(
-    auth: Annotated[AuthSchema, Security(AuthPermission(["module_system:ticket:query"]))],
+    auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
     search: Annotated[TicketQueryParam, Query()],

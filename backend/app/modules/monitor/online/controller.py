@@ -62,7 +62,7 @@ async def clear_online_controller(
 async def get_dashboard_stats_controller(
     db: Annotated[AsyncSession, Depends(db_getter)],
     redis: Annotated[Redis, Depends(redis_getter)],
-    _auth: Annotated[AuthSchema, Security(AuthPermission(["module_monitor:dashboard:query"]))],
+    _auth: Annotated[AuthSchema, Security(get_current_user)],
 ) -> JSONResponse:
     data: DashboardStatsSchema = await OnlineService.get_dashboard_stats(db=db, redis=redis)
     return SuccessResponse(data=data, msg="获取仪表盘统计成功")
