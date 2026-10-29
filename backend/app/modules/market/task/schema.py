@@ -20,7 +20,7 @@ class TaskCategoryOutSchema(BaseSchema, UserBySchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="分类唯一编码")
+    code: str = Field(description="分类编号")
     name: str = Field(description="分类名")
     sort: int = Field(default=0, description="排序(越小越靠前)")
     description: str | None = Field(default=None, description="分类描述")
@@ -29,7 +29,6 @@ class TaskCategoryOutSchema(BaseSchema, UserBySchema):
 class TaskCategoryCreateSchema(BaseModel):
     """创建一级任务分类"""
 
-    code: str = Field(min_length=1, max_length=64, description="分类唯一编码")
     name: str = Field(min_length=1, max_length=128, description="分类名")
     sort: int = Field(default=0, description="排序(越小越靠前)")
     description: str | None = Field(default=None, description="分类描述")
@@ -38,7 +37,6 @@ class TaskCategoryCreateSchema(BaseModel):
 class TaskCategoryUpdateSchema(BaseModel):
     """更新一级任务分类"""
 
-    code: str | None = Field(default=None, min_length=1, max_length=64, description="分类唯一编码")
     name: str | None = Field(default=None, min_length=1, max_length=128, description="分类名")
     sort: int | None = Field(default=None, description="排序(越小越靠前)")
     description: str | None = Field(default=None, description="分类描述")
@@ -56,7 +54,7 @@ class TaskTemplateOutSchema(BaseSchema, UserBySchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="模板唯一编码")
+    code: str = Field(description="模板编号")
     name: str = Field(description="模板名")
     category_id: int = Field(description="所属一级分类ID")
     category: TaskCategoryOutSchema | None = Field(default=None, description="所属一级分类")
@@ -70,7 +68,7 @@ class TaskItemOutSchema(BaseSchema, UserBySchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="任务唯一编码")
+    code: str = Field(description="任务编号")
     name: str = Field(description="任务名")
     template_id: int = Field(description="所属二级模板ID")
     config: TaskItemConfig | None = Field(default=None, description="任务设计配置(TaskItemConfig 结构)")
@@ -81,7 +79,6 @@ class TaskItemOutSchema(BaseSchema, UserBySchema):
 class TaskItemCreateSchema(BaseModel):
     """创建三级任务"""
 
-    code: str = Field(min_length=1, max_length=64, description="任务唯一编码")
     name: str = Field(min_length=1, max_length=128, description="任务名")
     template_id: int = Field(gt=0, description="所属二级模板ID")
     config: TaskItemConfig = Field(description="任务设计配置(TaskItemConfig 结构)")
@@ -92,7 +89,6 @@ class TaskItemCreateSchema(BaseModel):
 class TaskItemUpdateSchema(BaseModel):
     """更新三级任务"""
 
-    code: str | None = Field(default=None, min_length=1, max_length=64, description="任务唯一编码")
     name: str | None = Field(default=None, min_length=1, max_length=128, description="任务名")
     template_id: int | None = Field(default=None, gt=0, description="所属二级模板ID")
     config: TaskItemConfig | None = Field(default=None, description="任务设计配置(TaskItemConfig 结构)")
@@ -114,7 +110,7 @@ class TaskItemTreeOutSchema(BaseSchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="任务唯一编码")
+    code: str = Field(description="任务编号")
     name: str = Field(description="任务名")
     config: TaskItemConfig | None = Field(default=None, description="任务设计配置(TaskItemConfig 结构)")
     sort: int = Field(default=0, description="排序(越小越靠前)")
@@ -126,7 +122,7 @@ class TaskTemplateTreeOutSchema(BaseSchema, UserBySchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="模板唯一编码")
+    code: str = Field(description="模板编号")
     name: str = Field(description="模板名")
     category_id: int = Field(description="所属一级分类ID")
     category_name: str | None = Field(default=None, description="所属一级分类名称")
@@ -144,7 +140,6 @@ class TaskCategoryTreeSchema(TaskCategoryOutSchema):
 class TaskTemplateCreateSchema(BaseModel):
     """创建二级任务模板"""
 
-    code: str = Field(min_length=1, max_length=64, description="模板唯一编码")
     name: str = Field(min_length=1, max_length=128, description="模板名")
     category_id: int = Field(gt=0, description="所属一级分类ID")
     config: TaskConfig = Field(description="任务设计配置(TaskConfig 结构)")
@@ -154,7 +149,6 @@ class TaskTemplateCreateSchema(BaseModel):
 class TaskTemplateUpdateSchema(BaseModel):
     """更新二级任务模板"""
 
-    code: str | None = Field(default=None, min_length=1, max_length=64, description="模板唯一编码")
     name: str | None = Field(default=None, min_length=1, max_length=128, description="模板名")
     category_id: int | None = Field(default=None, gt=0, description="所属一级分类ID")
     config: TaskConfig | None = Field(default=None, description="任务设计配置(TaskConfig 结构)")
@@ -175,7 +169,7 @@ class TaskOutSchema(BaseSchema, UserBySchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    task_no: str = Field(description="任务流水号")
+    task_no: str = Field(description="任务编号")
     project_id: int = Field(description="所属项目ID")
     template_id: int = Field(description="所属二级模板ID")
     template: TaskTemplateOutSchema | None = Field(default=None, description="所属二级模板(含分类)")
@@ -190,7 +184,6 @@ class TaskOutSchema(BaseSchema, UserBySchema):
 class TaskCreateSchema(BaseModel):
     """创建任务"""
 
-    task_no: str = Field(min_length=1, max_length=32, description="任务流水号(如 TK202610-001)")
     project_id: int = Field(gt=0, description="所属项目ID")
     template_id: int = Field(gt=0, description="所属二级模板ID")
     name: str = Field(min_length=1, max_length=256, description="C端显示名(如 一心坦-等级医院管理)")
@@ -201,7 +194,6 @@ class TaskCreateSchema(BaseModel):
 class TaskUpdateSchema(BaseModel):
     """更新任务"""
 
-    task_no: str | None = Field(default=None, min_length=1, max_length=32, description="任务流水号")
     project_id: int | None = Field(default=None, gt=0, description="所属项目ID")
     template_id: int | None = Field(default=None, gt=0, description="所属二级模板ID")
     name: str | None = Field(default=None, min_length=1, max_length=256, description="C端显示名")
@@ -212,7 +204,7 @@ class TaskUpdateSchema(BaseModel):
 class TaskQueryParam(BaseQueryParam, UserByQueryParam):
     """任务实例查询参数"""
 
-    task_no: str | None = Field(default=None, description="任务流水号", json_schema_extra={"q": "like"})
+    task_no: str | None = Field(default=None, description="任务编号", json_schema_extra={"q": "like"})
     name: str | None = Field(default=None, description="C端显示名", json_schema_extra={"q": "like"})
     project_id: int | None = Field(default=None, description="所属项目ID", json_schema_extra={"q": "eq"})
     template_id: int | None = Field(default=None, description="所属二级模板ID", json_schema_extra={"q": "eq"})

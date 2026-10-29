@@ -18,6 +18,7 @@ from app.utils.common_util import search_to_dict
 
 from ..config import TaskConfig, TaskItemConfig
 from ..enums import AssignmentSource, AssignMode, SubmissionStatus, TaskStatus
+from ..numbering import NumberPrefix, next_code
 from ..project.crud import ProjectCRUD
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
 from .model import TaskItemModel, TaskTemplateModel
@@ -108,17 +109,14 @@ class TaskCategoryService:
         )
 
     async def create(self, data: TaskCategoryCreateSchema) -> TaskCategoryOutSchema:
-        """创建一级分类。"""
-        if await TaskCategoryCRUD(self.auth, self.db).get(code=data.code):
-            raise CustomException(msg="已存在相同编码的分类")
-        category = await TaskCategoryCRUD(self.auth, self.db).create(data=data)
+        """创建一级分类（编号自动生成）。"""
+        code = await next_code(self.db, NumberPrefix.CATEGORY)
+        category = await TaskCategoryCRUD(self.auth, self.db).create(data={**data.model_dump(), "code": code})
         return await self.detail(id=category.id)
 
     async def update(self, id: int, data: TaskCategoryUpdateSchema) -> TaskCategoryOutSchema:
-        """更新一级分类。"""
+        """更新一级分类（编号不可修改）。"""
         await TaskCategoryCRUD(self.auth, self.db).get_or_404(id=id)
-        if data.code and (exist := await TaskCategoryCRUD(self.auth, self.db).get(code=data.code)) and exist.id != id:
-            raise CustomException(msg="已存在相同编码的分类")
         await TaskCategoryCRUD(self.auth, self.db).update(id=id, data=data)
         return await self.detail(id=id)
 
@@ -201,20 +199,17 @@ class TaskTemplateService:
         )
 
     async def create(self, data: TaskTemplateCreateSchema) -> TaskTemplateOutSchema:
-        """创建二级模板。"""
-        if await TaskTemplateCRUD(self.auth, self.db).get(code=data.code):
-            raise CustomException(msg="已存在相同编码的模板")
+        """创建二级模板（编号自动生成）。"""
         await TaskCategoryCRUD(self.auth, self.db).get_or_404(id=data.category_id, msg="一级分类不存在")
         create_data = data.model_dump()
+        create_data["code"] = await next_code(self.db, NumberPrefix.TEMPLATE)
         create_data["config"] = data.config.model_dump(mode="json")
         template = await TaskTemplateCRUD(self.auth, self.db).create(data=create_data)
         return await self.detail(id=template.id)
 
     async def update(self, id: int, data: TaskTemplateUpdateSchema) -> TaskTemplateOutSchema:
-        """更新二级模板。"""
+        """更新二级模板（编号不可修改）。"""
         await TaskTemplateCRUD(self.auth, self.db).get_or_404(id=id)
-        if data.code and (exist := await TaskTemplateCRUD(self.auth, self.db).get(code=data.code)) and exist.id != id:
-            raise CustomException(msg="已存在相同编码的模板")
         if data.category_id is not None:
             await TaskCategoryCRUD(self.auth, self.db).get_or_404(id=data.category_id, msg="一级分类不存在")
         update_data = data.model_dump(exclude_unset=True, exclude_none=True)
@@ -262,11 +257,10 @@ class TaskItemService:
         )
 
     async def create(self, data: TaskItemCreateSchema) -> TaskItemOutSchema:
-        """创建三级任务（任务自包含完整采集分节，不从模板继承）。"""
+        """创建三级任务（任务自包含完整采集分节，编号自动生成）。"""
         await TaskTemplateCRUD(self.auth, self.db).get_or_404(id=data.template_id, msg="二级模板不存在")
-        if await TaskItemCRUD(self.auth, self.db).get(template_id=data.template_id, code=data.code):
-            raise CustomException(msg="该模板下已存在相同编码的任务")
         create_data = data.model_dump()
+        create_data["code"] = await next_code(self.db, NumberPrefix.ITEM)
         create_data["config"] = data.config.model_dump(mode="json")
         item = await TaskItemCRUD(self.auth, self.db).create(data=create_data)
         return await self.detail(id=item.id)
@@ -320,21 +314,18 @@ class TaskService:
         )
 
     async def create(self, data: TaskCreateSchema) -> TaskOutSchema:
-        """创建任务（草稿状态）。"""
-        if await TaskCRUD(self.auth, self.db).get(task_no=data.task_no):
-            raise CustomException(msg="已存在相同任务号的任务")
+        """创建任务（草稿状态，编号自动生成）。"""
         await ProjectCRUD(self.auth, self.db).get_or_404(id=data.project_id, msg="项目不存在")
         await TaskTemplateCRUD(self.auth, self.db).get_or_404(id=data.template_id, msg="任务模板不存在")
-        task = await TaskCRUD(self.auth, self.db).create(data=data)
+        task_no = await next_code(self.db, NumberPrefix.TASK)
+        task = await TaskCRUD(self.auth, self.db).create(data={**data.model_dump(), "task_no": task_no})
         return await self.detail(id=task.id)
 
     async def update(self, id: int, data: TaskUpdateSchema) -> TaskOutSchema:
-        """更新任务（仅草稿状态可改）。"""
+        """更新任务（仅草稿状态可改，编号不可修改）。"""
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status != TaskStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的任务可修改")
-        if data.task_no and (exist := await TaskCRUD(self.auth, self.db).get(task_no=data.task_no)) and exist.id != id:
-            raise CustomException(msg="已存在相同任务号的任务")
         if data.project_id is not None:
             await ProjectCRUD(self.auth, self.db).get_or_404(id=data.project_id, msg="项目不存在")
         if data.template_id is not None:

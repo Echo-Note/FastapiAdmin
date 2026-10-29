@@ -11,7 +11,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, SmallInteger, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import JSONType, ModelMixin, UserMixin
@@ -26,7 +26,7 @@ class TaskCategoryModel(ModelMixin, UserMixin):
     __tablename__: str = "market_task_category"
     __table_args__: dict[str, str] = {"comment": "一级任务分类表"}
 
-    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="分类唯一编码")
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="分类编号")
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, comment="分类名")
     sort: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0, comment="排序(越小越靠前)")
     description: Mapped[str | None] = mapped_column(Text, nullable=True, comment="分类描述")
@@ -40,7 +40,7 @@ class TaskTemplateModel(ModelMixin, UserMixin):
     __tablename__: str = "market_task_template"
     __table_args__: dict[str, str] = {"comment": "二级任务模板表"}
 
-    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="模板唯一编码")
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="模板编号")
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, comment="模板名")
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_task_category.id", ondelete="RESTRICT"), nullable=False, index=True, comment="所属一级分类ID"
@@ -57,12 +57,9 @@ class TaskItemModel(ModelMixin, UserMixin):
     """三级任务（TO C 任务，承载 TaskItemConfig 专属采集字段设计）。"""
 
     __tablename__: str = "market_task_item"
-    __table_args__ = (
-        UniqueConstraint("template_id", "code", name="uq_market_task_item_template_code"),
-        {"comment": "三级任务表"},
-    )
+    __table_args__: dict[str, str] = {"comment": "三级任务表"}
 
-    code: Mapped[str] = mapped_column(String(64), nullable=False, comment="任务唯一编码(模板内唯一)")
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="任务编号")
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, comment="任务名")
     template_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_task_template.id", ondelete="RESTRICT"), nullable=False, index=True, comment="所属二级模板ID"
@@ -85,7 +82,7 @@ class TaskModel(ModelMixin, UserMixin):
         {"comment": "任务实例表"},
     )
 
-    task_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True, comment="任务流水号(唯一，如 TK202610-001)")
+    task_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True, index=True, comment="任务编号(唯一，如 TK-001)")
     project_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_project.id", ondelete="RESTRICT"), nullable=False, index=True, comment="所属项目ID"
     )
