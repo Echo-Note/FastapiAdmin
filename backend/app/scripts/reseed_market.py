@@ -34,17 +34,18 @@ from app.config.path_conf import SCRIPT_DIR
 from app.config.setting import settings
 from app.core.base_model import MappedBase
 from app.core.database import async_db_session
+from app.modules.market.numbering import NumberPrefix, sync_counter
 from app.modules.market.task.model import TaskCategoryModel, TaskItemModel, TaskTemplateModel
 from app.utils.import_util import ImportUtil
 
 # 全量注册模型：确保 relationship 字符串引用可解析，且所有 market_ 表进入 metadata
 _ = ImportUtil.find_models(MappedBase)
 
-# 按依赖顺序重播种（分类 → 模板 → 三级任务），文件名与 __tablename__ 一致
-SEED_ORDER: list[tuple[type, str]] = [
-    (TaskCategoryModel, "market_task_category"),
-    (TaskTemplateModel, "market_task_template"),
-    (TaskItemModel, "market_task_item"),
+# 按依赖顺序重播种（分类 → 模板 → 三级任务），文件名与 __tablename__ 一致，并携带编号前缀
+SEED_ORDER: list[tuple[type, str, str]] = [
+    (TaskCategoryModel, "market_task_category", NumberPrefix.CATEGORY),
+    (TaskTemplateModel, "market_task_template", NumberPrefix.TEMPLATE),
+    (TaskItemModel, "market_task_item", NumberPrefix.ITEM),
 ]
 
 
@@ -74,9 +75,12 @@ async def main() -> None:
 
     async with async_db_session() as db, db.begin():
         _ = await db.execute(text(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE"))
-        for model, filename in SEED_ORDER:
+        for model, filename, prefix in SEED_ORDER:
             data = _load_seed(filename)
             db.add_all([model(**item) for item in data])
+            # 重播种后同步编号计数器，避免后续自动生成的编号与预置编号冲突
+            max_seq = max((int(item["code"].rsplit("-", 1)[1]) for item in data), default=0)
+            await sync_counter(db, prefix, max_seq)
             print(f"✅ 已重播种 {filename}: {len(data)} 条")
         await db.flush()
 

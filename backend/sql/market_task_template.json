@@ -1,6 +1,6 @@
 [
   {
-    "code": "grade_hospital_manage",
+    "code": "TPL-0001",
     "name": "等级医疗管理",
     "category_id": 1,
     "enabled": true,
@@ -21,7 +21,7 @@
     }
   },
   {
-    "code": "primary_care_manage",
+    "code": "TPL-0002",
     "name": "基层医疗管理",
     "category_id": 1,
     "enabled": true,
@@ -42,7 +42,7 @@
     }
   },
   {
-    "code": "private_medical_manage",
+    "code": "TPL-0003",
     "name": "民营医疗管理",
     "category_id": 1,
     "enabled": true,
@@ -63,7 +63,7 @@
     }
   },
   {
-    "code": "retail_pharmacy_manage",
+    "code": "TPL-0004",
     "name": "零售药店管理",
     "category_id": 1,
     "enabled": true,
@@ -84,7 +84,7 @@
     }
   },
   {
-    "code": "commercial_company_manage",
+    "code": "TPL-0005",
     "name": "商业公司管理",
     "category_id": 1,
     "enabled": true,
@@ -105,7 +105,7 @@
     }
   },
   {
-    "code": "archive_survey",
+    "code": "TPL-0006",
     "name": "市场档案信息调研",
     "category_id": 2,
     "enabled": true,
@@ -181,7 +181,7 @@
     }
   },
   {
-    "code": "product_awareness_survey",
+    "code": "TPL-0007",
     "name": "产品认知度调研",
     "category_id": 3,
     "enabled": true,
@@ -201,7 +201,7 @@
     }
   },
   {
-    "code": "recommend_willingness_survey",
+    "code": "TPL-0008",
     "name": "推荐意愿度调研",
     "category_id": 3,
     "enabled": true,
@@ -221,7 +221,7 @@
     }
   },
   {
-    "code": "category_insight_survey",
+    "code": "TPL-0009",
     "name": "品类洞察度调研",
     "category_id": 3,
     "enabled": true,
@@ -241,7 +241,7 @@
     }
   },
   {
-    "code": "disease_awareness_survey",
+    "code": "TPL-0010",
     "name": "疾病认知度调研",
     "category_id": 3,
     "enabled": true,
@@ -261,7 +261,7 @@
     }
   },
   {
-    "code": "enterprise_awareness_survey",
+    "code": "TPL-0011",
     "name": "企业认知度调研",
     "category_id": 3,
     "enabled": true,
@@ -281,7 +281,7 @@
     }
   },
   {
-    "code": "medication_adherence_survey",
+    "code": "TPL-0012",
     "name": "用药依从性调研",
     "category_id": 3,
     "enabled": true,
@@ -301,7 +301,7 @@
     }
   },
   {
-    "code": "price_sensitivity_survey",
+    "code": "TPL-0013",
     "name": "价格敏感度调研",
     "category_id": 3,
     "enabled": true,
@@ -321,7 +321,7 @@
     }
   },
   {
-    "code": "product_promotion",
+    "code": "TPL-0014",
     "name": "产品宣传",
     "category_id": 4,
     "enabled": true,
@@ -383,7 +383,7 @@
     }
   },
   {
-    "code": "health_popularization",
+    "code": "TPL-0015",
     "name": "健康科普",
     "category_id": 4,
     "enabled": true,
@@ -445,7 +445,7 @@
     }
   },
   {
-    "code": "product_training_event",
+    "code": "TPL-0016",
     "name": "产品培训活动",
     "category_id": 6,
     "enabled": true,
@@ -526,7 +526,7 @@
     }
   },
   {
-    "code": "product_distribution_event",
+    "code": "TPL-0017",
     "name": "商品分销活动",
     "category_id": 6,
     "enabled": true,
@@ -607,7 +607,7 @@
     }
   },
   {
-    "code": "skill_training_event",
+    "code": "TPL-0018",
     "name": "技能培训活动",
     "category_id": 6,
     "enabled": true,

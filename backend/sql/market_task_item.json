@@ -1,6 +1,6 @@
 [
   {
-    "code": "delivery_coordination",
+    "code": "ITEM-0001",
     "name": "配送协调",
     "template_id": 1,
     "config": {
@@ -108,7 +108,7 @@
     "enabled": true
   },
   {
-    "code": "inventory_check",
+    "code": "ITEM-0002",
     "name": "库存盘点",
     "template_id": 1,
     "config": {
@@ -201,7 +201,7 @@
     "enabled": true
   },
   {
-    "code": "price_check",
+    "code": "ITEM-0003",
     "name": "价格核查",
     "template_id": 1,
     "config": {
@@ -294,7 +294,7 @@
     "enabled": true
   },
   {
-    "code": "competitor_research",
+    "code": "ITEM-0004",
     "name": "竞品调研",
     "template_id": 1,
     "config": {
@@ -392,7 +392,7 @@
     "enabled": true
   },
   {
-    "code": "sales_reconciliation",
+    "code": "ITEM-0005",
     "name": "销售对账",
     "template_id": 1,
     "config": {
@@ -485,7 +485,7 @@
     "enabled": true
   },
   {
-    "code": "delivery_coordination",
+    "code": "ITEM-0006",
     "name": "配送协调",
     "template_id": 2,
     "config": {
@@ -568,7 +568,7 @@
     "enabled": true
   },
   {
-    "code": "inventory_check",
+    "code": "ITEM-0007",
     "name": "库存盘点",
     "template_id": 2,
     "config": {
@@ -646,7 +646,7 @@
     "enabled": true
   },
   {
-    "code": "price_check",
+    "code": "ITEM-0008",
     "name": "价格核查",
     "template_id": 2,
     "config": {
@@ -724,7 +724,7 @@
     "enabled": true
   },
   {
-    "code": "competitor_research",
+    "code": "ITEM-0009",
     "name": "竞品调研",
     "template_id": 2,
     "config": {
@@ -802,7 +802,7 @@
     "enabled": true
   },
   {
-    "code": "sales_reconciliation",
+    "code": "ITEM-0010",
     "name": "销售对账",
     "template_id": 2,
     "config": {
@@ -880,7 +880,7 @@
     "enabled": true
   },
   {
-    "code": "delivery_coordination",
+    "code": "ITEM-0011",
     "name": "配送协调",
     "template_id": 3,
     "config": {
@@ -963,7 +963,7 @@
     "enabled": true
   },
   {
-    "code": "inventory_check",
+    "code": "ITEM-0012",
     "name": "库存盘点",
     "template_id": 3,
     "config": {
@@ -1041,7 +1041,7 @@
     "enabled": true
   },
   {
-    "code": "price_check",
+    "code": "ITEM-0013",
     "name": "价格核查",
     "template_id": 3,
     "config": {
@@ -1119,7 +1119,7 @@
     "enabled": true
   },
   {
-    "code": "competitor_research",
+    "code": "ITEM-0014",
     "name": "竞品调研",
     "template_id": 3,
     "config": {
@@ -1197,7 +1197,7 @@
     "enabled": true
   },
   {
-    "code": "sales_reconciliation",
+    "code": "ITEM-0015",
     "name": "销售对账",
     "template_id": 3,
     "config": {
@@ -1275,7 +1275,7 @@
     "enabled": true
   },
   {
-    "code": "display_optimization",
+    "code": "ITEM-0016",
     "name": "陈列优化",
     "template_id": 4,
     "config": {
@@ -1358,7 +1358,7 @@
     "enabled": true
   },
   {
-    "code": "delivery_coordination",
+    "code": "ITEM-0017",
     "name": "配送协调",
     "template_id": 4,
     "config": {
@@ -1436,7 +1436,7 @@
     "enabled": true
   },
   {
-    "code": "inventory_check",
+    "code": "ITEM-0018",
     "name": "库存盘点",
     "template_id": 4,
     "config": {
@@ -1514,7 +1514,7 @@
     "enabled": true
   },
   {
-    "code": "price_check",
+    "code": "ITEM-0019",
     "name": "价格核查",
     "template_id": 4,
     "config": {
@@ -1592,7 +1592,7 @@
     "enabled": true
   },
   {
-    "code": "competitor_research",
+    "code": "ITEM-0020",
     "name": "竞品调研",
     "template_id": 4,
     "config": {
@@ -1670,7 +1670,7 @@
     "enabled": true
   },
   {
-    "code": "sales_reconciliation",
+    "code": "ITEM-0021",
     "name": "销售对账",
     "template_id": 4,
     "config": {
@@ -1748,7 +1748,7 @@
     "enabled": true
   },
   {
-    "code": "bidding_procurement",
+    "code": "ITEM-0022",
     "name": "招标采购",
     "template_id": 5,
     "config": {
@@ -1831,7 +1831,7 @@
     "enabled": true
   },
   {
-    "code": "delivery_coordination",
+    "code": "ITEM-0023",
     "name": "配送协调",
     "template_id": 5,
     "config": {
@@ -1909,7 +1909,7 @@
     "enabled": true
   },
   {
-    "code": "inventory_check",
+    "code": "ITEM-0024",
     "name": "库存盘点",
     "template_id": 5,
     "config": {
@@ -1987,7 +1987,7 @@
     "enabled": true
   },
   {
-    "code": "price_check",
+    "code": "ITEM-0025",
     "name": "价格核查",
     "template_id": 5,
     "config": {
@@ -2065,7 +2065,7 @@
     "enabled": true
   },
   {
-    "code": "competitor_research",
+    "code": "ITEM-0026",
     "name": "竞品调研",
     "template_id": 5,
     "config": {
@@ -2143,7 +2143,7 @@
     "enabled": true
   },
   {
-    "code": "inventory_data_collection",
+    "code": "ITEM-0027",
     "name": "进销存数据收集",
     "template_id": 5,
     "config": {
@@ -2231,7 +2231,7 @@
     "enabled": true
   },
   {
-    "code": "flow_data_collection",
+    "code": "ITEM-0028",
     "name": "流向数据收集",
     "template_id": 5,
     "config": {
@@ -2314,7 +2314,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0029",
     "name": "医务人员调研",
     "template_id": 7,
     "config": {
@@ -2398,7 +2398,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0030",
     "name": "非医务人员调研",
     "template_id": 7,
     "config": {
@@ -2482,7 +2482,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0031",
     "name": "医务人员调研",
     "template_id": 8,
     "config": {
@@ -2555,7 +2555,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0032",
     "name": "非医务人员调研",
     "template_id": 8,
     "config": {
@@ -2628,7 +2628,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0033",
     "name": "医务人员调研",
     "template_id": 9,
     "config": {
@@ -2697,7 +2697,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0034",
     "name": "非医务人员调研",
     "template_id": 9,
     "config": {
@@ -2766,7 +2766,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0035",
     "name": "医务人员调研",
     "template_id": 10,
     "config": {
@@ -2835,7 +2835,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0036",
     "name": "非医务人员调研",
     "template_id": 10,
     "config": {
@@ -2904,7 +2904,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0037",
     "name": "医务人员调研",
     "template_id": 11,
     "config": {
@@ -2973,7 +2973,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0038",
     "name": "非医务人员调研",
     "template_id": 11,
     "config": {
@@ -3042,7 +3042,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0039",
     "name": "医务人员调研",
     "template_id": 12,
     "config": {
@@ -3111,7 +3111,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0040",
     "name": "非医务人员调研",
     "template_id": 12,
     "config": {
@@ -3180,7 +3180,7 @@
     "enabled": true
   },
   {
-    "code": "staff",
+    "code": "ITEM-0041",
     "name": "医务人员调研",
     "template_id": 13,
     "config": {
@@ -3249,7 +3249,7 @@
     "enabled": true
   },
   {
-    "code": "patient",
+    "code": "ITEM-0042",
     "name": "非医务人员调研",
     "template_id": 13,
     "config": {
@@ -3318,7 +3318,7 @@
     "enabled": true
   },
   {
-    "code": "outdoor",
+    "code": "ITEM-0043",
     "name": "户外宣传",
     "template_id": 14,
     "config": {
@@ -3385,7 +3385,7 @@
     "enabled": true
   },
   {
-    "code": "media",
+    "code": "ITEM-0044",
     "name": "媒介宣传",
     "template_id": 14,
     "config": {
@@ -3452,7 +3452,7 @@
     "enabled": true
   },
   {
-    "code": "outdoor",
+    "code": "ITEM-0045",
     "name": "户外宣传",
     "template_id": 15,
     "config": {
@@ -3519,7 +3519,7 @@
     "enabled": true
   },
   {
-    "code": "media",
+    "code": "ITEM-0046",
     "name": "媒介宣传",
     "template_id": 15,
     "config": {
@@ -3586,7 +3586,7 @@
     "enabled": true
   },
   {
-    "code": "commercial_archive_survey",
+    "code": "ITEM-0047",
     "name": "商业公司档案信息调研",
     "template_id": 6,
     "config": {
@@ -3675,7 +3675,7 @@
     "enabled": true
   },
   {
-    "code": "grade_hospital_archive_survey",
+    "code": "ITEM-0048",
     "name": "等级医院档案信息调研",
     "template_id": 6,
     "config": {
@@ -3764,7 +3764,7 @@
     "enabled": true
   },
   {
-    "code": "primary_care_archive_survey",
+    "code": "ITEM-0049",
     "name": "基层医疗档案信息调研",
     "template_id": 6,
     "config": {
@@ -3853,7 +3853,7 @@
     "enabled": true
   },
   {
-    "code": "private_medical_archive_survey",
+    "code": "ITEM-0050",
     "name": "民营医疗档案信息调研",
     "template_id": 6,
     "config": {
@@ -3942,7 +3942,7 @@
     "enabled": true
   },
   {
-    "code": "retail_pharmacy_archive_survey",
+    "code": "ITEM-0051",
     "name": "零售药店档案信息调研",
     "template_id": 6,
     "config": {

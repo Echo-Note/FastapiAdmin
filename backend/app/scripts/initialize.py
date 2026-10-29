@@ -11,6 +11,7 @@ from app.config.setting import settings
 from app.core.base_model import MappedBase
 from app.core.database import async_db_session, async_engine, create_tables
 from app.core.logger import logger
+from app.modules.market.numbering import NumberPrefix, sync_counter
 from app.modules.market.task.model import TaskCategoryModel, TaskItemModel, TaskTemplateModel
 from app.modules.system.dept.model import DeptModel
 from app.modules.system.dict.model import DictDataModel, DictTypeModel
@@ -50,6 +51,13 @@ class InitializeData:
 
     # 树形模型：JSON 含嵌套 children，需递归创建对象
     _RECURSIVE_TABLES: set[str] = {"sys_menu", "sys_dept"}
+
+    # market 编号前缀映射：表名 -> 编号前缀（seed 后同步编号计数器，避免编号冲突）
+    _MARKET_NUMBER_PREFIX: dict[str, str] = {
+        "market_task_category": NumberPrefix.CATEGORY,
+        "market_task_template": NumberPrefix.TEMPLATE,
+        "market_task_item": NumberPrefix.ITEM,
+    }
 
     async def init_db(self) -> None:
         """应用数据库迁移并导入种子数据（迁移成功即证明连接正常，失败时异常上抛）"""
@@ -192,6 +200,11 @@ class InitializeData:
                 if objs:
                     db.add_all(objs)
                     await db.flush()
+                    # market 表 seed 后同步编号计数器，避免后续自动生成的编号与预置编号冲突
+                    if table_name in self._MARKET_NUMBER_PREFIX:
+                        prefix = self._MARKET_NUMBER_PREFIX[table_name]
+                        max_seq = max((int(item["code"].rsplit("-", 1)[1]) for item in data), default=0)
+                        await sync_counter(db, prefix, max_seq)
                     logger.info(f"✅️ 已向 {table_name} 写入初始化数据")
                 else:
                     logger.info(f"⏭️  跳过 {table_name} 表数据初始化（无有效数据）")

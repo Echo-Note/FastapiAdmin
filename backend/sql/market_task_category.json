@@ -1,36 +1,36 @@
 [
   {
-    "code": "business_management",
+    "code": "CAT-0001",
     "name": "商务管理服务",
     "sort": 1,
     "description": "等级医疗/基层医疗/民营医疗/零售药店/商业公司的月度商务管理走访"
   },
   {
-    "code": "institution_research",
+    "code": "CAT-0002",
     "name": "市场机构调研服务",
     "sort": 2,
     "description": "对机构档案信息的一次性调研采集"
   },
   {
-    "code": "interview_survey",
+    "code": "CAT-0003",
     "name": "访谈问卷调研服务",
     "sort": 3,
     "description": "医务人员/患者访谈问卷调研"
   },
   {
-    "code": "promotion",
+    "code": "CAT-0004",
     "name": "市场宣传服务",
     "sort": 4,
     "description": "产品宣传与健康科普等市场宣传服务"
   },
   {
-    "code": "special_report",
+    "code": "CAT-0005",
     "name": "专项管理报告",
     "sort": 5,
     "description": "区域市场管理分析报告等专项报告"
   },
   {
-    "code": "meeting_service",
+    "code": "CAT-0006",
     "name": "会议服务",
     "sort": 6,
     "description": "产品培训/分销/技能培训等会议活动服务"
