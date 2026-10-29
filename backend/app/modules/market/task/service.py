@@ -17,7 +17,8 @@ from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
 from ..config import TaskConfig, TaskItemConfig
-from ..enums import AssignmentSource, AssignMode, SubmissionStatus, TaskStatus
+from ..enums import AssignmentSource, AssignMode, SubjectType, SubmissionStatus, TaskStatus
+from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
 from ..numbering import NumberPrefix, next_code
 from ..project.crud import ProjectCRUD
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
@@ -515,10 +516,33 @@ class SubmissionService:
         )
 
     async def create(self, data: SubmissionCreateSchema) -> SubmissionOutSchema:
-        """创建成果（草稿状态）。"""
-        await AssignmentCRUD(self.auth, self.db).get_or_404(id=data.assignment_id, msg="分配记录不存在")
+        """创建成果（草稿状态），并按模板采集对象类型归集机构。
+
+        采集对象类型以任务模板 ``TaskConfig.subject_type`` 为准（前端传值仅作兜底）；
+        当对象为机构时，从 ``form_data`` 提取机构名称/区域/等级，按模板名映射机构类型后
+        归集机构（同名复用、否则创建），回填 ``institution_id``。运营端不再手动预置机构。
+        """
+        assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(
+            id=data.assignment_id, msg="分配记录不存在", preload=["task", "task.template"]
+        )
+        template = assignment.task.template
+        subject_type = (template.config or {}).get("subject_type", data.subject_type)
+
         create_data = data.model_dump()
         create_data["user_id"] = self.auth.user.id
+        create_data["subject_type"] = subject_type
+
+        if subject_type == SubjectType.INSTITUTION.value:
+            info = extract_institution_info(data.form_data)
+            institution_type = map_institution_type(template.name) if info else None
+            if info and institution_type:
+                create_data["institution_id"] = await InstitutionService(self.auth, self.db).collect(
+                    name=info["name"],
+                    institution_type=institution_type,
+                    level=info.get("level") or None,
+                    region=info.get("region") or None,
+                )
+
         submission = await SubmissionCRUD(self.auth, self.db).create(data=create_data)
         return await self.detail(id=submission.id)
 

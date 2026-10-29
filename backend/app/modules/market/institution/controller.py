@@ -11,7 +11,6 @@ from app.core.dependencies import AuthPermission, db_getter, redis_getter
 from app.core.router_class import OperationLogRoute
 
 from .schema import (
-    InstitutionCreateSchema,
     InstitutionImageCreateSchema,
     InstitutionImageOutSchema,
     InstitutionImageQueryParam,
@@ -44,17 +43,6 @@ async def get_institution_detail_controller(
 ) -> JSONResponse:
     result = await InstitutionService(auth, db).detail(id=id)
     return SuccessResponse(data=result, msg="获取机构详情成功")
-
-
-@InstitutionRouter.post("/create", status_code=status.HTTP_201_CREATED, summary="创建机构", response_model=ResponseSchema[InstitutionOutSchema])
-async def create_institution_controller(
-    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:institution:create"]))],
-    db: Annotated[AsyncSession, Depends(db_getter)],
-    redis: Annotated[Redis, Depends(redis_getter)],
-    data: Annotated[InstitutionCreateSchema, Body(description="创建机构参数")],
-) -> JSONResponse:
-    result = await InstitutionService(auth, db).create(redis=redis, data=data)
-    return SuccessResponse(data=result, msg="创建机构成功")
 
 
 @InstitutionRouter.put("/update/{id}", summary="修改机构", response_model=ResponseSchema[InstitutionOutSchema])

@@ -19,20 +19,6 @@ class InstitutionOutSchema(BaseSchema, UserBySchema):
     description: str | None = Field(default=None, description="备注")
 
 
-class InstitutionCreateSchema(BaseModel):
-    """创建机构"""
-
-    name: str = Field(min_length=1, max_length=128, description="机构名称")
-    type: str = Field(min_length=1, max_length=32, description="机构类型")
-    level: str | None = Field(default=None, max_length=32, description="等级(如三甲/二级)")
-    region: str | None = Field(default=None, max_length=64, description="所在区域")
-    address: str | None = Field(default=None, max_length=255, description="详细地址")
-    contact: str | None = Field(default=None, max_length=32, description="联系人")
-    contact_phone: str | None = Field(default=None, max_length=20, description="联系电话")
-    status: int = Field(default=0, ge=0, le=1, description="状态(0:启用 1:停用)")
-    description: str | None = Field(default=None, description="备注")
-
-
 class InstitutionUpdateSchema(BaseModel):
     """更新机构"""
 
@@ -98,7 +84,6 @@ class InstitutionImageQueryParam(BaseQueryParam, UserByQueryParam):
 
 __all__ = [
     "InstitutionOutSchema",
-    "InstitutionCreateSchema",
     "InstitutionUpdateSchema",
     "InstitutionQueryParam",
     "InstitutionImageOutSchema",
