@@ -1210,6 +1210,142 @@
 
 ---
 
+### 2026-10-29 — 项目管理「添加项目」表单三处体验优化（委托方可输入 / 周期限定 / 关联模板树形级联）
+
+#### 1. 原因
+
+用户反馈「项目管理 → 添加项目」三个字段体验问题：① 委托方只能选、列表为空时无法选择；② 周期自由文本输入、系统无法校验；③ 关联模板平铺下拉、数量多了不好选。要求：委托方支持输入、周期限定、关联模板改为树形 + 级联选择 + 多选 + 筛选。
+
+#### 2. 修改内容
+
+**后端（`app/modules/market/project/schema.py`）**
+- `ProjectCreateSchema.period` / `ProjectUpdateSchema.period` 由自由文本改为 `pattern=r"^\d{4}$"`（项目周期 = 年份，如 `2026`），与「任务发布有周期（如一年）」口径一致；description 同步改「项目周期年份」。
+
+**前端 web（`views/module_market/project/index.vue` + `api/module_market/project.ts`）**
+- **委托方支持输入**：`company_id` 下拉改为 `el-select` `filterable + allow-create + default-first-option`；`ProjectForm.company_id` 类型放宽为 `number | string`（新增时输入新公司名为 string）。提交前 `normalizeCompanyId()` 把 string 名称转公司 id——同名复用 `companyOptions`、否则 `CompanyAPI.createCompany({ name })` 自动创建并回填 `company_id` + 追加进下拉选项。委托方为空时也能直接输入公司名创建。
+- **周期限定**：表单与搜索栏的周期均由 `input` 改为 `FaDatePicker`（`type="year"`，`value-format="YYYY"`），只能选年份、无法乱输；rules 文案改「请选择项目周期年份」。
+- **关联模板树形级联多选筛选**：数据源由平铺 `TaskTemplateAPI.listTemplate` 改为 `TaskCategoryAPI.treeCategory()`（一级分类 → 二级模板树）；下拉由 `select` 改为 `el-tree-select`（`multiple + filterable + collapse-tags`，未设 `check-strictly` 即父子级联——勾选分类全选其下模板）；详情模板名 `templateMap` 同步从树构建。
+
+#### 3. 关键口径 / 踩坑
+
+1. **分类 id 与模板 id 各自自增会撞车，树形选择必须用「负值 value + 复合 nodeKey」**
+   - 现象：一级分类（`market_task_category`）与二级模板（`market_task_template`）各自独立自增（分类 id 1..6、模板 id 1..22），若直接用 `id` 作树节点 value / node-key，el-tree-select 回显 `template_ids=[3]` 会同时匹配到「分类 id=3」与「模板 id=3」，导致勾选错乱（与踩坑 15、task-catalog 的 row-key 冲突同源）。
+   - 处理：`buildTemplateTree()` 给分类节点 `value = -id`（负数）、模板节点 `value = id`（正数），node-key 用字符串复合 `category-{id}` / `template-{id}`；空分类 `disabled=true` 防勾选。这样正/负值天然隔离，模板正数 id 直接作为 `template_ids` 提交与回显，无需二次映射。
+   - 结论：凡「多张自增表拼一棵树」的树形选择（tree-select / cascader），节点 value 与 node-key 都不能直接用各自的 `id`，须用「类型前缀 + 复合 key」或「符号/偏移区隔」保证全局唯一。
+
+#### 4. 验证
+
+- 后端 `uv run ruff check app/modules/market/project/schema.py` All checks passed。
+- 前端 `pnpm ts:check` 通过（0 错误）。
+
+---
+
+### 2026-10-29 — 项目管理「周期」改为截止日期（DateStr 类型 + 快捷选项）
+
+#### 1. 原因
+
+用户纠正上一轮「周期限定为年份（YYYY）」的方案：年份仍不满足，要求「周期」改为**具体截止日期**，选择框支持快捷选「一个月 / 三个月 / 六个月 / 一年」，也可手选具体日期；并质疑字段类型为何是 `str`——截止日期应是日期类型而非字符串。
+
+#### 2. 修改内容
+
+**后端**
+- `project/schema.py`：`ProjectOutSchema/CreateSchema/UpdateSchema.period` 由 `str`（上一轮 `pattern=r"^\d{4}$"`）改为项目标准日期类型 `DateStr`（`app.core.validator.DateStr`：内部 `date`、JSON 序列化 "YYYY-MM-DD"、非法日期自动拒绝）。
+- `project/model.py` / `task/model.py`：`period` 列由 `String(16)` 改为 `Date`（`Mapped[date]`），注释改「截止日期」。
+- `task/schema.py`：`TaskOutSchema/CreateSchema/UpdateSchema.period` 同步改 `DateStr`（任务截止日期继承项目截止日期）。
+- 搜索参数 `ProjectQueryParam/TaskQueryParam.period` 仍为 `str`（搜索入参走字符串，`q="eq"` 精确匹配日期列）。
+
+**前端 web（`views/module_market/project/index.vue` + `api/module_market/project.ts`）**
+- 表单「周期」→「截止日期」：FaForm 具名 slot `#period` 渲染 `el-date-picker`（`type=date` + `value-format="YYYY-MM-DD"`），配 `shortcuts`「一个月/三个月/六个月/一年」（dayjs 相对今天推算），也可手选具体日期。
+- 搜索栏「周期」→「截止日期」日期选择器；表格列/详情/校验文案同步「截止日期」。
+
+#### 3. 关键口径
+
+- **日期字段统一用项目 `DateStr` 类型**（内部 `date`、序列化字符串），不要用 `str + pattern` 正则硬校；模型列对应 `Date` 而非 `String`。
+- 上一轮「年份限定」方案作废：周期语义 = 项目/任务截止日期（`YYYY-MM-DD`），与报告/成果的「月份」（`YYYY-MM`）字段解耦、互不影响。
+
+#### 4. 验证
+
+- 后端 `ruff check` All checks passed；`ProjectCreateSchema(period='2026-12-31')` 解析为 `date`，`'2026-13-45'` 被拒绝。
+- market 域 5 个测试文件 36 passed；前端 `pnpm ts:check` 通过（0 错误）。
+
+---
+
+### 2026-10-29 — 数据库迁移：project/task 的 period 由 VARCHAR 改为 DATE
+
+#### 1. 背景
+
+本轮把 `market_project.period` / `market_task.period` 由 `String(16)` 改为 `Date`（截止日期语义）。本地 dev 库（OrbStack PG）为存量库，需执行迁移对齐。
+
+#### 2. 执行
+
+- 确认库状态：`alembic_version=ed9e3a008acc`，两表 `period` 仍为 `varchar`，且均无数据。
+- 修复 autogen 产物缺 `USING`：给 `416002c63901`（project.period）与 `837416e7827d`（task.period）的 `alter_column` 补 `postgresql_using='period::date'`（详见踩坑 18）。
+- `uv run python main.py upgrade --env=dev` 应用全部迁移，最终 `alembic_version=837416e7827d`。
+- 复核：`information_schema.columns` 显示 `market_project.period`、`market_task.period` 均为 `date`。
+
+#### 3. 验证
+
+- `market_project.period` / `market_task.period` 列类型已变为 `date`，与 model `Mapped[date]` 一致。
+- 迁移链线性（ed9e3a008acc → 416002c63901 → 837416e7827d），无 multiple heads。
+
+---
+
+### 2026-10-29 — 项目管理「关联模板」修复搜索过滤 + 父级选择
+
+#### 1. 原因
+
+用户反馈「添加项目」的关联模板：① 无搜索过滤；② 无法选择父级（一级分类）。根因是上一版用 `FaForm type="treeselect"` 且给 el-tree-select 配了 `props.value`，用法错误（详见踩坑 19）。
+
+#### 2. 实现
+
+- 关联模板由 `formItems type="treeselect"` 改为 FaForm 具名 slot `#template_ids` 直接渲染 `ElTreeSelect`：`multiple + filterable + collapse-tags + clearable + node-key="id"` + 自定义 `filter-node-method`（按 name 过滤）。
+- `TemplateTreeNode` 接口改为 `{ id, name, disabled?, children? }`；`buildTemplateTree` 用「分类 `id=-cat.id`（负数）/ 模板 `id=tpl.id`（正数）」保证 node-key 全局唯一，模板正数 id 即提交的 `template_ids`。
+- 父级选择靠 `check-strictly` 默认 false（父子联动）：勾选一级分类级联全选其下模板，v-model 只输出叶子（模板正数 id）。
+
+#### 3. 验证
+
+- 前端 `pnpm ts:check` 通过（0 错误）。
+
+---
+
+### 2026-10-29 — 修复定向分派任务发布未指定分派人员导致 C 端不可见
+
+#### 1. 原因
+
+用户反馈：任务管理里「定向分派」任务必须指定分派人员，但现状是定向分派任务发布时无分派人员入口，发布后没有任何分派记录——C 端任务大厅（只展示 `assign_mode=open` 任务）看不到、被分派人的「我的任务」（依赖 `market_assignment` 记录）也看不到，任务等于「发不出去」。
+
+附带缺陷：分派页「批量分派」接口前后端不匹配（前端传 `user_ids` 数组、后端 `AssignmentCreateSchema` 只有单 `user_id`），批量分派会 422。
+
+#### 2. 修改内容
+
+**后端（`app/modules/market/task/`）**
+
+- `schema.py`：`AssignmentCreateSchema` 由单 `user_id` 改为 `user_ids: list[int]`（批量）；新增 `TaskPublishSchema`（`assignee_ids: list[int] | None`）。
+- `service.py`：
+  - `TaskService.publish(id, assignee_ids)`：`direct` 任务必须传 `assignee_ids`，否则报错「定向分派任务必须指定分派人员」；发布时调用 `AssignmentService.batch_assign` 批量创建分派（跳过已分派用户）；`open` 任务忽略 `assignee_ids` 直接发布。
+  - `AssignmentService`：新增 `batch_assign`（用户去重、跳过已分派），`create` 改为批量返回 `list[AssignmentOutSchema]`；`detail/page/my_assignments` 补 `_ASSIGNMENT_PRELOAD` 预加载任务链（此前 `_ASSIGNMENT_PRELOAD` 是死代码，序列化 `task` 会触发异步懒加载 MissingGreenlet）。
+- `controller.py`：`publish/{id}` 接受 `TaskPublishSchema` body；`assignments/create` 响应改为 `list[AssignmentOutSchema]`。
+
+**前端 web**
+
+- `api/module_market/task.ts`：`publishTask(id, body)` 支持 `assignee_ids`。
+- `views/module_market/task/index.vue`：发布时 `open` 任务直接发布；`direct` 任务弹窗多选分派人员后发布（`userOptions` 从 `UserAPI.listUser` 加载）。
+
+**测试**
+
+- 新增 `tests/test_market_task_publish.py`（3 用例）：direct 不带分派人员被拒、direct 带分派人员发布并生成 assignment、open 无需分派人员可发布。
+
+#### 3. 验证
+
+- 后端 `pytest tests/test_market_*.py` 39 passed；`ruff check` all passed。
+- 前端 `pnpm ts:check`、`pnpm eslint` 均 0 错误。
+
+#### 4. 注意
+
+- 项目发布（`ProjectService.publish`）批量生成的 `market_task` 硬编码 `assign_mode="direct"`，因此项目级发布后还需逐个任务在「任务管理」里指定分派人员再发布；公开大厅任务需单独 `POST /market/tasks/create` 用 `assign_mode=open` 创建（项目发布流程暂未提供 open 选项）。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -1279,3 +1415,11 @@
 17. **同步测试里用 `asyncio.run` 操作全局 `async_db_session` → `Event loop is closed`**（2026-10-29）
    - 现象：集成测试 `TestInstitution` 需要先落库准备机构数据，用 `asyncio.run(_run())` 里 `async with async_db_session()` 直接插入，运行时报 `RuntimeError: Event loop is closed`——模块级 `async_engine` 的连接池绑定在 TestClient lifespan 的事件循环上，`asyncio.run` 新建的临时循环与引擎循环不一致，池内连接已随旧循环关闭。
    - 结论：同步测试（`def test_xxx`）里不要用 `asyncio.run` 碰全局 `async_db_session`/`async_engine`；改用**同步引擎** `engine`（`create_sync_engine` 已在 `database.py` 暴露）配 `Session(engine)` 直接落库。真正的异步逻辑测试再走 pytest-asyncio（`asyncio_mode=auto`），且需和引擎生命周期对齐。
+
+18. **存量 `VARCHAR` 列改 `Date`，autogen 不生成 `USING` 子句 → `DatatypeMismatchError`**（2026-10-29）
+   - 现象：`market_project/market_task.period` 由 `String(16)` 改 `Date` 后，dev autogen 生成的迁移 `batch_op.alter_column(type_=sa.Date())` 缺 `postgresql_using`，`upgrade` 报 `column "period" cannot be cast automatically to type date`（提示 `USING period::date`）。
+   - 结论：**这不是模型设计问题，而是「跨类型收窄迁移」的正常代价**——`varchar` 与 `date` 无隐式 cast，PG 要求显式转换表达式，而 autogen 无法推断「旧字符串如何转日期」，必须手动补 `postgresql_using='period::date'`。若列有历史脏数据（如「2026 全年」），`::date` 会转换失败，需先清洗数据或写更复杂的转换表达式。凡「字符串/文本列 → 强类型（Date/DateTime/Int 等）」的迁移，都要检查 autogen 产物是否漏 `USING`；更彻底的做法是设计阶段就用强类型，避免自由文本列事后收窄。
+
+19. **el-tree-select 的节点值取自 `node-key`，不是 `props.value`；`show-checkbox` 与 `filter-node-method` 都需显式声明**（2026-10-29）
+   - 现象：① 配 `props: { label, children, value, disabled }` 时 TS 报 `'value' does not exist in type 'TreeOptionProps'`——`TreeOptionProps` 根本没有 `value` 字段，选中输出值 = `node[nodeKey]`；② `multiple` 下树节点**没有 checkbox**（父级/叶子都无法勾选）——`multiple` 只控制多选 tags，不会自动开启 el-tree 的 `show-checkbox`，官方多选示例也是显式写 `show-checkbox`；③ 节点 label 字段改名（如 `name`）后，默认 filterable 过滤按 `label` 匹配会失效。
+   - 结论：el-tree-select 的「值」与「唯一标识」统一由 `node-key`（默认 `id`）承载，`props` 只配 `label/children/disabled`；凡「多张自增表拼树 + 值取 id」的场景，`node-key` 必须全局唯一（用「分类负数 id / 模板正数 id」这类符号区隔，与踩坑 15 同源），父级级联勾选时 v-model 只输出叶子值；多选必须显式 `show-checkbox`；label 字段改名时必须显式 `filter-node-method`（如 `(value, data) => data.name.includes(value)`）；`collapse-tags` 会把多选 tag 折叠成「+N」，需要完整展示时不要加。
