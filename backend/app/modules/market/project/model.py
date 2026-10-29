@@ -32,7 +32,7 @@ class CompanyModel(ModelMixin, UserMixin):
     __table_args__: dict[str, str] = {"comment": "医药公司主数据表"}
 
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True, comment="公司名称")
-    code: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, comment="公司编码")
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="公司编号")
     credit_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True, comment="统一社会信用代码")
     contact: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="联系人")
     contact_phone: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="联系电话")
@@ -51,7 +51,7 @@ class ProjectModel(ModelMixin, UserMixin):
     __tablename__: str = "market_project"
     __table_args__: dict[str, str] = {"comment": "项目表"}
 
-    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="项目编码")
+    code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="项目编号")
     name: Mapped[str] = mapped_column(String(128), nullable=False, index=True, comment="项目名(如药品名)")
     company_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_company.id", ondelete="RESTRICT"), nullable=False, index=True, comment="委托方(医药公司)ID"

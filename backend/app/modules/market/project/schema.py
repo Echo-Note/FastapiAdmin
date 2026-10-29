@@ -13,7 +13,7 @@ class CompanyOutSchema(BaseSchema, UserBySchema):
     model_config = ConfigDict(from_attributes=True)
 
     name: str = Field(description="公司名称")
-    code: str | None = Field(default=None, description="公司编码")
+    code: str = Field(description="公司编号")
     credit_code: str | None = Field(default=None, description="统一社会信用代码")
     contact: str | None = Field(default=None, description="联系人")
     contact_phone: str | None = Field(default=None, description="联系电话")
@@ -26,7 +26,6 @@ class CompanyCreateSchema(BaseModel):
     """创建医药公司"""
 
     name: str = Field(min_length=1, max_length=128, description="公司名称")
-    code: str | None = Field(default=None, max_length=64, description="公司编码")
     credit_code: str | None = Field(default=None, max_length=32, description="统一社会信用代码")
     contact: str | None = Field(default=None, max_length=32, description="联系人")
     contact_phone: str | None = Field(default=None, max_length=20, description="联系电话")
@@ -39,7 +38,6 @@ class CompanyUpdateSchema(BaseModel):
     """更新医药公司"""
 
     name: str | None = Field(default=None, min_length=1, max_length=128, description="公司名称")
-    code: str | None = Field(default=None, max_length=64, description="公司编码")
     credit_code: str | None = Field(default=None, max_length=32, description="统一社会信用代码")
     contact: str | None = Field(default=None, max_length=32, description="联系人")
     contact_phone: str | None = Field(default=None, max_length=20, description="联系电话")
@@ -52,7 +50,7 @@ class CompanyQueryParam(BaseQueryParam, UserByQueryParam):
     """医药公司查询参数"""
 
     name: str | None = Field(default=None, description="公司名称", json_schema_extra={"q": "like"})
-    code: str | None = Field(default=None, description="公司编码", json_schema_extra={"q": "like"})
+    code: str | None = Field(default=None, description="公司编号", json_schema_extra={"q": "like"})
     credit_code: str | None = Field(default=None, description="统一社会信用代码", json_schema_extra={"q": "eq"})
     status: int | None = Field(default=None, description="状态", json_schema_extra={"q": "eq"})
 
@@ -62,7 +60,7 @@ class ProjectOutSchema(BaseSchema, UserBySchema):
 
     model_config = ConfigDict(from_attributes=True)
 
-    code: str = Field(description="项目编码")
+    code: str = Field(description="项目编号")
     name: str = Field(description="项目名(如药品名)")
     company_id: int = Field(description="委托方(医药公司)ID")
     company: CompanyOutSchema | None = Field(default=None, description="委托方(医药公司)")
@@ -75,7 +73,6 @@ class ProjectOutSchema(BaseSchema, UserBySchema):
 class ProjectCreateSchema(BaseModel):
     """创建项目"""
 
-    code: str = Field(min_length=1, max_length=64, description="项目编码")
     name: str = Field(min_length=1, max_length=128, description="项目名(如药品名)")
     company_id: int = Field(gt=0, description="委托方(医药公司)ID")
     period: str = Field(min_length=1, max_length=16, description="项目周期(如 2026 全年)")
@@ -85,7 +82,6 @@ class ProjectCreateSchema(BaseModel):
 class ProjectUpdateSchema(BaseModel):
     """更新项目"""
 
-    code: str | None = Field(default=None, min_length=1, max_length=64, description="项目编码")
     name: str | None = Field(default=None, min_length=1, max_length=128, description="项目名(如药品名)")
     company_id: int | None = Field(default=None, gt=0, description="委托方(医药公司)ID")
     period: str | None = Field(default=None, min_length=1, max_length=16, description="项目周期")
@@ -95,7 +91,7 @@ class ProjectUpdateSchema(BaseModel):
 class ProjectQueryParam(BaseQueryParam, UserByQueryParam):
     """项目查询参数"""
 
-    code: str | None = Field(default=None, description="项目编码", json_schema_extra={"q": "like"})
+    code: str | None = Field(default=None, description="项目编号", json_schema_extra={"q": "like"})
     name: str | None = Field(default=None, description="项目名", json_schema_extra={"q": "like"})
     company_id: int | None = Field(default=None, description="委托方(医药公司)ID", json_schema_extra={"q": "eq"})
     period: str | None = Field(default=None, description="项目周期", json_schema_extra={"q": "eq"})

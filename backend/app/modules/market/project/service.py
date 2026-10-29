@@ -9,8 +9,6 @@
 避免本模块加载时因依赖尚未就绪而整体失败。
 """
 
-import uuid
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +17,7 @@ from app.core.exceptions import CustomException
 from app.utils.common_util import search_to_dict
 
 from ..enums import ProjectStatus, SubmissionStatus
+from ..numbering import NumberPrefix, next_code
 from .crud import CompanyCRUD, ProjectCRUD, ProjectTemplateCRUD, ReportCRUD
 from .schema import (
     CompanyCreateSchema,
@@ -79,21 +78,18 @@ class CompanyService:
         )
 
     async def create(self, data: CompanyCreateSchema) -> CompanyOutSchema:
-        """创建医药公司。"""
+        """创建医药公司（编号自动生成）。"""
         if await CompanyCRUD(self.auth, self.db).get(name=data.name):
             raise CustomException(msg="已存在相同名称的医药公司")
-        if data.code and await CompanyCRUD(self.auth, self.db).get(code=data.code):
-            raise CustomException(msg="已存在相同编码的医药公司")
-        company = await CompanyCRUD(self.auth, self.db).create(data=data)
+        code = await next_code(self.db, NumberPrefix.COMPANY)
+        company = await CompanyCRUD(self.auth, self.db).create(data={**data.model_dump(), "code": code})
         return CompanyOutSchema.model_validate(company)
 
     async def update(self, id: int, data: CompanyUpdateSchema) -> CompanyOutSchema:
-        """更新医药公司。"""
+        """更新医药公司（编号不可修改）。"""
         await CompanyCRUD(self.auth, self.db).get_or_404(id=id)
         if data.name and (exist := await CompanyCRUD(self.auth, self.db).get(name=data.name)) and exist.id != id:
             raise CustomException(msg="已存在相同名称的医药公司")
-        if data.code and (exist := await CompanyCRUD(self.auth, self.db).get(code=data.code)) and exist.id != id:
-            raise CustomException(msg="已存在相同编码的医药公司")
         await CompanyCRUD(self.auth, self.db).update(id=id, data=data)
         return await self.detail(id=id)
 
@@ -135,20 +131,17 @@ class ProjectService:
         )
 
     async def create(self, data: ProjectCreateSchema) -> ProjectOutSchema:
-        """创建项目（草稿状态），并关联二级模板。"""
-        if await ProjectCRUD(self.auth, self.db).get(code=data.code):
-            raise CustomException(msg="已存在相同编码的项目")
+        """创建项目（草稿状态，编号自动生成），并关联二级模板。"""
         await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
         create_data = data.model_dump(exclude={"template_ids"})
+        create_data["code"] = await next_code(self.db, NumberPrefix.PROJECT)
         project = await ProjectCRUD(self.auth, self.db).create(data=create_data)
         await self._sync_template_links(project.id, data.template_ids)
         return await self.detail(id=project.id)
 
     async def update(self, id: int, data: ProjectUpdateSchema) -> ProjectOutSchema:
-        """更新项目。"""
+        """更新项目（编号不可修改）。"""
         await ProjectCRUD(self.auth, self.db).get_or_404(id=id)
-        if data.code and (exist := await ProjectCRUD(self.auth, self.db).get(code=data.code)) and exist.id != id:
-            raise CustomException(msg="已存在相同编码的项目")
         if data.company_id is not None:
             await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
         update_data = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"template_ids"})
@@ -199,7 +192,7 @@ class ProjectService:
     async def publish(self, id: int) -> ProjectOutSchema:
         """发布项目：状态置为进行中，并按关联的二级模板批量创建任务实例。
 
-        任务实例字段按新设计（``market_task``）：``task_no`` 用 ``TK{period}-{uuid8}`` 保证唯一，
+        任务实例字段按新设计（``market_task``）：``task_no`` 用 ``TK-XXX`` 编号自动生成，
         ``name=f"{project.name}-{template.name}"``，``period=project.period``，
         ``assign_mode="direct"``，``status="DRAFT"``；已存在同 project+template 的任务则跳过（幂等）。
         """
@@ -214,9 +207,10 @@ class ProjectService:
             existing = await TaskCRUD(self.auth, self.db).get(project_id=id, template_id=template.id)
             if existing:
                 continue  # 同项目同模板已生成任务，幂等跳过
+            task_no = await next_code(self.db, NumberPrefix.TASK)
             await TaskCRUD(self.auth, self.db).create(
                 data={
-                    "task_no": f"TK{project.period}-{uuid.uuid4().hex[:8]}",
+                    "task_no": task_no,
                     "project_id": id,
                     "template_id": template.id,
                     "name": f"{project.name}-{template.name}",
