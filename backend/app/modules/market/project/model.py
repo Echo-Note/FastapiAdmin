@@ -11,9 +11,10 @@
 此处仅以字符串引用，避免模块间强耦合导入。
 """
 
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import JSONType, ModelMixin, UserMixin
@@ -56,7 +57,7 @@ class ProjectModel(ModelMixin, UserMixin):
     company_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_company.id", ondelete="RESTRICT"), nullable=False, index=True, comment="委托方(医药公司)ID"
     )
-    period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="项目周期(如 2026 全年)")
+    period: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="项目截止日期")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="项目状态")
     publisher_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, index=True, comment="发布人ID"

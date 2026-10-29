@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
-from app.core.validator import DateTimeStr
+from app.core.validator import DateStr, DateTimeStr
 
 from ..config import TaskConfig, TaskItemConfig
 
@@ -174,7 +174,7 @@ class TaskOutSchema(BaseSchema, UserBySchema):
     template_id: int = Field(description="所属二级模板ID")
     template: TaskTemplateOutSchema | None = Field(default=None, description="所属二级模板(含分类)")
     name: str = Field(description="C端显示名")
-    period: str = Field(description="周期(继承项目周期)")
+    period: DateStr = Field(description="截止日期(继承项目截止日期)")
     assign_mode: str = Field(default="direct", description="分配方式(direct 定向分派/open 公开大厅)")
     status: str = Field(default="DRAFT", description="任务状态")
     publisher_id: int | None = Field(default=None, description="发布人ID")
@@ -187,7 +187,7 @@ class TaskCreateSchema(BaseModel):
     project_id: int = Field(gt=0, description="所属项目ID")
     template_id: int = Field(gt=0, description="所属二级模板ID")
     name: str = Field(min_length=1, max_length=256, description="C端显示名(如 一心坦-等级医院管理)")
-    period: str = Field(min_length=1, max_length=16, description="周期(继承项目周期，如 2026-10)")
+    period: DateStr = Field(description="截止日期(继承项目截止日期，如 2026-12-31)")
     assign_mode: Literal["direct", "open"] = Field(default="direct", description="分配方式(direct 定向分派/open 公开大厅)")
 
 
@@ -197,7 +197,7 @@ class TaskUpdateSchema(BaseModel):
     project_id: int | None = Field(default=None, gt=0, description="所属项目ID")
     template_id: int | None = Field(default=None, gt=0, description="所属二级模板ID")
     name: str | None = Field(default=None, min_length=1, max_length=256, description="C端显示名")
-    period: str | None = Field(default=None, min_length=1, max_length=16, description="周期")
+    period: DateStr | None = Field(default=None, description="截止日期")
     assign_mode: Literal["direct", "open"] | None = Field(default=None, description="分配方式")
 
 

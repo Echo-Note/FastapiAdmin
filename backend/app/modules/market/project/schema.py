@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
+from app.core.validator import DateStr
 
 
 class CompanyOutSchema(BaseSchema, UserBySchema):
@@ -64,7 +65,7 @@ class ProjectOutSchema(BaseSchema, UserBySchema):
     name: str = Field(description="项目名(如药品名)")
     company_id: int = Field(description="委托方(医药公司)ID")
     company: CompanyOutSchema | None = Field(default=None, description="委托方(医药公司)")
-    period: str = Field(description="项目周期(如 2026 全年)")
+    period: DateStr = Field(description="项目截止日期(如 2026-12-31)")
     status: str = Field(description="项目状态")
     publisher_id: int | None = Field(default=None, description="发布人ID")
     template_ids: list[int] = Field(default_factory=list, description="关联的二级模板ID列表")
@@ -75,7 +76,7 @@ class ProjectCreateSchema(BaseModel):
 
     name: str = Field(min_length=1, max_length=128, description="项目名(如药品名)")
     company_id: int = Field(gt=0, description="委托方(医药公司)ID")
-    period: str = Field(min_length=1, max_length=16, description="项目周期(如 2026 全年)")
+    period: DateStr = Field(description="项目截止日期(如 2026-12-31)")
     template_ids: list[int] = Field(default_factory=list, description="关联的二级模板ID列表(可为空)")
 
 
@@ -84,7 +85,7 @@ class ProjectUpdateSchema(BaseModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=128, description="项目名(如药品名)")
     company_id: int | None = Field(default=None, gt=0, description="委托方(医药公司)ID")
-    period: str | None = Field(default=None, min_length=1, max_length=16, description="项目周期")
+    period: DateStr | None = Field(default=None, description="项目截止日期(如 2026-12-31)")
     template_ids: list[int] | None = Field(default=None, description="关联的二级模板ID列表(缺省不修改)")
 
 

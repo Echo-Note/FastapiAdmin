@@ -8,10 +8,10 @@
 状态机取值见 ``app.modules.market.enums``。
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, SmallInteger, String, Text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import JSONType, ModelMixin, UserMixin
@@ -90,7 +90,7 @@ class TaskModel(ModelMixin, UserMixin):
         Integer, ForeignKey("market_task_template.id", ondelete="RESTRICT"), nullable=False, comment="所属二级模板ID"
     )
     name: Mapped[str] = mapped_column(String(256), nullable=False, index=True, comment="C端显示名(如 一心坦-等级医院管理)")
-    period: Mapped[str] = mapped_column(String(16), nullable=False, index=True, comment="周期(继承项目周期，如 2026-10)")
+    period: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="截止日期(继承项目截止日期)")
     assign_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="direct", index=True, comment="分配方式(direct 定向分派/open 公开大厅)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="任务状态")
     publisher_id: Mapped[int | None] = mapped_column(
