@@ -7,6 +7,7 @@ SQLAlchemy 解析 ``relationship`` 字符串引用时依赖所有模型均已注
 """
 
 from .institution.model import InstitutionImageModel, InstitutionModel
+from .numbering import MarketNumberCounterModel
 from .payout.model import (
     AllowanceDetailModel,
     AllowanceModel,
@@ -31,6 +32,7 @@ __all__ = [
     "CompanyModel",
     "InstitutionImageModel",
     "InstitutionModel",
+    "MarketNumberCounterModel",
     "PayoutConfigModel",
     "ProjectModel",
     "ProjectTemplateModel",
