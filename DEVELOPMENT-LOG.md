@@ -1127,6 +1127,47 @@
 
 ---
 
+### 2026-10-29 — 市场模块 code 改「类型前缀+数字」自动编号（并发/分布式安全）
+
+#### 1. 原因
+
+用户要求：市场管理模块所有业务实体的 `code`（一级分类/二级模板/三级任务/医药公司/项目）由「手填英文编码」改为「数字编号」，页面添加时不再让用户输入，由后端按规则自动生成；并特别提醒**注意并发冲突与分布式冲突**。任务实例流水号 `task_no` 一并纳入。
+
+#### 2. 编号规则
+
+- 格式：`{类型前缀}-{NNN}`，序号从 1 起独立递增，补齐到至少 4 位（超 9999 自动扩展，后续按需求可再调宽）。
+- 前缀映射：`CAT`(一级分类) / `TPL`(二级模板) / `ITEM`(三级任务) / `CO`(医药公司) / `PRJ`(项目) / `TK`(任务实例 task_no)。
+- 生成：后端创建时自动生成，前端不提供输入；编号一旦生成不可修改。
+
+#### 3. 修改内容
+
+**后端**
+- 新增 `app/modules/market/numbering.py`：`NumberPrefix` 前缀常量 + `MarketNumberCounterModel` 计数器表（`market_number_counter`，`prefix` 主键 + `current_value` BigInteger）+ `next_code` 原子生成 + `sync_counter` seed 对齐。
+- `models.py` 注册 `MarketNumberCounterModel`。
+- 模型：`TaskItemModel.code` 由「模板内唯一 `UniqueConstraint(template_id, code)`」改为全局 `unique=True, index=True`；`CompanyModel.code` 由可空改非空 `unique=True`；`code`/`task_no` 注释「编码/流水号」统一改「编号」。
+- Schema：各 `CreateSchema`/`UpdateSchema` 移除 `code`/`task_no` 字段（编号不可改、前端不传）；`OutSchema`/`QueryParam` 保留用于展示与搜索。
+- Service：`create` 时调 `next_code` 自动生成编号，移除所有 code/task_no 重复检查；`ProjectService.publish` 的 task_no 由 `TK{period}-{uuid8}` 改为 `next_code(NumberPrefix.TASK)`。
+- 种子 JSON：6 分类 / 18 模板 / 51 任务的**顶层** code 重写为 `CAT-0001..`/`TPL-0001..`/`ITEM-0001..`（`config.form_schema` 分节 code 不动）。
+- `reseed_market.py` / `initialize.py`：seed 后调 `sync_counter` 对齐计数器。
+
+**前端 web**
+- `api/module_market` 5 个 Form 类型移除 `code` 字段（Table/PageQuery 保留）。
+- `company`/`project`/`task-catalog` 三页移除「编码」输入框与必填校验；列表/详情/搜索栏 label「编码」→「编号」；`task` 页 task_no label「任务号」→「任务编号」。
+- 测试 `test_market_company_institution.py` 移除创建公司时传 `code`。
+
+#### 4. 关键口径（并发/分布式安全）
+
+- 序号取自 `market_number_counter` 计数器表，用**单条 `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`** 原子自增：PG 主键冲突 + 行级锁保证并发事务与多实例（分布式）下同一前缀序号严格递增、不重复；事务回滚时计数一并回滚，序号不产生空洞。
+- 计数器表是普通 ORM 表，随 `create_all`/autogen 自动建表，无需独立 PG SEQUENCE。
+- **seed 预置编号后必须 `sync_counter`**（`GREATEST` 只增不减）对齐计数器，否则 `TRUNCATE`/reseed 后计数器空，下次自动编号会与预置编号撞唯一约束。
+
+#### 5. 验证
+
+- 后端：`ruff check app/modules/market/ app/scripts/reseed_market.py app/scripts/initialize.py` All checks passed；`numbering`/`initialize`/`reseed_market` 导入成功。
+- 前端 web：read_lints 零错误。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -1188,3 +1229,7 @@
    - 现象：`market_task.template_id`（列索引）与 `market_task_template.id`（ModelMixin 主键 `index=True`）都渲染为 `ix_market_task_template_id`，`create_all` 建到第二个同名索引时抛 `DuplicateTableError: relation "ix_market_task_template_id" already exists`，全部测试在 TestClient 布局阶段 ERROR。
    - 结论：当出现「`X.Y_id` 列」与「`X_Y` 表的主键 `id`」并存时，默认命名约定会把两者拼成同一个 `ix_X_Y_id`。修复需给冲突列改用**显式 `Index` 对象**（`__table_args__` 里 `Index("ix_X_Y_fk", "Y_id")`），因为 `Column.index` 参数只接受布尔、不接受字符串名。给新模型加 `_id` 外键列时，先扫一遍是否存在 `前缀_该后缀` 形式的表名，避免重名。
    - 附带：dev autogen 在「旧库 → 新模型」时生成的根迁移（`down_revision=None`）是对旧 schema 的增量，不是从空库的干净迁移，且版本文件目录应保持「仅 `__init__.py`」，勿提交这类中间态迁移（否则与 create_all 自举库撞表/撞索引）。
+
+16. **编号计数器表被 `TRUNCATE` 清空后未对齐 seed → 自动编号撞预置编号唯一约束**（2026-10-29）
+   - 现象：market 域编号改用计数器表 `market_number_counter` 原子自增，但 `reseed_market.py` 的 `_market_tables()` 会收集所有 `market_` 前缀表（含计数器表）一并 `TRUNCATE`，重播种后计数器为空；下次创建分类 `next_code(CAT)` 从 1 重新开始，与 seed 预置的 `CAT-001` 撞唯一约束。
+   - 结论：凡「预置编号 + 计数器自增」并存，seed/reseed 后必须用 `sync_counter`（`INSERT ... ON CONFLICT DO UPDATE SET current_value = GREATEST(current_value, :seq)`）把计数器对齐到预置编号的最大序号；`GREATEST` 保证只增不减、幂等。与踩坑 6（seed 用硬编码 ID 依赖空库自增）同源：market 域的种子与计数器都要和 `TRUNCATE ... RESTART IDENTITY` 的语义保持一致。
