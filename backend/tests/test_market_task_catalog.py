@@ -12,9 +12,9 @@ class TestTaskCatalogTree:
         assert body["success"] is True
 
         categories = body["data"]
-        # 种子：一级分类 5 条、二级模板 22 条
-        assert len(categories) == 5
-        assert sum(len(c["children"]) for c in categories) == 22
+        # 种子：一级分类 6 条、二级模板 18 条（任务目录三级化后，见 DEVELOPMENT-LOG「任务目录三级化」）
+        assert len(categories) == 6
+        assert sum(len(c["children"]) for c in categories) == 18
 
         for category in categories:
             # 分类节点不含 category_id（只有模板子节点携带）

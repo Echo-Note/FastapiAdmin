@@ -24,9 +24,9 @@ class TestDashboard:
         """空库播种后，一级分类 / 二级模板计数与种子数据一致。"""
         resp = test_client.get("/market/dashboard/overview", headers=auth_headers)
         data = resp.json()["data"]
-        # 种子：一级分类 5 条、二级模板 22 条（见 market_task_category.json / market_task_template.json）
-        assert data["category_count"] == 5
-        assert data["template_count"] == 22
+        # 种子：一级分类 6 条、二级模板 18 条（任务目录三级化后，见 DEVELOPMENT-LOG「任务目录三级化」）
+        assert data["category_count"] == 6
+        assert data["template_count"] == 18
         # 未产生任何任务/成果/结算
         assert data["task"]["total"] == 0
         assert data["submission"]["total"] == 0
