@@ -140,19 +140,6 @@ export interface SubmissionItem {
   ai_check_result?: Record<string, unknown> | null
 }
 
-/** 机构（对齐后端 InstitutionOutSchema，供成果提交选择） */
-export interface InstitutionItem {
-  id?: number
-  name?: string
-  type?: string
-  level?: string | null
-  region?: string | null
-  address?: string | null
-  contact?: string | null
-  contact_phone?: string | null
-  status?: number
-}
-
 /** 我的发放/津贴（对齐后端 mini/payout 返回） */
 export interface PayoutSummary {
   user_id?: number
@@ -211,11 +198,6 @@ export const MarketAPI = {
     const method = http.Get<PayoutSummary>(`${MARKET_BASE}/mini/payout`, params)
     method.config.cacheFor = 0
     return method
-  },
-
-  /** 机构列表（提交成果选择对象机构，走小程序端 mini 接口，无需运营端 RBAC 权限） */
-  getInstitutions(params?: Record<string, any>) {
-    return http.Get<MarketPageResult<InstitutionItem>>(`${MARKET_BASE}/mini/institutions`, params)
   },
 
   /**

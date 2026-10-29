@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FormSchema, FormSchemaField, InstitutionItem, TaskItemConfig } from '@/api/module_market'
+import type { FormSchema, FormSchemaField, TaskItemConfig } from '@/api/module_market'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -24,12 +24,7 @@ interface TaskItemView {
 }
 const taskItems = ref<TaskItemView[]>([])
 
-const institutionId = ref<number>()
-const institutions = ref<InstitutionItem[]>([])
 const period = ref(currentMonth())
-
-const showInstitutionPicker = ref(false)
-const institutionColumns = computed(() => [institutions.value.map(i => ({ value: i.id, label: i.name }))])
 
 /** 当前月份（提交月份默认值，如 2026-03） */
 function currentMonth() {
@@ -113,19 +108,6 @@ function isRequired(field: FormSchemaField) {
 /** 动态字段是否使用选择器（select / radio） */
 function usePicker(field: FormSchemaField) {
   return field.type === 'select' || field.type === 'radio' || !!field.options?.length
-}
-
-function openInstitutionPicker() {
-  if (institutions.value.length === 0)
-    return
-  showInstitutionPicker.value = true
-}
-
-function onInstitutionConfirm(e: { value: Array<string | number> }) {
-  const item = institutions.value.find(i => String(i.id) === String(e.value[0]))
-  if (item)
-    institutionId.value = item.id
-  showInstitutionPicker.value = false
 }
 
 function openFieldPicker(sectionCode: string, name: string, field: FormSchemaField) {
@@ -233,20 +215,6 @@ function chooseAndUploadFile(sectionCode: string, name: string) {
   })
 }
 
-function institutionName() {
-  return institutions.value.find(i => i.id === institutionId.value)?.name ?? ''
-}
-
-async function loadInstitutions() {
-  try {
-    const res = await MarketAPI.getInstitutions({ page_no: 1, page_size: 100 })
-    institutions.value = (res as any).items ?? []
-  }
-  catch {
-    institutions.value = []
-  }
-}
-
 /** 初始化表单数据：按分节嵌套，多行子表字段初始化为首行 */
 function initFormData() {
   for (const section of allSections.value) {
@@ -262,10 +230,6 @@ function initFormData() {
 
 /** 校验必填：单值必填字段 + 多行子表的必填列 */
 function validate(): boolean {
-  if (!institutionId.value) {
-    toast.warning(t('market.selectInstitution'))
-    return false
-  }
   for (const section of allSections.value) {
     for (const [name, field] of Object.entries(section.fields)) {
       if (field.type === 'table') {
@@ -289,13 +253,10 @@ function validate(): boolean {
   return true
 }
 
-/** 构造提交载荷：{ assignment_id, subject_type, institution_id, subject_name, period, form_data }，form_data 按分节嵌套 */
+/** 构造提交载荷：{ assignment_id, period, form_data }，form_data 按分节嵌套；机构信息由后端从 form_data 归集 */
 function buildPayload() {
   return {
     assignment_id: assignmentId.value,
-    subject_type: 'institution',
-    institution_id: institutionId.value,
-    subject_name: undefined,
     period: period.value,
     form_data: JSON.parse(JSON.stringify(formData)),
   }
@@ -344,7 +305,6 @@ onLoad((query) => {
   assignmentId.value = Number(query?.assignment_id)
   taskNo.value = query?.task_no ?? ''
   loadAssignment()
-  loadInstitutions()
 })
 </script>
 
@@ -358,12 +318,6 @@ onLoad((query) => {
       <view class="mt-3 rounded-2 bg-white p-4">
         <wd-loading v-if="formLoading" class="my-4 block" />
         <wd-form v-if="!formLoading" :model="formData" label-position="left">
-          <wd-form-item :label="t('market.institution')" required border>
-            <view class="flex-1" @click="openInstitutionPicker">
-              <wd-cell :value="institutionName() || t('market.selectInstitution')" is-link :border="false" />
-            </view>
-            <wd-picker :visible="showInstitutionPicker" :columns="institutionColumns" @confirm="onInstitutionConfirm" @cancel="showInstitutionPicker = false" />
-          </wd-form-item>
           <wd-form-item :label="t('market.period')" required border>
             <wd-input v-model="period" :placeholder="t('market.period')" />
           </wd-form-item>
