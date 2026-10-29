@@ -69,7 +69,35 @@
           label-position="right"
           :span="24"
           :gutter="16"
-        />
+        >
+          <template #period>
+            <ElDatePicker
+              v-model="formData.period"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="请选择截止日期"
+              :shortcuts="periodShortcuts"
+              :clearable="true"
+              style="width: 100%"
+            />
+          </template>
+          <template #template_ids>
+            <ElTreeSelect
+              v-model="formData.template_ids"
+              :data="templateTreeData"
+              multiple
+              show-checkbox
+              filterable
+              clearable
+              :filter-node-method="filterTemplateNode"
+              :props="{ label: 'name', children: 'children', disabled: 'disabled' }"
+              node-key="id"
+              :render-after-expand="false"
+              placeholder="请选择二级任务模板（勾选分类可全选其下模板）"
+              style="width: 100%"
+            />
+          </template>
+        </FaForm>
       </template>
     </FaDialog>
   </div>
@@ -78,7 +106,8 @@
 <script setup lang="ts">
 import ProjectAPI, { type ProjectForm, type ProjectTable } from "@/api/module_market/project";
 import CompanyAPI from "@/api/module_market/company";
-import TaskTemplateAPI from "@/api/module_market/task-template";
+import TaskCategoryAPI, { type TaskCategoryTreeItem } from "@/api/module_market/task-category";
+import dayjs from "dayjs";
 import { useDictStore } from "@stores";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
 import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
@@ -108,15 +137,49 @@ const searchForm = ref<{ code?: string; name?: string; company_id?: number; peri
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
+/** 关联模板树节点：分类用负数 id 与模板正数 id 区分，避免「分类 id」与「模板 id」各自自增撞车；id 同时作为 el-tree-select 的 node-key 与选中值 */
+interface TemplateTreeNode {
+  id: number;
+  name: string;
+  disabled?: boolean;
+  children?: TemplateTreeNode[];
+}
+
 const companyOptions = ref<OptionType[]>([]);
-const templateOptions = ref<OptionType[]>([]);
+const templateTreeData = ref<TemplateTreeNode[]>([]);
 const templateMap = ref<Record<number, string>>({});
+
+/** 把「一级分类 → 二级模板」目录树转换为 el-tree-select 数据（模板为叶子，分类负值仅作父级） */
+function buildTemplateTree(categories: TaskCategoryTreeItem[]): TemplateTreeNode[] {
+  return categories.map((cat) => ({
+    id: -(cat.id ?? 0),
+    name: cat.name ?? "",
+    disabled: !cat.children?.length,
+    children: (cat.children ?? []).map((tpl) => ({
+      id: tpl.id!,
+      name: tpl.name ?? tpl.code ?? "",
+    })),
+  }));
+}
+
+/** 关联模板树节点按名称过滤（el-tree-select 的 filterable 需显式 filter-node-method，否则默认按 label 字段匹配会失效） */
+function filterTemplateNode(value: string, data: { name?: string }): boolean {
+  return (data.name ?? "").includes(value);
+}
+
+/** 截止日期快捷选项：相对今天推算一个月/三个月/六个月/一年 */
+const periodShortcuts = [
+  { text: "一个月", value: () => dayjs().add(1, "month").toDate() },
+  { text: "三个月", value: () => dayjs().add(3, "month").toDate() },
+  { text: "六个月", value: () => dayjs().add(6, "month").toDate() },
+  { text: "一年", value: () => dayjs().add(1, "year").toDate() },
+];
 
 const searchItems = computed<SearchFormItem[]>(() => [
   { label: "项目编号", key: "code", type: "input", placeholder: "请输入项目编号", clearable: true, span: 6 },
   { label: "项目名", key: "name", type: "input", placeholder: "请输入项目名", clearable: true, span: 6 },
   { label: "委托方", key: "company_id", type: "select", props: { placeholder: "请选择医药公司", options: companyOptions.value, filterable: true, clearable: true }, span: 6 },
-  { label: "周期", key: "period", type: "input", placeholder: "如 2026-10", clearable: true, span: 6 },
+  { label: "截止日期", key: "period", type: "date", props: { type: "date", placeholder: "请选择截止日期", clearable: true }, span: 6 },
   { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: statusOptions.value, clearable: true }, span: 6 },
 ]);
 
@@ -159,7 +222,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "code", label: "项目编号", minWidth: 120, showOverflowTooltip: true },
         { prop: "name", label: "项目名", minWidth: 150, showOverflowTooltip: true },
         { prop: "company", label: "委托方", minWidth: 150, formatter: (row: ProjectTable) => row.company?.name ?? "—" },
-        { prop: "period", label: "周期", width: 90 },
+        { prop: "period", label: "截止日期", width: 110 },
         { prop: "template_ids", label: "关联模板数", width: 100, align: "center", formatter: (row: ProjectTable) => row.template_ids?.length ?? 0 },
         { prop: "status", label: "状态", width: 92, status: projectStatusMap.value },
         { prop: "operation", label: "操作", width: 260, fixed: "right", align: "center", formatter: (row: ProjectTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
@@ -172,7 +235,7 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "项目编号", prop: "code" },
   { label: "项目名", prop: "name" },
   { label: "委托方", prop: "company.name" },
-  { label: "周期", prop: "period" },
+  { label: "截止日期", prop: "period" },
   { label: "状态", prop: "status", tag: { map: projectStatusMap.value } },
   { label: "关联模板", prop: "template_ids", slot: "templateNames", span: 4 },
   { label: "创建人", prop: "created_by.name" },
@@ -188,18 +251,18 @@ const initialFormData: ProjectForm = { id: undefined, name: undefined, company_i
 
 const rules = reactive({
   name: [{ required: true, message: "请输入项目名", trigger: "blur" }],
-  company_id: [{ required: true, message: "请选择委托方", trigger: "change" }],
-  period: [{ required: true, message: "请输入周期", trigger: "blur" }],
+  company_id: [{ required: true, message: "请选择或输入委托方", trigger: "change" }],
+  period: [{ required: true, message: "请选择截止日期", trigger: "change" }],
 });
 
 const formItems = computed<FormItem[]>(() => [
   { label: "项目名", key: "name", type: "input", span: 24, props: { placeholder: "项目名称", maxlength: 128 } },
-  { label: "委托方", key: "company_id", type: "select", span: 24, props: { placeholder: "请选择医药公司", options: companyOptions.value, filterable: true } },
-  { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "项目周期，如 2026 全年", maxlength: 16 } },
-  { label: "关联模板", key: "template_ids", type: "select", span: 24, props: { placeholder: "请选择二级任务模板（可多选）", options: templateOptions.value, multiple: true, filterable: true, clearable: true } },
+  { label: "委托方", key: "company_id", type: "select", span: 24, props: { placeholder: "请选择或输入医药公司", options: companyOptions.value, filterable: true, allowCreate: true, defaultFirstOption: true } },
+  { label: "截止日期", key: "period", span: 24 },
+  { label: "关联模板", key: "template_ids", span: 24 },
 ]);
 
-const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = useCrudForm<ProjectForm>({
+const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit: crudSubmit } = useCrudForm<ProjectForm>({
   formData,
   initialFormData,
   dialogVisible,
@@ -214,6 +277,28 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   onUpdateSuccess: refreshUpdate,
 });
 
+/** 提交前把「输入的新委托方名称」转换为公司 id（同名复用、否则自动创建） */
+async function normalizeCompanyId() {
+  const cid = formData.value.company_id;
+  if (typeof cid !== "string" || !cid.trim()) return;
+  const name = cid.trim();
+  const exist = companyOptions.value.find((c) => c.label === name);
+  if (exist) {
+    formData.value.company_id = exist.value as number;
+    return;
+  }
+  const res = await CompanyAPI.createCompany({ name });
+  const id = res.data.data.id!;
+  formData.value.company_id = id;
+  companyOptions.value.push({ value: id, label: res.data.data.name ?? name });
+}
+
+/** 提交表单：先归一化委托方，再走通用 CRUD 提交流程 */
+async function handleSubmit() {
+  await normalizeCompanyId();
+  await crudSubmit();
+}
+
 function resolveTemplateNames(row: Record<string, unknown> | null): string {
   const ids = (row?.template_ids as number[] | undefined) ?? [];
   if (ids.length === 0) return "—";
@@ -221,13 +306,16 @@ function resolveTemplateNames(row: Record<string, unknown> | null): string {
 }
 
 async function loadOptions() {
-  const [companyRes, templateRes] = await Promise.all([
+  const [companyRes, treeRes] = await Promise.all([
     CompanyAPI.listCompany({ page_no: 1, page_size: 100 }),
-    TaskTemplateAPI.listTemplate({ page_no: 1, page_size: 100 }),
+    TaskCategoryAPI.treeCategory(),
   ]);
   companyOptions.value = companyRes.data.data.items.map((c) => ({ value: c.id!, label: c.name ?? "" }));
-  templateOptions.value = templateRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? t.code ?? "" }));
-  templateMap.value = Object.fromEntries(templateRes.data.data.items.map((t) => [t.id!, t.name ?? t.code ?? ""]));
+  const categories = treeRes.data.data ?? [];
+  templateTreeData.value = buildTemplateTree(categories);
+  templateMap.value = Object.fromEntries(
+    categories.flatMap((cat) => (cat.children ?? []).map((tpl) => [tpl.id!, tpl.name ?? tpl.code ?? ""]))
+  );
 }
 
 onMounted(async () => {

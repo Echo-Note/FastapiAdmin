@@ -102,7 +102,9 @@ export interface ProjectTable extends BaseType {
 
 export interface ProjectForm extends BaseFormType {
   name?: string;
-  company_id?: number;
+  /** 委托方(医药公司)ID；新增时若直接输入新公司名则为 string，提交前会转换为公司 id */
+  company_id?: number | string;
+  /** 项目截止日期（YYYY-MM-DD） */
   period?: string;
   template_ids?: number[];
 }
