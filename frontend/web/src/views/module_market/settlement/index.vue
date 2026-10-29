@@ -50,7 +50,7 @@
     </ElDialog>
 
     <!-- 归集结算对话框 -->
-    <ElDialog v-model="settleVisible" title="归集结算" width="480px" :close-on-click-modal="false" @closed="resetSettleForm">
+    <ElDialog v-model="settleVisible" title="归集结算" width="480px" :close-on-click-modal="false">
       <FaForm
         ref="settleFormRef"
         v-model="settleForm"
@@ -80,7 +80,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
-import { createFormDraft } from "@/utils/form-draft";
+import { useFormDraft } from "@/hooks/core/useFormDraft";
 
 defineOptions({ name: "MarketSettlement", inheritAttrs: false });
 
@@ -204,17 +204,15 @@ const settleRules = reactive({
   period: [{ required: true, message: "请输入结算月份", trigger: "blur" }],
 });
 
-const settleDraft = createFormDraft("settlement");
+const settleDraft = useFormDraft({
+  key: "settlement",
+  dialogVisible: settleVisible,
+  form: settleForm,
+  blank: () => ({ task_id: undefined, period: undefined }),
+});
 
 function openSettleDialog() {
-  settleForm.value = { task_id: undefined, period: undefined };
-  settleDraft.restore(settleForm.value);
-  settleVisible.value = true;
-}
-
-function resetSettleForm() {
-  settleDraft.persist(settleForm.value);
-  settleForm.value = { task_id: undefined, period: undefined };
+  settleDraft.openCreate();
 }
 
 async function handleSettleSubmit() {

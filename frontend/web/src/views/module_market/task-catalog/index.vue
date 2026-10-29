@@ -30,7 +30,6 @@
       :form-mode="categoryDialogMode"
       :confirm-loading="categorySubmitting"
       @confirm="handleCategorySubmit()"
-      @close="resetCategoryForm"
       @cancel="categoryDialogVisible = false"
     >
       <FaForm
@@ -52,7 +51,6 @@
       :title="templateDialogMode === 'create' ? '新增二级模板' : '修改二级模板'"
       width="820px"
       :close-on-click-modal="false"
-      @closed="resetTemplateForm"
     >
       <FaForm
         ref="templateFormRef"
@@ -84,7 +82,6 @@
       width="1100px"
       draggable
       :close-on-click-modal="false"
-      @closed="resetItemForm"
     >
       <FaForm
         ref="itemFormRef"
@@ -179,7 +176,7 @@ import { useTableColumns } from "@/hooks/core/useTableColumns";
 import { useDictStore } from "@stores";
 import { ElMessage } from "element-plus";
 import { renderTableOperationCell, type TableOperationAction } from "@utils";
-import { createFormDraft } from "@/utils/form-draft";
+import { useFormDraft } from "@/hooks/core/useFormDraft";
 
 defineOptions({ name: "MarketTaskCatalog", inheritAttrs: false });
 
@@ -364,22 +361,18 @@ const categoryFormItems: import("@/components/forms/fa-form/index.vue").FormItem
   { label: "描述", key: "description", type: "input", span: 24, props: { type: "textarea", rows: 3, maxlength: 255, showWordLimit: true, placeholder: "分类描述（可选）" } },
 ];
 
-const categoryDraft = createFormDraft("task-catalog-category");
-
-function resetCategoryForm() {
-  if (categoryDialogMode.value === "create") {
-    categoryDraft.persist(categoryForm.value);
-  }
-  categoryForm.value = { id: undefined, name: undefined, sort: 0, description: undefined };
-  categoryEditId.value = null;
-}
+const categoryDraft = useFormDraft({
+  key: "task-catalog-category",
+  dialogVisible: categoryDialogVisible,
+  form: categoryForm,
+  blank: () => ({ id: undefined, name: undefined, sort: 0, description: undefined }),
+  mode: categoryDialogMode,
+});
 
 function openCategoryCreate() {
   categoryDialogMode.value = "create";
-  categoryForm.value = { id: undefined, name: undefined, sort: 0, description: undefined };
   categoryEditId.value = null;
-  categoryDraft.restore(categoryForm.value);
-  categoryDialogVisible.value = true;
+  categoryDraft.openCreate();
 }
 
 function openCategoryEdit(row: CategoryNode) {
@@ -461,15 +454,13 @@ function blankTemplateForm(): TemplateEditForm {
   };
 }
 
-const templateDraft = createFormDraft("task-catalog-template");
-
-function resetTemplateForm() {
-  if (templateDialogMode.value === "create") {
-    templateDraft.persist(templateForm.value);
-  }
-  templateForm.value = blankTemplateForm();
-  templateEditId.value = null;
-}
+const templateDraft = useFormDraft({
+  key: "task-catalog-template",
+  dialogVisible: templateDialogVisible,
+  form: templateForm,
+  blank: blankTemplateForm,
+  mode: templateDialogMode,
+});
 
 function fillTemplateFormFromConfig(config?: TaskConfig | null) {
   templateForm.value.subject_type = config?.subject_type ?? "institution";
@@ -524,11 +515,8 @@ const templateFormItems: import("@/components/forms/fa-form/index.vue").FormItem
 
 function openTemplateCreate(categoryRow?: CategoryNode) {
   templateDialogMode.value = "create";
-  templateForm.value = blankTemplateForm();
   templateEditId.value = null;
-  templateDraft.restore(templateForm.value);
-  if (categoryRow) templateForm.value.category_id = categoryRow.id;
-  templateDialogVisible.value = true;
+  templateDraft.openCreate(categoryRow ? { category_id: categoryRow.id } : undefined);
 }
 
 async function openTemplateEdit(row: TemplateNode) {
@@ -616,15 +604,13 @@ function blankItemForm(): ItemEditForm {
   };
 }
 
-const itemDraft = createFormDraft("task-catalog-item");
-
-function resetItemForm() {
-  if (itemDialogMode.value === "create") {
-    itemDraft.persist(itemForm.value);
-  }
-  itemForm.value = blankItemForm();
-  itemEditId.value = null;
-}
+const itemDraft = useFormDraft({
+  key: "task-catalog-item",
+  dialogVisible: itemDialogVisible,
+  form: itemForm,
+  blank: blankItemForm,
+  mode: itemDialogMode,
+});
 
 const itemRules = reactive({
   name: [{ required: true, message: "请输入任务名", trigger: "blur" }],
@@ -642,11 +628,8 @@ const itemFormItems: import("@/components/forms/fa-form/index.vue").FormItem[] =
 
 function openItemCreate(templateRow?: TemplateNode) {
   itemDialogMode.value = "create";
-  itemForm.value = blankItemForm();
   itemEditId.value = null;
-  itemDraft.restore(itemForm.value);
-  if (templateRow) itemForm.value.template_id = templateRow.id;
-  itemDialogVisible.value = true;
+  itemDraft.openCreate(templateRow ? { template_id: templateRow.id } : undefined);
 }
 
 async function openItemEdit(row: ItemNode) {

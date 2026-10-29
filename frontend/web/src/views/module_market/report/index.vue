@@ -37,7 +37,7 @@
     </ElCard>
 
     <!-- 生成报告对话框 -->
-    <ElDialog v-model="generateVisible" title="生成报告" width="520px" :close-on-click-modal="false" @closed="resetGenerateForm">
+    <ElDialog v-model="generateVisible" title="生成报告" width="520px" :close-on-click-modal="false">
       <FaForm
         ref="generateFormRef"
         v-model="generateForm"
@@ -76,7 +76,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
-import { createFormDraft } from "@/utils/form-draft";
+import { useFormDraft } from "@/hooks/core/useFormDraft";
 
 defineOptions({ name: "MarketReport", inheritAttrs: false });
 
@@ -173,17 +173,15 @@ const generateRules = reactive({
   period: [{ required: true, message: "请输入月份", trigger: "blur" }],
 });
 
-const generateDraft = createFormDraft("report");
+const generateDraft = useFormDraft({
+  key: "report",
+  dialogVisible: generateVisible,
+  form: generateForm,
+  blank: () => ({ project_id: undefined, template_id: undefined, period: undefined }),
+});
 
 function openGenerateDialog() {
-  generateForm.value = { project_id: undefined, template_id: undefined, period: undefined };
-  generateDraft.restore(generateForm.value);
-  generateVisible.value = true;
-}
-
-function resetGenerateForm() {
-  generateDraft.persist(generateForm.value);
-  generateForm.value = { project_id: undefined, template_id: undefined, period: undefined };
+  generateDraft.openCreate();
 }
 
 async function handleGenerateSubmit() {

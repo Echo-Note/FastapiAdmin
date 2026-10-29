@@ -42,7 +42,7 @@
     </ElCard>
 
     <!-- 批量分派对话框 -->
-    <ElDialog v-model="assignDialogVisible" title="批量分派任务" width="560px" :close-on-click-modal="false" @closed="resetAssignForm">
+    <ElDialog v-model="assignDialogVisible" title="批量分派任务" width="560px" :close-on-click-modal="false">
       <FaForm
         ref="assignFormRef"
         v-model="assignForm"
@@ -74,7 +74,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
-import { createFormDraft } from "@/utils/form-draft";
+import { useFormDraft } from "@/hooks/core/useFormDraft";
 
 defineOptions({ name: "MarketAssignment", inheritAttrs: false });
 
@@ -183,17 +183,15 @@ onMounted(async () => {
   }
 });
 
-const assignDraft = createFormDraft("assignment");
+const assignDraft = useFormDraft({
+  key: "assignment",
+  dialogVisible: assignDialogVisible,
+  form: assignForm,
+  blank: () => ({ task_id: undefined, user_ids: [] }),
+});
 
 function openAssignDialog() {
-  assignForm.value = { task_id: undefined, user_ids: [] };
-  assignDraft.restore(assignForm.value);
-  assignDialogVisible.value = true;
-}
-
-function resetAssignForm() {
-  assignDraft.persist(assignForm.value);
-  assignForm.value = { task_id: undefined, user_ids: [] };
+  assignDraft.openCreate();
 }
 
 async function handleAssignSubmit() {

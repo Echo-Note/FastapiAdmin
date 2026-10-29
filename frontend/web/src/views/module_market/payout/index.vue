@@ -42,7 +42,7 @@
     </ElCard>
 
     <!-- 新增发放额度配置对话框 -->
-    <ElDialog v-model="createVisible" title="新增发放额度配置" width="520px" :close-on-click-modal="false" @closed="resetCreateForm">
+    <ElDialog v-model="createVisible" title="新增发放额度配置" width="520px" :close-on-click-modal="false">
       <FaForm
         ref="createFormRef"
         v-model="createForm"
@@ -128,7 +128,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
-import { createFormDraft } from "@/utils/form-draft";
+import { useFormDraft } from "@/hooks/core/useFormDraft";
 
 defineOptions({ name: "MarketPayout", inheritAttrs: false });
 
@@ -208,17 +208,15 @@ const createRules = reactive({
   payout_limit: [{ required: true, message: "请输入发放额度", trigger: "blur" }],
 });
 
-const payoutDraft = createFormDraft("payout");
+const payoutDraft = useFormDraft({
+  key: "payout",
+  dialogVisible: createVisible,
+  form: createForm,
+  blank: () => ({ user_id: undefined, period: undefined, payout_limit: undefined, enabled: true }),
+});
 
 function handleAdd() {
-  createForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
-  payoutDraft.restore(createForm.value);
-  createVisible.value = true;
-}
-
-function resetCreateForm() {
-  payoutDraft.persist(createForm.value);
-  createForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
+  payoutDraft.openCreate();
 }
 
 async function handleCreateSubmit() {
