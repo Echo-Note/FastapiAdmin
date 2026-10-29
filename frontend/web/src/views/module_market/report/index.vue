@@ -76,6 +76,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
+import { createFormDraft } from "@/utils/form-draft";
 
 defineOptions({ name: "MarketReport", inheritAttrs: false });
 
@@ -172,11 +173,16 @@ const generateRules = reactive({
   period: [{ required: true, message: "请输入月份", trigger: "blur" }],
 });
 
+const generateDraft = createFormDraft("report");
+
 function openGenerateDialog() {
+  generateForm.value = { project_id: undefined, template_id: undefined, period: undefined };
+  generateDraft.restore(generateForm.value);
   generateVisible.value = true;
 }
 
 function resetGenerateForm() {
+  generateDraft.persist(generateForm.value);
   generateForm.value = { project_id: undefined, template_id: undefined, period: undefined };
 }
 
@@ -191,6 +197,7 @@ async function handleGenerateSubmit() {
   generateSubmitting.value = true;
   try {
     await ReportAPI.generateReport({ project_id: generateForm.value.project_id, template_id: generateForm.value.template_id, period: generateForm.value.period });
+    generateDraft.done();
     generateVisible.value = false;
     await refreshData();
   } catch {

@@ -268,6 +268,7 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit: crudSu
   dialogVisible,
   dataFormRef,
   formRenderKey,
+  cacheKey: "project",
   detailApi: ProjectAPI.detailProject as unknown as (id: number) => Promise<{ data: { data?: ProjectForm } }>,
   createApi: ProjectAPI.createProject,
   updateApi: ProjectAPI.updateProject,

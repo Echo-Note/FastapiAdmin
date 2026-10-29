@@ -172,13 +172,14 @@ import TaskCategoryAPI, {
 } from "@/api/module_market/task-category";
 import TaskTemplateAPI, { type TaskConfig, type TaskTemplateTable } from "@/api/module_market/task-template";
 import TaskItemAPI, { type TaskItemConfig, type TaskItemForm, type TaskItemTable } from "@/api/module_market/task-item";
-import type { FormSchema, FormSchemaColumn, FormSchemaField, FormSchemaOption } from "@/api/module_market/form-schema";
+import type { FormSchema, FormSchemaField, FormSchemaOption } from "@/api/module_market/form-schema";
 import FormSchemaEditor from "@/components/forms/form-schema-editor/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { useTableColumns } from "@/hooks/core/useTableColumns";
 import { useDictStore } from "@stores";
 import { ElMessage } from "element-plus";
 import { renderTableOperationCell, type TableOperationAction } from "@utils";
+import { createFormDraft } from "@/utils/form-draft";
 
 defineOptions({ name: "MarketTaskCatalog", inheritAttrs: false });
 
@@ -262,7 +263,7 @@ function toggleExpand() {
 }
 
 // ── 表格列 ──
-const { columns, columnChecks } = useTableColumns<CatalogRow>(() => [
+const { columns } = useTableColumns<CatalogRow>(() => [
   { type: "globalIndex", width: 56, label: "序号" },
   { prop: "name", label: "名称", minWidth: 200, showOverflowTooltip: true, formatter: (row: CatalogRow) => row.name ?? "—" },
   {
@@ -363,14 +364,21 @@ const categoryFormItems: import("@/components/forms/fa-form/index.vue").FormItem
   { label: "描述", key: "description", type: "input", span: 24, props: { type: "textarea", rows: 3, maxlength: 255, showWordLimit: true, placeholder: "分类描述（可选）" } },
 ];
 
+const categoryDraft = createFormDraft("task-catalog-category");
+
 function resetCategoryForm() {
+  if (categoryDialogMode.value === "create") {
+    categoryDraft.persist(categoryForm.value);
+  }
   categoryForm.value = { id: undefined, name: undefined, sort: 0, description: undefined };
   categoryEditId.value = null;
 }
 
 function openCategoryCreate() {
   categoryDialogMode.value = "create";
-  resetCategoryForm();
+  categoryForm.value = { id: undefined, name: undefined, sort: 0, description: undefined };
+  categoryEditId.value = null;
+  categoryDraft.restore(categoryForm.value);
   categoryDialogVisible.value = true;
 }
 
@@ -392,6 +400,7 @@ async function handleCategorySubmit() {
   try {
     if (categoryDialogMode.value === "create") {
       await TaskCategoryAPI.createCategory(categoryForm.value);
+      categoryDraft.done();
     } else {
       await TaskCategoryAPI.updateCategory(categoryEditId.value!, categoryForm.value);
     }
@@ -452,7 +461,12 @@ function blankTemplateForm(): TemplateEditForm {
   };
 }
 
+const templateDraft = createFormDraft("task-catalog-template");
+
 function resetTemplateForm() {
+  if (templateDialogMode.value === "create") {
+    templateDraft.persist(templateForm.value);
+  }
   templateForm.value = blankTemplateForm();
   templateEditId.value = null;
 }
@@ -510,7 +524,9 @@ const templateFormItems: import("@/components/forms/fa-form/index.vue").FormItem
 
 function openTemplateCreate(categoryRow?: CategoryNode) {
   templateDialogMode.value = "create";
-  resetTemplateForm();
+  templateForm.value = blankTemplateForm();
+  templateEditId.value = null;
+  templateDraft.restore(templateForm.value);
   if (categoryRow) templateForm.value.category_id = categoryRow.id;
   templateDialogVisible.value = true;
 }
@@ -545,6 +561,7 @@ async function handleTemplateSubmit() {
     };
     if (templateDialogMode.value === "create") {
       await TaskTemplateAPI.createTemplate(payload);
+      templateDraft.done();
     } else {
       await TaskTemplateAPI.updateTemplate(templateEditId.value!, payload);
     }
@@ -599,7 +616,12 @@ function blankItemForm(): ItemEditForm {
   };
 }
 
+const itemDraft = createFormDraft("task-catalog-item");
+
 function resetItemForm() {
+  if (itemDialogMode.value === "create") {
+    itemDraft.persist(itemForm.value);
+  }
   itemForm.value = blankItemForm();
   itemEditId.value = null;
 }
@@ -620,7 +642,9 @@ const itemFormItems: import("@/components/forms/fa-form/index.vue").FormItem[] =
 
 function openItemCreate(templateRow?: TemplateNode) {
   itemDialogMode.value = "create";
-  resetItemForm();
+  itemForm.value = blankItemForm();
+  itemEditId.value = null;
+  itemDraft.restore(itemForm.value);
   if (templateRow) itemForm.value.template_id = templateRow.id;
   itemDialogVisible.value = true;
 }
@@ -669,6 +693,7 @@ async function handleItemSubmit() {
     };
     if (itemDialogMode.value === "create") {
       await TaskItemAPI.createItem(payload);
+      itemDraft.done();
     } else {
       await TaskItemAPI.updateItem(itemEditId.value!, payload);
     }

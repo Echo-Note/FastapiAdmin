@@ -186,6 +186,7 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   dialogVisible,
   dataFormRef,
   formRenderKey,
+  cacheKey: "company",
   detailApi: CompanyAPI.detailCompany,
   createApi: CompanyAPI.createCompany,
   updateApi: CompanyAPI.updateCompany,

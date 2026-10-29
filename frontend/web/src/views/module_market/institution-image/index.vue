@@ -104,7 +104,7 @@ const searchItems = computed<SearchFormItem[]>(() => [
 ]);
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
-const { selectedRows, selectedIds, batchDeleting, onTableSelectionChange } = useTableSelection<InstitutionImageTable>();
+const { selectedIds, batchDeleting, onTableSelectionChange } = useTableSelection<InstitutionImageTable>();
 
 const opCtx = {
   onDetail: (id: number) => void handleOpenDialog("detail", id),
@@ -184,6 +184,7 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   dialogVisible,
   dataFormRef,
   formRenderKey,
+  cacheKey: "institution-image",
   detailApi: InstitutionImageAPI.detailImage,
   createApi: InstitutionImageAPI.createImage,
   titles: { create: "新增机构图片", detail: "机构图片详情" },

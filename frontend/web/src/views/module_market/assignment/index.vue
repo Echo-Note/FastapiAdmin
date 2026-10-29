@@ -74,6 +74,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
+import { createFormDraft } from "@/utils/form-draft";
 
 defineOptions({ name: "MarketAssignment", inheritAttrs: false });
 
@@ -182,11 +183,16 @@ onMounted(async () => {
   }
 });
 
+const assignDraft = createFormDraft("assignment");
+
 function openAssignDialog() {
+  assignForm.value = { task_id: undefined, user_ids: [] };
+  assignDraft.restore(assignForm.value);
   assignDialogVisible.value = true;
 }
 
 function resetAssignForm() {
+  assignDraft.persist(assignForm.value);
   assignForm.value = { task_id: undefined, user_ids: [] };
 }
 
@@ -201,6 +207,7 @@ async function handleAssignSubmit() {
   assignSubmitting.value = true;
   try {
     await AssignmentAPI.createAssignment({ task_id: assignForm.value.task_id, user_ids: assignForm.value.user_ids });
+    assignDraft.done();
     assignDialogVisible.value = false;
     await refreshData();
   } catch {

@@ -128,6 +128,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
+import { createFormDraft } from "@/utils/form-draft";
 
 defineOptions({ name: "MarketPayout", inheritAttrs: false });
 
@@ -207,12 +208,16 @@ const createRules = reactive({
   payout_limit: [{ required: true, message: "请输入发放额度", trigger: "blur" }],
 });
 
+const payoutDraft = createFormDraft("payout");
+
 function handleAdd() {
   createForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
+  payoutDraft.restore(createForm.value);
   createVisible.value = true;
 }
 
 function resetCreateForm() {
+  payoutDraft.persist(createForm.value);
   createForm.value = { user_id: undefined, period: undefined, payout_limit: undefined, enabled: true };
 }
 
@@ -227,6 +232,7 @@ async function handleCreateSubmit() {
   createSubmitting.value = true;
   try {
     await PayoutAPI.createPayout({ user_id: createForm.value.user_id, period: createForm.value.period, payout_limit: createForm.value.payout_limit, enabled: createForm.value.enabled });
+    payoutDraft.done();
     createVisible.value = false;
     await refreshCreate();
   } catch {

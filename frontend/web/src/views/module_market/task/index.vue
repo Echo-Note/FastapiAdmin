@@ -285,6 +285,7 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
   dialogVisible,
   dataFormRef,
   formRenderKey,
+  cacheKey: "task",
   detailApi: TaskAPI.detailTask as unknown as (id: number) => Promise<{ data: { data?: TaskForm } }>,
   createApi: TaskAPI.createTask,
   updateApi: TaskAPI.updateTask,

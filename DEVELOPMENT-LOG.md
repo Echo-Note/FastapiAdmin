@@ -1346,6 +1346,39 @@
 
 ---
 
+### 2026-10-29 — 市场管理创建表单草稿缓存（误关恢复）
+
+#### 1. 原因
+
+用户要求：市场管理里所有「新建/创建/添加」表单都要有本地草稿缓存——填写一半误关窗口后重开，之前填写的内容自动恢复，不用重新输入；**编辑表单不缓存**（由详情接口回填）。
+
+#### 2. 修改内容
+
+**通用工具与 hook**
+
+- 新增 `frontend/web/src/utils/form-draft.ts`：
+  - `loadFormDraft/saveFormDraft/clearFormDraft`：localStorage 读写（统一 `market-form-draft:` 前缀，保存时剔除 `id`）。
+  - `createFormDraft(key)`：手写表单帮助器，内置「提交成功后跳过本次关闭保存」标志，避免提交后残留草稿。
+- `hooks/core/useCrudForm.ts`：新增可选 `cacheKey` 参数。提供后自动启用「新增表单」草稿缓存——打开 create 时恢复草稿、关闭 create 时保存草稿、提交成功清草稿、页面卸载兜底保存；编辑/详情表单不缓存。
+
+**接入页面**
+
+- `useCrudForm` 页面（加 `cacheKey`）：company / project / institution-image / task。
+- 手写表单页面（用 `createFormDraft`）：task-catalog 的「一级分类/二级模板/三级任务」三个表单、payout 的「新增发放额度配置」、settlement 的「归集结算」、report 的「生成报告」、assignment 的「批量分派」。
+- 未接入：institution（无新增，仅编辑）、submission（仅审核）、dashboard/import（无表单）。
+
+#### 3. 关键口径
+
+- 缓存范围严格限定「创建态」：`useCrudForm` 仅在 `type === "create"` 时读写草稿；手写页面用 `persist/restore` 包裹「关闭/打开」并仅在 create 分支调用。
+- 提交成功后必须 `done()`/`clearFormDraft` 清草稿并跳过本次关闭保存，否则 `visible=false` 触发的关闭回调会再次写回草稿。
+
+#### 4. 验证
+
+- `pnpm ts:check` 通过（0 错误）。
+- `pnpm eslint`：本次改动文件无新增错误；顺手清理了 3 处历史遗留 unused 告警（`institution-image` 的 `selectedRows`、`task-catalog` 的 `FormSchemaColumn`/`columnChecks`）。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。

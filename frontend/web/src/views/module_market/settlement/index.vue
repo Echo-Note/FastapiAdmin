@@ -80,6 +80,7 @@ import type FaSearchBar from "@/components/forms/fa-search-bar/index.vue";
 import type { FormItem } from "@/components/forms/fa-form/index.vue";
 import FaForm from "@/components/forms/fa-form/index.vue";
 import { renderTableOperationCell, resolveStatusColumns, cleanEmptyArrayParams, type TableOperationAction, type StatusType } from "@utils";
+import { createFormDraft } from "@/utils/form-draft";
 
 defineOptions({ name: "MarketSettlement", inheritAttrs: false });
 
@@ -203,12 +204,16 @@ const settleRules = reactive({
   period: [{ required: true, message: "请输入结算月份", trigger: "blur" }],
 });
 
+const settleDraft = createFormDraft("settlement");
+
 function openSettleDialog() {
   settleForm.value = { task_id: undefined, period: undefined };
+  settleDraft.restore(settleForm.value);
   settleVisible.value = true;
 }
 
 function resetSettleForm() {
+  settleDraft.persist(settleForm.value);
   settleForm.value = { task_id: undefined, period: undefined };
 }
 
@@ -223,6 +228,7 @@ async function handleSettleSubmit() {
   settleSubmitting.value = true;
   try {
     await SettlementAPI.settle({ task_id: settleForm.value.task_id, period: settleForm.value.period });
+    settleDraft.done();
     settleVisible.value = false;
     await refreshData();
   } catch {
