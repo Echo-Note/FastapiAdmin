@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onShow, onPullDownRefresh } from '@dcloudio/uni-app'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { useMarketListPage } from '@/composables/useMarketListPage'
@@ -37,7 +37,7 @@ const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
 
-const { list, total, loading, loadData, refreshData, loadNext } = useMarketListPage<HallTaskItem>({
+const { list, total, loading, refreshData, reload, loadNext } = useMarketListPage<HallTaskItem>({
   fetcher: p => MarketAPI.getTaskHall({ ...p }) as any,
   onError: () => toast.error(t('common.loadFailed')),
 })
@@ -60,8 +60,10 @@ function assignModeText(item: HallTaskItem) {
 
 /** 卡片点击统一跳任务详情页（详情页内完成接单） */
 function goDetail(item: HallTaskItem) {
+  // 用 path 而非 name 跳转：@wot-ui/router 的 resolve 在 name 分支误把 to.params 当 query，
+  // 导致 query 丢失；传 path 走 resolvePath 分支才能正确带上 query。
   router.push({
-    name: 'market-task-detail',
+    path: '/subPages/module_market/task-detail/index',
     query: { task_id: String(item.id) },
   })
 }
@@ -78,7 +80,8 @@ onPullDownRefresh(async () => {
     uni.stopPullDownRefresh()
   }
 })
-onLoad(() => loadData())
+// 每次显示都刷新：从任务详情领取返回后，任务已下架，需重新拉取大厅列表
+onShow(() => reload())
 </script>
 
 <template>
