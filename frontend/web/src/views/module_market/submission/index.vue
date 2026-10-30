@@ -35,7 +35,7 @@
         <template #statusTag="{ row }"><component :is="dictTag('market_submission_status', row?.status)" /></template>
       </FaDescriptions>
       <ElDivider content-position="left">采集数据</ElDivider>
-      <pre class="form-data-pre">{{ formattedFormData }}</pre>
+      <FaFormDataViewer :form-data="detailData.form_data" :section-names="sectionNames" />
     </ElDialog>
 
     <!-- 审核对话框 -->
@@ -45,7 +45,7 @@
         <template #statusTag="{ row }"><component :is="dictTag('market_submission_status', row?.status)" /></template>
       </FaDescriptions>
       <ElDivider content-position="left">采集数据</ElDivider>
-      <pre class="form-data-pre">{{ formattedReviewFormData }}</pre>
+      <FaFormDataViewer :form-data="reviewData.form_data" :section-names="sectionNames" />
       <ElDivider content-position="left">审核意见</ElDivider>
       <FaForm
         ref="reviewFormRef"
@@ -149,6 +149,19 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 // ── 详情 ──
 const detailVisible = ref(false);
 const detailData = ref<Partial<SubmissionTable>>({});
+/** 采集表单分节 code → 中文标题（成果详情接口不返回 form_schema，故用约定映射） */
+const sectionNames: Record<string, string> = {
+  execution_info: "执行信息",
+  management_verification: "管理核实",
+  delivery_coordination: "配送协调",
+  inventory_check: "库存盘点",
+  price_check: "价格核查",
+  competitor_research: "竞品调研",
+  sales_reconciliation: "销售对账",
+  bidding_procurement: "招标采购",
+  display_optimization: "陈列优化",
+};
+
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
   { label: "机构", prop: "institution.name" },
   { label: "对象名称", prop: "subject_name" },
@@ -164,8 +177,6 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "审核时间", prop: "reviewed_at" },
   { label: "审核意见", prop: "review_comment", span: 4 },
 ];
-
-const formattedFormData = computed(() => (detailData.value.form_data ? JSON.stringify(detailData.value.form_data, null, 2) : "—"));
 
 async function openDetail(id: number) {
   const res = await SubmissionAPI.detailSubmission(id);
@@ -199,8 +210,6 @@ const reviewFormItems: FormItem[] = [
 ];
 
 const reviewRules = reactive({ approved: [{ required: true, message: "请选择审核结论", trigger: "change" }] });
-
-const formattedReviewFormData = computed(() => (reviewData.value.form_data ? JSON.stringify(reviewData.value.form_data, null, 2) : "—"));
 
 async function openReview(id: number) {
   const res = await SubmissionAPI.detailSubmission(id);
@@ -264,16 +273,4 @@ async function onResetSearch() {
 </script>
 
 <style scoped>
-.form-data-pre {
-  margin: 0;
-  padding: 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 6px;
-  max-height: 260px;
-  overflow: auto;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
 </style>

@@ -1945,6 +1945,33 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — C 端图片/附件支持多份（最多 9），运营端成果详情加缩略图预览
+
+#### 1. 需求与定案
+
+现场照片、打卡照、陈列照经常不止一张；附件（签到表/票据）也可能多份。定案：
+
+| 决策 | 取值 |
+|---|---|
+| `form_data` 值形态 | `image` / `file` 存 **URL 数组**（`["url1","url2"]`） |
+| 兼容 | 历史单字符串读取时归一成数组，**不做数据迁移** |
+| 上限 | 单字段最多 **9** 份（微信 `chooseImage` 单次上限，可多次追加） |
+| 运营端 | 成果详情/审核弹窗加缩略图网格 + 点击大图预览、附件文件名链接、子表按表格渲染 |
+
+#### 2. 改法
+
+- **App**（`subPages/module_market/submission-form/index.vue`）：`asUrlList()` 统一归一；上传改为「追加 + 逐份删除」（`appendUrl` / `removeUrlAt`），多选 `count = 9 - 已有`、串行上传（并发会让 uploadingKey 互相覆盖）；单值字段与子表 image/file 列共用同一套逻辑；`isBlank` 增加空数组判定，必填图片不会被漏校验。
+- **Web**（新增 `components/display/fa-form-data-viewer`）：不依赖 `form_schema`，按数据结构推断渲染——图片 URL（按扩展名识别）给 `ElImage` 缩略图 + `preview-src-list` 大图预览，非图片 URL 给文件名链接，对象数组按 `ElTable` 渲染子表，其余走文本；末尾 `ElCollapse` 保留原始 JSON。成果详情与审核弹窗两处 `<pre>{{ JSON }}</pre>` 替换为该组件。
+- 顺带删掉两处失效的 `formattedFormData` / `formattedReviewFormData` computed 与 `.form-data-pre` 样式。
+
+#### 3. 验证
+
+- App：`npx vue-tsc --noEmit` 通过；`eslint` 0 error。
+- Web：`npx vue-tsc --noEmit` 通过；`eslint` / `stylelint`（新组件与改动页面）通过。
+- 后端无需改动（`form_data` 是 JSONB，且没有任何代码解析 image 字段）；`ruff check` 通过、`uv run pytest` 322 passed。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。

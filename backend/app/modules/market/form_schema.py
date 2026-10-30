@@ -56,6 +56,8 @@ class FormSchemaField(BaseModel):
     每个字段对应表单上的一个输入项：
     - 单值字段：text/textarea/number/date/select/radio/checkbox/image/file，
       图片用 image（如打卡照片、机构内/外部照片），文件附件用 file（如合同、入库单、宣传资料）。
+      **image / file 的值是多份 URL 数组**（如 `["/static/upload/a.png", "/static/upload/b.png"]`），
+      单个字段最多 9 份；历史数据是单个字符串，前后端读取时统一归一成数组，不做数据迁移。
     - ``type=table``：多行子表，``columns`` 携带子列定义，行数据为 ``list[dict[子列名, 值]]``。
     - ``autofill=current_user``：字段由后端按当前登录用户自动填充并只读（如「执行人」），
       前端不渲染输入框，提交时由后端注入当前用户身份，不参与用户填写。

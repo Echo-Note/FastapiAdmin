@@ -400,14 +400,46 @@ function parseUploadUrl(result: UniApp.UploadFileSuccessCallbackResult): string 
   return null
 }
 
-/** 上传选中文件并写入目标（单值字段与子表列共用） */
+/** 单个图片/附件字段最多保存的份数（微信 chooseImage 单次上限也是 9） */
+const MAX_UPLOAD_COUNT = 9
+
+/**
+ * 归一成 URL 数组：历史数据是单个字符串（`"url"`），2026-11 起多图/多附件存字符串数组。
+ * 渲染与校验都走这里，因此老成果也能照常显示。
+ */
+function asUrlList(value: any): string[] {
+  if (value === null || value === undefined || value === '')
+    return []
+  if (Array.isArray(value))
+    return value.filter((v): v is string => typeof v === 'string' && !!v)
+  return typeof value === 'string' ? [value] : []
+}
+
+/** 该字段还能再传几份 */
+function remainingSlots(value: any): number {
+  return Math.max(0, MAX_UPLOAD_COUNT - asUrlList(value).length)
+}
+
+/** 追加一份 URL 到目标（保留已有图片/附件，多图是累加而不是覆盖） */
+function appendUrl(target: ValueTarget, url: string) {
+  setTargetValue(target, [...asUrlList(targetValue(target)), url])
+}
+
+/** 删除目标里第 index 份图片/附件 */
+function removeUrlAt(target: ValueTarget, index: number) {
+  const list = asUrlList(targetValue(target))
+  list.splice(index, 1)
+  setTargetValue(target, list)
+}
+
+/** 上传单个文件并追加到目标（单值字段与子表列共用） */
 async function uploadInto(target: ValueTarget, filePath: string, key: string) {
   uploadingKey.value = key
   try {
     const result = await MarketAPI.uploadFile(filePath)
     const url = parseUploadUrl(result)
     if (url)
-      setTargetValue(target, url)
+      appendUrl(target, url)
   }
   catch {
     toast.error('上传失败')
@@ -417,25 +449,42 @@ async function uploadInto(target: ValueTarget, filePath: string, key: string) {
   }
 }
 
-/** 选择并上传图片（image 字段 / 子表 image 列） */
+/** 顺序上传多个文件（并发会让 uploadingKey 互相覆盖，故串行） */
+async function uploadMany(target: ValueTarget, filePaths: string[], key: string) {
+  for (const filePath of filePaths)
+    await uploadInto(target, filePath, key)
+}
+
+/** 选择并上传图片（image 字段 / 子表 image 列）：支持多选，最多累计 9 张 */
 function chooseAndUploadImage(target: ValueTarget, key: string) {
   if (uploadingKey.value)
     return
+  const remaining = remainingSlots(targetValue(target))
+  if (remaining <= 0) {
+    toast.warning(`最多上传 ${MAX_UPLOAD_COUNT} 张图片`)
+    return
+  }
   uni.chooseImage({
-    count: 1,
+    count: remaining,
     sizeType: ['compressed'],
     success: (res) => {
-      const filePath = res.tempFilePaths?.[0]
-      if (filePath)
-        void uploadInto(target, filePath, key)
+      // 各端类型声明不一致（string | string[]），统一成数组再过滤空值
+      const picked = res.tempFilePaths ?? []
+      const filePaths = (Array.isArray(picked) ? picked : [picked]).filter(Boolean) as string[]
+      if (filePaths.length)
+        void uploadMany(target, filePaths, key)
     },
   })
 }
 
-/** 选择并上传文件（file 字段 / 子表 file 列） */
+/** 选择并上传文件（file 字段 / 子表 file 列）：逐个追加，最多累计 9 份 */
 function chooseAndUploadFile(target: ValueTarget, key: string) {
   if (uploadingKey.value)
     return
+  if (remainingSlots(targetValue(target)) <= 0) {
+    toast.warning(`最多上传 ${MAX_UPLOAD_COUNT} 个附件`)
+    return
+  }
   uni.chooseFile({
     count: 1,
     success: (res) => {
@@ -445,6 +494,12 @@ function chooseAndUploadFile(target: ValueTarget, key: string) {
         void uploadInto(target, filePath, key)
     },
   })
+}
+
+/** 附件展示名：取路径最后一段 */
+function fileNameOf(url: string): string {
+  const clean = String(url).split('?')[0] ?? ''
+  return clean.split('/').filter(Boolean).pop() || clean
 }
 
 /** 初始化表单数据：按分节嵌套，多行子表字段初始化为首行 */
@@ -539,7 +594,10 @@ watch(
 
 /** 是否空值 */
 function isBlank(v: any): boolean {
-  return v === undefined || v === null || v === ''
+  if (v === undefined || v === null || v === '')
+    return true
+  // 多图/多附件：空数组同样视为未填
+  return Array.isArray(v) && v.length === 0
 }
 
 /** 单值必填字段缺失提示：按字段类型 / 自动填充语义措辞 */
@@ -658,8 +716,10 @@ onLoad((query) => {
         <wd-loading v-if="formLoading" class="my-4 block" />
         <wd-form v-if="!formLoading" :model="formData" label-position="left">
           <wd-form-item :label="t('market.period')" border>
-            <view class="flex-1 flex items-center">
-              <text class="text-3.5" style="color: var(--wot-text-auxiliary)">{{ period }}</text>
+            <view class="flex flex-1 items-center">
+              <text class="text-3.5" style="color: var(--wot-text-auxiliary)">
+                {{ period }}
+              </text>
             </view>
           </wd-form-item>
 
@@ -717,40 +777,58 @@ onLoad((query) => {
                       @click="openDatePicker(columnTarget(section.code, fieldName, rowIndex, col.name))"
                     />
                     <!-- 图片列：上传后回显缩略图 -->
-                    <view
-                      v-else-if="col.type === 'image'"
-                      @click="chooseAndUploadImage(columnTarget(section.code, fieldName, rowIndex, col.name), `${section.code}.${fieldName}.${rowIndex}.${col.name}`)"
-                    >
-                      <image
-                        v-if="row[col.name]"
-                        :src="row[col.name]"
-                        mode="aspectFill"
-                        class="h-40 w-40 rounded-2 object-cover"
-                      />
+                    <view v-else-if="col.type === 'image'" class="flex flex-wrap items-start gap-2">
                       <view
-                        v-else
-                        class="h-24 flex flex-col items-center justify-center border rounded-2 border-dashed text-2.5"
+                        v-for="(url, imgIndex) in asUrlList(row[col.name])"
+                        :key="`${url}-${imgIndex}`"
+                        class="relative"
+                      >
+                        <image :src="url" mode="aspectFill" class="h-24 w-24 rounded-2 object-cover" />
+                        <view
+                          class="absolute right-0 top-0 h-5 w-5 flex items-center justify-center rounded-full text-3 text-white"
+                          style="background: rgba(0, 0, 0, 0.55)"
+                          @click.stop="removeUrlAt(columnTarget(section.code, fieldName, rowIndex, col.name), imgIndex)"
+                        >
+                          ×
+                        </view>
+                      </view>
+                      <view
+                        v-if="remainingSlots(row[col.name]) > 0"
+                        class="h-24 w-24 flex flex-col items-center justify-center border rounded-2 border-dashed text-2.5"
                         style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                        @click="chooseAndUploadImage(columnTarget(section.code, fieldName, rowIndex, col.name), `${section.code}.${fieldName}.${rowIndex}.${col.name}`)"
                       >
                         <view class="text-4">
                           +
                         </view>
                         <view class="mt-1">
-                          {{ uploadingKey === `${section.code}.${fieldName}.${rowIndex}.${col.name}` ? '上传中…' : '点击上传图片' }}
+                          {{ uploadingKey === `${section.code}.${fieldName}.${rowIndex}.${col.name}` ? '上传中…' : `已 ${asUrlList(row[col.name]).length}/${MAX_UPLOAD_COUNT}` }}
                         </view>
                       </view>
                     </view>
                     <!-- 文件列 -->
-                    <view
-                      v-else-if="col.type === 'file'"
-                      class="h-12 flex items-center justify-between border rounded-2 border-dashed px-3 text-2.5"
-                      style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
-                      @click="chooseAndUploadFile(columnTarget(section.code, fieldName, rowIndex, col.name), `${section.code}.${fieldName}.${rowIndex}.${col.name}`)"
-                    >
-                      <text>{{ row[col.name] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
-                      <text style="color: var(--wot-text-auxiliary)">
-                        {{ uploadingKey === `${section.code}.${fieldName}.${rowIndex}.${col.name}` ? '上传中…' : '' }}
-                      </text>
+                    <view v-else-if="col.type === 'file'" class="flex flex-col gap-1">
+                      <view
+                        v-for="(url, fileIndex) in asUrlList(row[col.name])"
+                        :key="`${url}-${fileIndex}`"
+                        class="flex items-center justify-between rounded-2 px-2 py-1 text-2.5"
+                        style="border: 1rpx solid var(--wot-border-main)"
+                      >
+                        <text class="flex-1 truncate" style="color: var(--wot-text-main)">
+                          {{ fileNameOf(url) }}
+                        </text>
+                        <text class="wot-text-error-main ml-2" @click.stop="removeUrlAt(columnTarget(section.code, fieldName, rowIndex, col.name), fileIndex)">
+                          删除
+                        </text>
+                      </view>
+                      <view
+                        v-if="remainingSlots(row[col.name]) > 0"
+                        class="h-10 flex items-center justify-center border rounded-2 border-dashed text-2.5"
+                        style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                        @click="chooseAndUploadFile(columnTarget(section.code, fieldName, rowIndex, col.name), `${section.code}.${fieldName}.${rowIndex}.${col.name}`)"
+                      >
+                        {{ uploadingKey === `${section.code}.${fieldName}.${rowIndex}.${col.name}` ? '上传中…' : `+ 添加附件（${asUrlList(row[col.name]).length}/${MAX_UPLOAD_COUNT}）` }}
+                      </view>
                     </view>
                     <!-- 数字列：数字键盘 -->
                     <wd-input
@@ -805,7 +883,7 @@ onLoad((query) => {
 
               <wd-form-item v-else :label="fieldLabel(field)" border :required="isRequired(field)">
                 <!-- 自动填充字段（执行人）：只读展示，弱化样式 -->
-                <view v-if="field.autofill === 'current_user'" class="flex-1 flex items-center">
+                <view v-if="field.autofill === 'current_user'" class="flex flex-1 items-center">
                   <text class="text-3.5" style="color: var(--wot-text-auxiliary)">
                     {{ fieldValueText(section.code, fieldName, field) }}
                   </text>
@@ -842,35 +920,58 @@ onLoad((query) => {
                   type="textarea"
                   :placeholder="field.placeholder || fieldLabel(field)"
                 />
-                <view v-else-if="field.type === 'image'" class="flex-1" @click="chooseAndUploadImage(singleTarget(section.code, fieldName), `${section.code}.${fieldName}`)">
-                  <image
-                    v-if="formData[section.code][fieldName]"
-                    :src="formData[section.code][fieldName]"
-                    mode="aspectFill"
-                    class="h-40 w-40 rounded-2 object-cover"
-                  />
-                  <view
-                    v-else
-                    class="h-24 flex flex-col items-center justify-center border rounded-2 border-dashed text-2.5"
-                    style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
-                  >
-                    <view class="text-4">
-                      +
+                <view v-else-if="field.type === 'image'" class="flex-1">
+                  <view class="flex flex-wrap items-start gap-2">
+                    <view
+                      v-for="(url, imgIndex) in asUrlList(formData[section.code][fieldName])"
+                      :key="`${url}-${imgIndex}`"
+                      class="relative"
+                    >
+                      <image :src="url" mode="aspectFill" class="h-40 w-40 rounded-2 object-cover" />
+                      <view
+                        class="absolute right-0 top-0 h-6 w-6 flex items-center justify-center rounded-full text-3 text-white"
+                        style="background: rgba(0, 0, 0, 0.55)"
+                        @click.stop="removeUrlAt(singleTarget(section.code, fieldName), imgIndex)"
+                      >
+                        ×
+                      </view>
                     </view>
-                    <view class="mt-1">
-                      {{ uploadingKey === `${section.code}.${fieldName}` ? '上传中…' : '点击上传图片' }}
+                    <view
+                      v-if="remainingSlots(formData[section.code][fieldName]) > 0"
+                      class="h-40 w-40 flex flex-col items-center justify-center border rounded-2 border-dashed text-2.5"
+                      style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                      @click="chooseAndUploadImage(singleTarget(section.code, fieldName), `${section.code}.${fieldName}`)"
+                    >
+                      <view class="text-4">
+                        +
+                      </view>
+                      <view class="mt-1">
+                        {{ uploadingKey === `${section.code}.${fieldName}` ? '上传中…' : `点击上传图片（${asUrlList(formData[section.code][fieldName]).length}/${MAX_UPLOAD_COUNT}）` }}
+                      </view>
                     </view>
                   </view>
                 </view>
-                <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(singleTarget(section.code, fieldName), `${section.code}.${fieldName}`)">
+                <view v-else-if="field.type === 'file'" class="flex flex-1 flex-col gap-1">
                   <view
-                    class="h-12 flex items-center justify-between border rounded-2 border-dashed px-3 text-2.5"
-                    style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                    v-for="(url, fileIndex) in asUrlList(formData[section.code][fieldName])"
+                    :key="`${url}-${fileIndex}`"
+                    class="flex items-center justify-between rounded-2 px-3 py-2 text-3"
+                    style="border: 1rpx solid var(--wot-border-main)"
                   >
-                    <text>{{ formData[section.code][fieldName] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
-                    <text style="color: var(--wot-text-auxiliary)">
-                      {{ uploadingKey === `${section.code}.${fieldName}` ? '上传中…' : '' }}
+                    <text class="flex-1 truncate" style="color: var(--wot-text-main)">
+                      {{ fileNameOf(url) }}
                     </text>
+                    <text class="wot-text-error-main ml-2 text-2.5" @click.stop="removeUrlAt(singleTarget(section.code, fieldName), fileIndex)">
+                      删除
+                    </text>
+                  </view>
+                  <view
+                    v-if="remainingSlots(formData[section.code][fieldName]) > 0"
+                    class="h-12 flex items-center justify-center border rounded-2 border-dashed text-2.5"
+                    style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                    @click="chooseAndUploadFile(singleTarget(section.code, fieldName), `${section.code}.${fieldName}`)"
+                  >
+                    {{ uploadingKey === `${section.code}.${fieldName}` ? '上传中…' : `+ 添加附件（${asUrlList(formData[section.code][fieldName]).length}/${MAX_UPLOAD_COUNT}）` }}
                   </view>
                 </view>
                 <wd-input

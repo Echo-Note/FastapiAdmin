@@ -81,6 +81,14 @@ parent: market-domain
 - 产品三要素列（`product_name` / `product_spec` / `manufacturer`）带 `product_role`（`name` / `spec` / `manufacturer`），C 端据此触发产品库联想与回填。
 - 素材里没有采集表的三级任务（`ITEM-0027` 进销存数据收集、`ITEM-0028` 流向数据收集）不做臆造，保持原样。App 侧子表单元格按列类型渲染（`date` / `number` / `select` / `image` / `file` 各用对应控件），不再一律文本输入。
 
+## 多图 / 多附件（`form_data` 的值形态）
+
+- `image` 与 `file` 字段的值是**URL 字符串数组**：`["/static/upload/a.png", "/static/upload/b.png"]`，单个字段最多 **9** 份（与微信 `chooseImage` 单次上限一致，可多次「继续添加」累加）。
+- **历史数据是单个字符串**（`"/static/upload/a.png"`）。前后端读取时统一归一成数组（字符串包一层），因此**不做数据迁移**，老成果照常显示。
+- C 端上传是「累加 + 逐份删除」，不是「重新上传覆盖」；子表内的 image/file 列同样如此。
+- 运营端成果详情/审核弹窗用 `components/display/fa-form-data-viewer` 渲染：图片给缩略图 + 点击大图预览（`ElImage` + `preview-src-list`），附件给文件名链接，对象数组按子表渲染，末尾保留「原始 JSON」折叠供排查。该组件不依赖 `form_schema`（成果详情接口不返回 schema），按数据结构推断渲染形态。
+- 必填校验把**空数组也算未填**（`isBlank` 同时判 `[]`），否则必填的图片字段会漏校验。
+
 ## 已知取舍
 
 - 6 个 Service 同处一个 900+ 行的 `service.py`。改任一处都要通读全文件，是域内最高风险点。
