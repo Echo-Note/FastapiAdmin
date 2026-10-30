@@ -7,6 +7,10 @@
           <div class="inline-flex flex-wrap items-center gap-2">
             <FaTableHeaderLeft :perm-create="['module_market:task_category:create']" @add="openCategoryCreate" />
             <ElButton @click="toggleExpand">{{ isExpanded ? "收起" : "展开" }}</ElButton>
+            <ElSwitch v-model="onlyUsed" active-text="只看已用目录" @change="loadTree" />
+            <span v-if="onlyUsed" class="text-xs" style="color: var(--el-text-color-secondary)">
+              仅显示已被项目引用的三级任务/叶子模板；新增目录请先关掉此开关
+            </span>
           </div>
         </template>
       </FaTableHeader>
@@ -203,6 +207,10 @@ type CatalogRow = CategoryNode | TemplateNode | ItemNode;
 
 const treeData = ref<CategoryNode[]>([]);
 const loading = ref(false);
+/** 只看已被项目引用的目录项（默认开；关掉才看到全部 6 分类 / 18 模板 / 51 三级任务） */
+const onlyUsed = ref(true);
+const usedItemIds = ref<number[]>([]);
+const usedTemplateIds = ref<number[]>([]);
 const isExpanded = ref(false);
 const faTableRef = ref<{ elTableRef?: { toggleRowExpansion: (row: CatalogRow, expanded?: boolean) => void } } | null>(null);
 
@@ -218,21 +226,40 @@ function nodeType(row: CatalogRow): NodeType {
 async function loadTree() {
   loading.value = true;
   try {
-    const res = await TaskCategoryAPI.treeCategory();
+    const [res, usageRes] = await Promise.all([TaskCategoryAPI.treeCategory(), TaskItemAPI.getUsage()]);
     const raw = res.data.data ?? [];
+    usedItemIds.value = usageRes.data.data?.item_ids ?? [];
+    usedTemplateIds.value = usageRes.data.data?.template_ids ?? [];
+
+    const usedItems = new Set(usedItemIds.value);
+    const usedTemplates = new Set(usedTemplateIds.value);
+    /** 叶子模板（无三级任务）被项目直接引用即算已用；有三级任务的模板则看其下是否存在已用任务 */
+    const keepTemplate = (tpl: TaskTemplateTreeItem) => {
+      const items = tpl.items ?? [];
+      if (!onlyUsed.value) return true;
+      if (items.length === 0) return usedTemplates.has(tpl.id!);
+      return items.some((i) => usedItems.has(i.id!));
+    };
+    const keepItem = (item: { id?: number }) => !onlyUsed.value || usedItems.has(item.id!);
+
     // 分类/模板/任务 id 各自独立自增，直接用作树形 row-key 会冲突导致展开异常；
     // 给每个节点生成带前缀的唯一 key，并统一用 children 承载子节点。
-    treeData.value = raw.map((c) => ({
-      ...c,
-      _rowKey: `category-${c.id}`,
-      _nodeType: "category" as NodeType,
-      children: (c.children ?? []).map((t) => ({
-        ...t,
-        _rowKey: `template-${t.id}`,
-        _nodeType: "template" as NodeType,
-        children: (t.items ?? []).map((i) => ({ ...i, _rowKey: `item-${i.id}`, _nodeType: "item" as NodeType })),
-      })),
-    }));
+    treeData.value = raw
+      .map((c) => {
+        const templates = (c.children ?? []).filter(keepTemplate);
+        return {
+          ...c,
+          _rowKey: `category-${c.id}`,
+          _nodeType: "category" as NodeType,
+          children: templates.map((t) => ({
+            ...t,
+            _rowKey: `template-${t.id}`,
+            _nodeType: "template" as NodeType,
+            children: (t.items ?? []).filter(keepItem).map((i) => ({ ...i, _rowKey: `item-${i.id}`, _nodeType: "item" as NodeType })),
+          })),
+        };
+      })
+      .filter((c) => (onlyUsed.value ? (c.children ?? []).length > 0 : true));
     categoryOptions.value = raw.map((c) => ({ value: c.id!, label: c.name ?? c.code ?? "" }));
   } catch {
     treeData.value = [];

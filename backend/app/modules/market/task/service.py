@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from redis.asyncio.client import Redis
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.enums import RedisInitKeyConfig
@@ -19,11 +19,20 @@ from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
 from ..config import TaskConfig, TaskItemConfig
-from ..enums import AssignmentSource, AssignmentStatus, AssignMode, SubjectType, SubmissionStatus, TaskStatus
+from ..enums import (
+    AssignmentSource,
+    AssignmentStatus,
+    AssignMode,
+    ProjectStatus,
+    SubjectType,
+    SubmissionStatus,
+    TaskStatus,
+)
 from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
 from ..numbering import NumberPrefix, next_code
 from ..product.service import ProductService
 from ..project.crud import ProjectCRUD
+from ..project.model import ProjectItemModel, ProjectModel
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
 from .model import AssignmentModel, TaskItemModel, TaskModel, TaskTemplateModel
 from .schema import (
@@ -31,6 +40,7 @@ from .schema import (
     AssignmentOutSchema,
     AssignmentQueryParam,
     AssignmentUpdateSchema,
+    CatalogUsageSchema,
     MiniAssignmentGroupSchema,
     MiniTaskGroupSchema,
     SubmissionCreateSchema,
@@ -182,6 +192,22 @@ class TaskCategoryService:
         out.category_name = category_name
         out.items = [TaskCategoryService._item_tree_out(i) for i in template.items]
         return out
+
+    async def catalog_usage(self) -> CatalogUsageSchema:
+        """统计目录里「已被项目引用」的三级任务与叶子模板 id。
+
+        任务目录页默认只显示这些条目；未被引用的靠开关展示，避免刚建的库里
+        目录树里一堆没有任何项目在用的条目。
+        """
+        stmt = (
+            select(ProjectItemModel.item_id, ProjectItemModel.template_id)
+            .join(ProjectModel, ProjectModel.id == ProjectItemModel.project_id)
+            .where(ProjectModel.is_deleted.is_(False))
+        )
+        rows = (await self.db.execute(stmt)).all()
+        item_ids = sorted({item_id for item_id, _ in rows if item_id is not None})
+        template_ids = sorted({template_id for _, template_id in rows if template_id is not None})
+        return CatalogUsageSchema(item_ids=item_ids, template_ids=template_ids)
 
     @staticmethod
     def _item_tree_out(item: TaskItemModel) -> TaskItemTreeOutSchema:
@@ -401,6 +427,8 @@ class TaskService:
         """
         offset = (page_no - 1) * page_size
         search_dict = search_to_dict(search) or {}
+        if search is not None:
+            search_dict.pop("include_closed_project", None)
 
         # category_id → template_id in
         if search is not None and search.category_id is not None:
@@ -417,6 +445,23 @@ class TaskService:
             search_dict.pop("exclude_status", None)
             if "status" not in search_dict:
                 search_dict["status"] = ("notin", [exclude_val])
+
+        # 非活跃项目（已关闭 / 已删除）的任务默认不出现在任务列表：项目都结束了，任务还能被接单/分派是错的。
+        # 注意不能直接覆写 search_dict["project_id"]——那是调用方显式指定的过滤条件，
+        # 覆写会把「按项目查」变成「查所有活跃项目」，因此显式指定时改为判定该投影是否非活跃。
+        if search is None or not search.include_closed_project:
+            inactive = await self._inactive_project_ids()
+            if "project_id" in search_dict:
+                # 显式按项目过滤：值可能是 ("eq", 6) 形式的元组，取出其中的项目 id 判定是否非活跃
+                cond = search_dict["project_id"]
+                raw = cond[1] if isinstance(cond, tuple) else cond
+                values = raw if isinstance(raw, list) else [raw]
+                if any(isinstance(v, int) and v in inactive for v in values):
+                    return PageResultSchema[TaskOutSchema](
+                        page_no=page_no, page_size=page_size, total=0, has_next=False, items=[]
+                    )
+            elif inactive:
+                search_dict["project_id"] = ("notin", inactive)
 
         result = await TaskCRUD(self.auth, self.db).page(
             offset=offset,
@@ -470,10 +515,14 @@ class TaskService:
         隐藏「目录里有、但一个任务都没有」的模板——否则新建库/空库时侧边栏会显示
         一整棵没有任何任务对应的目录树。
         """
+        conditions = [TaskModel.is_deleted.is_(False)]
+        inactive = await self._inactive_project_ids()
+        if inactive:
+            conditions.append(TaskModel.project_id.notin_(inactive))
         stmt = (
             select(TaskTemplateModel.category_id, TaskModel.template_id, func.count(TaskModel.id))
             .join(TaskTemplateModel, TaskTemplateModel.id == TaskModel.template_id)
-            .where(TaskModel.is_deleted.is_(False))
+            .where(*conditions)
             .group_by(TaskTemplateModel.category_id, TaskModel.template_id)
             .order_by(TaskTemplateModel.category_id, TaskModel.template_id)
         )
@@ -620,16 +669,33 @@ class TaskService:
         return result
 
     async def _hall_visibility_search(self) -> dict[str, Any]:
-        """任务大厅可见性过滤条件：PUBLISHED + open + 排除当前用户已领取任务。"""
+        """任务大厅可见性过滤条件：PUBLISHED + open + 排除已领取 + 排除已关闭/已删除项目的任务。"""
         claimed = await AssignmentCRUD(self.auth, self.db).get_list(
             search={"user_id": self.auth.user.id, "source": AssignmentSource.CLAIMED.value}
         )
         claimed_ids = [a.task_id for a in claimed]
-        return {
+        search: dict[str, Any] = {
             "status": TaskStatus.PUBLISHED.value,
             "assign_mode": AssignMode.OPEN.value,
             "id": ("notin", claimed_ids),
         }
+        inactive = await self._inactive_project_ids()
+        if inactive:
+            search["project_id"] = ("notin", inactive)
+        return search
+
+    async def _inactive_project_ids(self) -> list[int]:
+        """取「非活跃项目」id：已关闭（CLOSED）或已软删除。
+
+        项目的生命周期结束后，其下任务不应再出现在任务列表/大厅/目录统计里；
+        数据保留在库里以便追溯。
+        """
+        rows = await self.db.execute(
+            select(ProjectModel.id).where(
+                or_(ProjectModel.status == ProjectStatus.CLOSED.value, ProjectModel.is_deleted.is_(True))
+            )
+        )
+        return list(rows.scalars().all())
 
     async def grouped_hall_tasks(self) -> list[MiniTaskGroupSchema]:
         """任务大厅分组：复用大厅可见性，一次性查出全部可见任务并按项目分组。"""

@@ -3,12 +3,26 @@ import type { FormSchema } from "./form-schema";
 
 const API_PATH = "/market/items";
 
+/** 目录已用统计（对齐后端 CatalogUsageSchema） */
+export interface CatalogUsage {
+  item_ids: number[];
+  template_ids: number[];
+}
+
 const TaskItemAPI = {
   listItem(query?: TaskItemPageQuery) {
     return request<ApiResponse<PageResult<TaskItemTable>>>({
       url: `${API_PATH}/list`,
       method: "get",
       params: query,
+    });
+  },
+
+  /** 目录「已用」统计：被项目引用的三级任务与叶子模板 id */
+  getUsage() {
+    return request<ApiResponse<CatalogUsage>>({
+      url: `${API_PATH}/usage`,
+      method: "get",
     });
   },
 

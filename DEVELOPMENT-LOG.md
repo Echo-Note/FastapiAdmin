@@ -1875,9 +1875,29 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 - API：不排除草稿 → 57 条；`exclude_status=DRAFT` → 0 条（正是用户看到的现象）；`/market/tasks/facets` → 5 条（分类 1 下的模板 1..5，含任务数）。
 - Web：`vue-tsc --noEmit` 通过，改动文件 `eslint` 通过。
 
-#### 3. 附带发现（重要）
+#### 3. 附带订正（我上一条记录写错了）
 
-`backend/tests/conftest.py` 读取 `docker/.env`，因此 `uv run pytest` **用的是同一个开发库**，会把 `test-*` 项目/任务写进日常开发数据里。要让测试与开发数据隔离，需给测试单独建库（或让 conftest 支持 `TEST_DATABASE_NAME`）。
+曾怀疑 `uv run pytest` 往开发库里写测试数据——**这是错的**：`tests/conftest.py` 早已把 `DATABASE_NAME` 固定为 `fastapiadmin_test`（`TEST_DB_NAME` 可覆盖），实测库列表里 `fastapiadmin` 与 `fastapiadmin_test` 是分开的两个库。开发库里那些 `test` / `demo` 项目是运营在界面上手动建的，不是测试产物。
+
+---
+
+### 2026-11-01 — 项目结束后其任务仍在列表/大厅；任务目录页默认只看已用
+
+#### 1. 现象与根因
+
+- **项目已关闭/已删除，任务还挂在任务列表里**：`TaskService.page` 只按任务自身字段过滤，完全没看所属项目的生命周期。实测：项目 `test` 状态 `CLOSED` 且 `is_deleted=true`，其 28 个任务仍出现在 `/market/tasks/list`。C 端大厅同理——项目都结束了任务还能被接单。
+- **任务目录页一进就是完整 6 分类 / 18 模板 / 51 三级任务**：目录页读的是主数据树（`/market/categories/tree`），与「有没有项目在用」无关。
+
+#### 2. 改法
+
+- `TaskService._inactive_project_ids()`：取「已关闭（`ProjectStatus.CLOSED`）或已软删除」的项目 id；任务列表、目录统计、C 端大厅三处统一排除（`TaskQueryParam.include_closed_project` 默认 false，需要追溯时显式打开）。
+- 新增 `GET /market/items/usage`（`CatalogUsageSchema {item_ids, template_ids}`）：返回被**未删除项目**引用的三级任务与叶子模板 id；任务目录页默认「只看已用目录」（开关可关，关掉才显示全量，新增目录时用）。
+
+#### 3. 验证
+
+- API：默认任务 `28` 条（只剩进行中的 demo 项目）；`include_closed_project=true` → `56` 条；`/market/items/usage` → 已用三级任务 28、叶子模板 0。
+- 新增 `tests/test_market_task_project_visibility.py` 3 个用例：项目关闭后任务从列表/统计消失、显式参数仍可追溯、软删除项目同样隐藏、已发布任务所属项目关闭后不出现在大厅。
+- `uv run pytest`（`fastapiadmin_test` 库）→ 全绿；`ruff check` 通过；Web `vue-tsc` / `eslint` 通过。
 
 ---
 

@@ -20,6 +20,7 @@ from .schema import (
     AssignmentOutSchema,
     AssignmentQueryParam,
     AssignmentUpdateSchema,
+    CatalogUsageSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
     SubmissionReviewSchema,
@@ -187,6 +188,16 @@ async def get_task_item_list_controller(
 ) -> JSONResponse:
     result = await TaskItemService(auth, db).page(page_no=page.page_no, page_size=page.page_size, search=search, order_by=page.order_by)
     return SuccessResponse(data=result, msg="查询三级任务成功")
+
+
+@TaskItemRouter.get("/usage", summary="目录已用统计(目录页只看已用)", response_model=ResponseSchema[CatalogUsageSchema])
+async def get_task_item_usage_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task_template:query"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """返回被项目引用的三级任务与叶子模板 id，供任务目录页默认只展示「已用」条目。"""
+    result = await TaskCategoryService(auth, db).catalog_usage()
+    return SuccessResponse(data=result, msg="获取目录已用统计成功")
 
 
 @TaskItemRouter.get("/detail/{id}", summary="查询三级任务详情", response_model=ResponseSchema[TaskItemOutSchema])

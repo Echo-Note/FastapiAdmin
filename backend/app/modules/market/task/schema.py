@@ -266,9 +266,21 @@ class TaskQueryParam(BaseQueryParam, UserByQueryParam):
     item_id: int | None = Field(default=None, description="所属三级任务ID", json_schema_extra={"q": "eq"})
     category_id: int | None = Field(default=None, description="一级分类ID", json_schema_extra={"q": "eq"})
     exclude_status: str | None = Field(default=None, description="排除的任务状态(如 DRAFT)")
+    include_closed_project: bool = Field(default=False, description="是否包含已关闭/已删除项目的任务(默认排除)")
     period: str | None = Field(default=None, description="周期", json_schema_extra={"q": "eq"})
     assign_mode: str | None = Field(default=None, description="分配方式", json_schema_extra={"q": "eq"})
     status: str | None = Field(default=None, description="任务状态", json_schema_extra={"q": "eq"})
+
+
+class CatalogUsageSchema(BaseModel):
+    """任务目录的「已用」集合（任务目录页的「只看已用」过滤依据）。
+
+    项目与任务单元的关系有两种指向：有三级任务的模板关联 ``item_id``，
+    叶子模板（无三级任务）直接关联 ``template_id``，两者都要算作「已用」。
+    """
+
+    item_ids: list[int] = Field(default_factory=list, description="被项目引用的三级任务ID")
+    template_ids: list[int] = Field(default_factory=list, description="被项目直接引用的叶子模板ID")
 
 
 class TaskFacetSchema(BaseModel):
