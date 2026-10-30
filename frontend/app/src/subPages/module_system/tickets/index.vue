@@ -120,7 +120,9 @@ function openCreate() {
   showForm.value = true
 }
 function navigateToDetail(id: number) {
-  router.push({ name: 'work-ticket-detail', query: { id: String(id) } })
+  // 用 path 而非 name 跳转：@wot-ui/router 的 resolve 在 name 分支误把 to.params 当 query，
+  // 导致 query 丢失；传 path 走 resolvePath 分支才能正确带上 query。
+  router.push({ path: '/subPages/module_system/ticket-detail/index', query: { id: String(id) } })
 }
 /** 左滑删除：wd-swipe-action 展开后点击右侧按钮触发 */
 function onSwipeRight(item: TicketItem, e: { value: string }) {
