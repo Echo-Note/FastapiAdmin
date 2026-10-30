@@ -21,6 +21,8 @@ from app.modules.common.file.service import FileService
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
 from .payout.service import PayoutService
+from .product.schema import ProductSearchItemSchema, ProductSearchQueryParam
+from .product.service import ProductService
 from .task.schema import (
     AssignmentOutSchema,
     AssignmentQueryParam,
@@ -164,6 +166,23 @@ async def mini_my_payout_controller(
 ) -> JSONResponse:
     result = await PayoutService(auth, db).my_payout(user_id=auth.user.id, period=period)
     return SuccessResponse(data=result, msg="获取我的发放信息成功")
+
+
+@MiniRouter.get(
+    "/products/search", summary="产品检索(产品库, 提交成果自动填充)", response_model=ResponseSchema[list[ProductSearchItemSchema]]
+)
+async def mini_product_search_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    search: Annotated[ProductSearchQueryParam, Query()],
+) -> JSONResponse:
+    """C 端产品检索：按产品名称模糊匹配，命中后由前端回填规格与生产企业。
+
+    可见范围由审核状态决定：已通过的产品对所有人可见；自己提交的待审核产品仅本人可见；
+    已驳回的产品不参与检索。认证使用 get_current_user（不要求运营权限码）。
+    """
+    result = await ProductService(auth, db).search(keyword=search.keyword, limit=search.limit)
+    return SuccessResponse(data=result, msg="检索产品成功")
 
 
 @MiniRouter.get("/institutions", summary="机构列表(提交成果选择)", response_model=ResponseSchema[PageResultSchema[InstitutionOutSchema]])

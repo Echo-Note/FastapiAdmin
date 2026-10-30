@@ -15,6 +15,7 @@ from .payout.model import (
     SettlementItemModel,
     SettlementModel,
 )
+from .product.model import ProductModel
 from .project.model import CompanyModel, ProjectItemModel, ProjectModel, ReportModel
 from .task.model import (
     AssignmentModel,
@@ -34,6 +35,7 @@ __all__ = [
     "InstitutionModel",
     "MarketNumberCounterModel",
     "PayoutConfigModel",
+    "ProductModel",
     "ProjectModel",
     "ProjectItemModel",
     "ReportModel",

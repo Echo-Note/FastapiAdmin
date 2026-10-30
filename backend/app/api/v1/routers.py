@@ -10,6 +10,7 @@ from app.modules.market.dashboard.controller import DashboardRouter
 from app.modules.market.institution.controller import InstitutionImageRouter, InstitutionRouter
 from app.modules.market.mini_controller import MiniRouter
 from app.modules.market.payout.controller import PayoutRouter, SettlementRouter
+from app.modules.market.product.controller import ProductRouter
 from app.modules.market.project.controller import CompanyRouter, ProjectRouter, ReportRouter
 from app.modules.market.task.controller import (
     AssignmentRouter,
@@ -78,6 +79,7 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
     "/common": [FileRouter],
     "/market": [
         MiniRouter,
+        ProductRouter,
         DashboardRouter,
         CompanyRouter,
         ProjectRouter,

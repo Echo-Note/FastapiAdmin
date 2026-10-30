@@ -1,0 +1,6 @@
+name = "market-product"
+title = "产品库"
+version = "1.0.0"
+description = "产品三要素字典：C 端检索自动填充、提交缺失产品自动入库、运营审核"
+optional = true
+tags = ["market", "product"]

@@ -22,6 +22,7 @@ from ..config import TaskConfig, TaskItemConfig
 from ..enums import AssignmentSource, AssignmentStatus, AssignMode, SubjectType, SubmissionStatus, TaskStatus
 from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
 from ..numbering import NumberPrefix, next_code
+from ..product.service import ProductService
 from ..project.crud import ProjectCRUD
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
 from .model import AssignmentModel, TaskItemModel, TaskModel, TaskTemplateModel
@@ -93,6 +94,21 @@ _TASK_PRELOAD = [
 _ASSIGNMENT_PRELOAD = ["task", *[f"task.{p}" for p in _TASK_PRELOAD]]
 
 
+
+
+def _resolve_form_schema(task: TaskModel) -> list[dict[str, Any]] | None:
+    """取任务自带的采集表单结构：三级任务优先，叶子模板回退到模板配置。
+
+    :param task: 任务实例（需已预加载 ``item`` 与 ``template``）
+    :return: ``form_schema`` 分节列表；未配置时返回 None
+    """
+    if task.item is not None and isinstance(task.item.config, dict):
+        schema = task.item.config.get("form_schema")
+        if schema:
+            return schema
+    if isinstance(task.template.config, dict):
+        return task.template.config.get("form_schema")
+    return None
 
 
 class TaskCategoryService:
@@ -829,7 +845,7 @@ class SubmissionService:
         归集机构（同名复用、否则创建），回填 ``institution_id``。运营端不再手动预置机构。
         """
         assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(
-            id=data.assignment_id, msg="分配记录不存在", preload=["task", "task.template"]
+            id=data.assignment_id, msg="分配记录不存在", preload=["task", "task.template", "task.item"]
         )
         template = assignment.task.template
         subject_type = (template.config or {}).get("subject_type", data.subject_type)
@@ -850,11 +866,17 @@ class SubmissionService:
                 )
 
         submission = await SubmissionCRUD(self.auth, self.db).create(data=create_data)
+        # 产品库自动入库：成果里出现库里没有的产品时写待审记录（失败不阻断提交，见 ProductService）
+        await ProductService(self.auth, self.db).ingest_from_form_data(
+            data.form_data, _resolve_form_schema(assignment.task)
+        )
         return await self.detail(id=submission.id)
 
     async def update(self, id: int, data: SubmissionUpdateSchema) -> SubmissionOutSchema:
         """更新成果（草稿/驳回状态可改，驳回重提版本 +1）。"""
-        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(id=id)
+        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(
+            id=id, preload=["assignment", "assignment.task", "assignment.task.template", "assignment.task.item"]
+        )
         if submission.status not in {SubmissionStatus.DRAFT.value, SubmissionStatus.REJECTED.value}:
             raise CustomException(msg="仅草稿/驳回状态的成果可修改")
         update_data = data.model_dump(exclude_unset=True, exclude_none=True)
@@ -862,6 +884,11 @@ class SubmissionService:
             update_data["version"] = submission.version + 1
             update_data["status"] = SubmissionStatus.DRAFT.value
         await SubmissionCRUD(self.auth, self.db).update(id=id, data=update_data)
+        if data.form_data is not None:
+            # 驳回重提同样要把新增产品入库（同一判重键已存在则跳过）
+            await ProductService(self.auth, self.db).ingest_from_form_data(
+                data.form_data, _resolve_form_schema(submission.assignment.task)
+            )
         return await self.detail(id=id)
 
     async def delete(self, ids: list[int]) -> None:
