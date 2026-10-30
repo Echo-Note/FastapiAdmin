@@ -98,3 +98,19 @@ export function statusMeta(map: Record<string, MarketStatusMeta>, status?: strin
     return { label: '-', type: 'info' }
   return map[status] ?? { label: status, type: 'info' }
 }
+
+/** 任务显示名入参：取三级任务名/模板名，叶子模板任务无三级任务 */
+export interface TaskNameSource {
+  item?: { name?: string } | null
+  template?: { name?: string } | null
+  name?: string
+  task_no?: string
+}
+
+/**
+ * 任务显示名：优先三级任务名 ``item.name``，叶子模板任务回退 ``template.name``，
+ * 再回退实例显示名 ``name`` / 任务编号 ``task_no``。
+ */
+export function taskDisplayName(task?: TaskNameSource | null): string {
+  return task?.item?.name ?? task?.template?.name ?? task?.name ?? task?.task_no ?? ''
+}

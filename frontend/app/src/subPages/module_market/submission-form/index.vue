@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import type { FormSchema, FormSchemaField, TaskItemDetail } from '@/api/module_market'
+import type { FormSchema, FormSchemaColumn, FormSchemaField, TaskItemDetail } from '@/api/module_market'
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
+import { taskDisplayName } from '@/constants'
+import { useUserStore } from '@/store/userStore'
+import { pcaTextArr } from 'element-china-area-data'
 
 definePage({ name: 'market-submission-form', style: { navigationBarTitleText: '提交成果' } })
 
 const { t } = useI18n()
 const toast = useToast()
 const router = useRouter()
+const userStore = useUserStore()
 
 const assignmentId = ref<number>()
 const taskNo = ref('')
@@ -25,6 +29,11 @@ const period = ref(currentMonth())
 function currentMonth() {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** 当前登录用户姓名（执行人自动填充，name 优先回退 username） */
+function currentUserName() {
+  return userStore.userInfo?.name ?? userStore.userInfo?.username ?? ''
 }
 
 /**
@@ -96,10 +105,21 @@ const activeFieldName = ref('')
 const showFieldPicker = ref(false)
 const fieldPickerColumns = computed(() => [(activeField.value?.options ?? []).map(o => ({ value: o.value, label: o.label }))])
 
+/** 执行日期选择器（date 字段复用同一实例）：modelValue 为毫秒时间戳 */
+const datePickerVisible = ref(false)
+const datePickerValue = ref<number>(Date.now())
+const activeDateSectionCode = ref('')
+const activeDateFieldName = ref('')
+
+/** 区域选择器（region 字段复用同一实例）：省市区三级联动，options 使用 pcaTextArr */
+const regionPickerVisible = ref(false)
+const activeRegionSectionCode = ref('')
+const activeRegionFieldName = ref('')
+
 const submitting = ref(false)
 
 function isRequired(field: FormSchemaField) {
-  return field.required === true
+  return field.required === true || field.autofill === 'current_user'
 }
 
 /** 动态字段是否使用选择器（select / radio） */
@@ -122,8 +142,60 @@ function onFieldPickerConfirm(e: { value: Array<string | number> }) {
   showFieldPicker.value = false
 }
 
+/** 打开日期选择器：有值回显，无值默认今天 */
+function openDatePicker(sectionCode: string, name: string) {
+  activeDateSectionCode.value = sectionCode
+  activeDateFieldName.value = name
+  const v = sectionData(sectionCode)[name]
+  const ts = typeof v === 'string' && v ? parseDateStr(v) : null
+  datePickerValue.value = ts ?? Date.now()
+  datePickerVisible.value = true
+}
+
+/** 确认日期：时间戳转 YYYY-MM-DD 写入表单 */
+function onDateConfirm(e: { value: number | string }) {
+  const ts = typeof e.value === 'number' ? e.value : Number(e.value)
+  if (activeDateSectionCode.value && activeDateFieldName.value && !Number.isNaN(ts))
+    sectionData(activeDateSectionCode.value)[activeDateFieldName.value] = formatDateStr(ts)
+  datePickerVisible.value = false
+}
+
+/** 打开区域选择器 */
+function openRegionPicker(sectionCode: string, name: string) {
+  activeRegionSectionCode.value = sectionCode
+  activeRegionFieldName.value = name
+  regionPickerVisible.value = true
+}
+
+/** 确认区域：selectedOptions 取完整路径（省/市/区），以 / 拼接写回表单 */
+function onRegionConfirm(e: { value: string | number, selectedOptions: Array<{ label?: string }> }) {
+  const path = (e.selectedOptions ?? []).map(o => o.label ?? '').filter(Boolean).join('/')
+  if (activeRegionSectionCode.value && activeRegionFieldName.value && path)
+    sectionData(activeRegionSectionCode.value)[activeRegionFieldName.value] = path
+  regionPickerVisible.value = false
+}
+
+/** 时间戳 → YYYY-MM-DD */
+function formatDateStr(ts: number): string {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** YYYY-MM-DD → 时间戳（非法返回 null） */
+function parseDateStr(str: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str)
+  if (!m)
+    return null
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+}
+
 function fieldLabel(field: FormSchemaField) {
   return field.label || ''
+}
+
+/** 选择类字段（date/region）占位文案，如「请选择执行日期」「请选择区域」 */
+function selectPlaceholder(field: FormSchemaField): string {
+  return field.placeholder || `请选择${fieldLabel(field)}`
 }
 
 function fieldValueText(sectionCode: string, name: string, field: FormSchemaField) {
@@ -214,35 +286,57 @@ function chooseAndUploadFile(sectionCode: string, name: string) {
 
 /** 初始化表单数据：按分节嵌套，多行子表字段初始化为首行 */
 function initFormData() {
+  const executorName = currentUserName()
   for (const section of allSections.value) {
     const sec = sectionData(section.code)
     for (const [fieldName, field] of Object.entries(section.fields)) {
       if (field.type === 'table')
         sec[fieldName] = [tableEmptyRow(field)]
+      else if (field.autofill === 'current_user')
+        sec[fieldName] = executorName
       else
         sec[fieldName] = field.type === 'number' ? undefined : ''
     }
   }
 }
 
-/** 校验必填：单值必填字段 + 多行子表的必填列 */
+/** 是否空值 */
+function isBlank(v: any): boolean {
+  return v === undefined || v === null || v === ''
+}
+
+/** 单值必填字段缺失提示：按字段类型 / 自动填充语义措辞 */
+function requiredHint(field: FormSchemaField): string {
+  const label = fieldLabel(field)
+  if (field.autofill === 'current_user' || field.type === 'date' || field.type === 'region' || field.type === 'select' || field.type === 'radio' || field.type === 'checkbox')
+    return `请选择「${label}」`
+  return `请填写「${label}」`
+}
+
+/** 子表必填列缺失提示：按列类型措辞 */
+function columnRequiredHint(col: FormSchemaColumn): string {
+  if (col.type === 'date' || col.type === 'select' || col.type === 'radio' || col.type === 'checkbox')
+    return `请选择「${col.label}」`
+  return `请填写「${col.label}」`
+}
+
+/** 校验必填：单值必填字段（含自动填充）+ 多行子表的必填列 */
 function validate(): boolean {
   for (const section of allSections.value) {
     for (const [name, field] of Object.entries(section.fields)) {
       if (field.type === 'table') {
         for (const row of rowsOf(section.code, name)) {
           for (const col of field.columns ?? []) {
-            if (col.required && (row[col.name] === undefined || row[col.name] === null || row[col.name] === '')) {
-              toast.warning(`${section.name}·${field.label} 的「${col.label}」为必填项`)
+            if (col.required && isBlank(row[col.name])) {
+              toast.warning(`「${section.name}·${field.label}」${columnRequiredHint(col)}`)
               return false
             }
           }
         }
         continue
       }
-      const v = sectionData(section.code)[name]
-      if (isRequired(field) && (v === undefined || v === null || v === '')) {
-        toast.warning(`${fieldLabel(field)} 为必填项`)
+      if (isRequired(field) && isBlank(sectionData(section.code)[name])) {
+        toast.warning(requiredHint(field))
         return false
       }
     }
@@ -276,15 +370,17 @@ async function handleSubmit() {
   }
 }
 
-/** 直接取分派单详情（含内嵌 task → template → form_schema 与三级任务） */
+/** 直接取分派单详情：按任务粒度渲染该任务（三级任务 item / 叶子模板 template）的采集分节 */
 async function loadAssignment() {
   formLoading.value = true
   try {
     const detail = await MarketAPI.getAssignmentDetail(assignmentId.value!)
-    const template = detail.task?.template
+    const task = detail.task
+    const template = task?.template
     formSchema.value = template?.config?.form_schema ?? []
-    taskItems.value = template?.items ?? []
-    taskNo.value = detail.task?.name ?? detail.task?.task_no ?? ''
+    // 三级任务粒度：仅渲染该任务的专属采集分节（自包含）；叶子模板无三级任务，回退模板分节
+    taskItems.value = task?.item ? [task.item] : []
+    taskNo.value = taskDisplayName(task)
   }
   catch {
     formSchema.value = []
@@ -320,8 +416,10 @@ onLoad((query) => {
       <view class="wot-bg-filled-oppo mt-3 rounded-3 px-4 py-4">
         <wd-loading v-if="formLoading" class="my-4 block" />
         <wd-form v-if="!formLoading" :model="formData" label-position="left">
-          <wd-form-item :label="t('market.period')" required border>
-            <wd-input v-model="period" :placeholder="t('market.period')" />
+          <wd-form-item :label="t('market.period')" border>
+            <view class="flex-1 flex items-center">
+              <text class="text-3.5" style="color: var(--wot-text-auxiliary)">{{ period }}</text>
+            </view>
           </wd-form-item>
 
           <!-- 采集字段：模板通用分节 + 三级任务分节，按分节分组渲染 -->
@@ -369,9 +467,38 @@ onLoad((query) => {
               </view>
 
               <wd-form-item v-else :label="fieldLabel(field)" border :required="isRequired(field)">
-                <view v-if="usePicker(field)" class="flex-1" @click="openFieldPicker(section.code, fieldName, field)">
+                <!-- 自动填充字段（执行人）：只读展示，弱化样式 -->
+                <view v-if="field.autofill === 'current_user'" class="flex-1 flex items-center">
+                  <text class="text-3.5" style="color: var(--wot-text-auxiliary)">
+                    {{ fieldValueText(section.code, fieldName, field) }}
+                  </text>
+                </view>
+
+                <!-- 选择类字段（select/radio/checkbox 带 options）：下拉/单选选择 -->
+                <view v-else-if="usePicker(field)" class="flex-1" @click="openFieldPicker(section.code, fieldName, field)">
                   <wd-cell :value="fieldValueText(section.code, fieldName, field)" is-link :border="false" />
                 </view>
+
+                <!-- 日期字段：点击唤起日期选择器 -->
+                <view v-else-if="field.type === 'date'" class="flex-1" @click="openDatePicker(section.code, fieldName)">
+                  <wd-cell
+                    :value="formData[section.code][fieldName] || ''"
+                    :placeholder="selectPlaceholder(field)"
+                    is-link
+                    :border="false"
+                  />
+                </view>
+
+                <!-- 区域字段：点击唤起省市区三级联动 -->
+                <view v-else-if="field.type === 'region'" class="flex-1" @click="openRegionPicker(section.code, fieldName)">
+                  <wd-cell
+                    :value="formData[section.code][fieldName] || ''"
+                    :placeholder="selectPlaceholder(field)"
+                    is-link
+                    :border="false"
+                  />
+                </view>
+
                 <wd-input
                   v-else-if="field.type === 'textarea'"
                   v-model="formData[section.code][fieldName]"
@@ -420,6 +547,20 @@ onLoad((query) => {
           </template>
         </wd-form>
         <wd-picker :visible="showFieldPicker" :columns="fieldPickerColumns" @confirm="onFieldPickerConfirm" @cancel="showFieldPicker = false" />
+        <wd-datetime-picker
+          v-model="datePickerValue"
+          v-model:visible="datePickerVisible"
+          type="date"
+          title="选择日期"
+          @confirm="onDateConfirm"
+        />
+        <wd-cascader
+          v-model:visible="regionPickerVisible"
+          :options="pcaTextArr"
+          text-key="label"
+          title="选择区域"
+          @confirm="onRegionConfirm"
+        />
       </view>
 
       <view class="mt-5">

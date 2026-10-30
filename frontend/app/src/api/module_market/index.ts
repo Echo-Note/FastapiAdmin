@@ -29,12 +29,14 @@ export interface FormSchemaColumn {
 /** 采集字段定义（对齐后端 form_schema.py FormSchemaField，字段名由外层 dict 的 key 表达） */
 export interface FormSchemaField {
   label: string
-  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file' | 'table'
+  type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'radio' | 'checkbox' | 'image' | 'file' | 'table' | 'region'
   required?: boolean
   placeholder?: string
   options?: { label: string, value: string }[]
   /** 子表列定义（仅 type=table 需要） */
   columns?: FormSchemaColumn[]
+  /** 自动填充来源(current_user=自动填当前登录用户并只读) */
+  autofill?: 'current_user' | null
 }
 
 /** 采集表单分节：英文 code + 中文 name + 其下字段（对齐后端 FormSchemaSection） */
@@ -105,19 +107,36 @@ export interface TaskTemplateItem {
   items?: TaskItemDetail[]
 }
 
+/** 任务所属项目摘要（对齐后端 TaskProjectBriefSchema） */
+export interface TaskProjectBrief {
+  id?: number
+  name?: string
+  code?: string | null
+}
+
 /** 任务实例（对齐后端 TaskOutSchema） */
 export interface TaskItem {
   id?: number
   task_no?: string
   project_id?: number
+  /** 所属项目摘要（含项目名，供归属链路展示） */
+  project?: TaskProjectBrief | null
   template_id?: number
   template?: TaskTemplateItem | null
+  /** 三级任务ID（叶子模板任务为空） */
+  item_id?: number | null
+  /** 三级任务（嵌套在任务响应中） */
+  item?: TaskItemDetail | null
   name?: string
   period?: string
   assign_mode?: string
   status?: string
   publisher_id?: number | null
   published_at?: string | null
+  /** 执行标准（后端已扁平透出：item.config 优先，回退 template.config） */
+  exec_standard?: string | null
+  /** 执行要求（后端已扁平透出：item.config 优先，回退 template.config） */
+  executor_requirement?: string | null
 }
 
 /** 任务分配/接收（对齐后端 AssignmentOutSchema） */
@@ -169,10 +188,35 @@ export interface PayoutSummary {
   }[]
 }
 
+/** C 端按项目分组的任务组（对齐后端 MiniTaskGroupSchema，任务大厅） */
+export interface MiniTaskGroup {
+  project_id?: number
+  project_name?: string
+  /** 项目截止日期 */
+  period?: string | null
+  /** 该项目下最小单元任务（已按 分类→模板→任务 排序） */
+  tasks?: TaskItem[]
+}
+
+/** C 端按项目分组的分派单组（对齐后端 MiniAssignmentGroupSchema，我的任务） */
+export interface MiniAssignmentGroup {
+  project_id?: number
+  project_name?: string
+  /** 项目截止日期 */
+  period?: string | null
+  /** 该项目下当前用户的分派单（含内嵌 task 归属链路） */
+  assignments?: AssignmentItem[]
+}
+
 export const MarketAPI = {
-  /** 任务大厅：公开接单任务列表 */
+  /** 任务大厅：公开接单任务列表（分页平铺） */
   getTaskHall(params?: Record<string, any>) {
     return http.Get<MarketPageResult<TaskItem>>(`${MARKET_BASE}/mini/tasks`, { params })
+  },
+
+  /** 任务大厅分组：按项目分组返回全部可见任务（不分页） */
+  getTaskHallGrouped(): Promise<MiniTaskGroup[]> {
+    return http.Get(`${MARKET_BASE}/mini/tasks/grouped`)
   },
 
   /** 任务详情（单条） */
@@ -188,6 +232,11 @@ export const MarketAPI = {
   /** 我的任务：当前用户的全部任务分派 */
   getMyAssignments(params?: Record<string, any>) {
     return http.Get<MarketPageResult<AssignmentItem>>(`${MARKET_BASE}/mini/assignments`, { params })
+  },
+
+  /** 我的任务分组：按项目分组返回当前用户分派单（不分页，支持 status 等筛选） */
+  getMyAssignmentsGrouped(params?: Record<string, any>): Promise<MiniAssignmentGroup[]> {
+    return http.Get(`${MARKET_BASE}/mini/assignments/grouped`, { params })
   },
 
   /** 任务分派详情（单条，含 task 内嵌） */
@@ -234,6 +283,6 @@ export const MarketAPI = {
    * @returns uni.uploadFile 成功回调结果（statusCode + data 响应体字符串）
    */
   uploadFile(filePath: string): Promise<UniApp.UploadFileSuccessCallbackResult> {
-    return http.Post('/common/file/upload?upload_type=file', { filePath, name: 'file' }, { requestType: 'upload' })
+    return http.Post(`${MARKET_BASE}/mini/upload?upload_type=file`, { filePath, name: 'file' }, { requestType: 'upload' })
   },
 }

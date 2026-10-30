@@ -4,7 +4,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
-import { ASSIGNMENT_STATUS_MAP, statusMeta } from '@/constants'
+import { ASSIGNMENT_STATUS_MAP, statusMeta, taskDisplayName } from '@/constants'
 
 definePage({ name: 'market-task-detail', style: { navigationBarTitleText: '任务详情' } })
 
@@ -28,14 +28,14 @@ const loading = ref(false)
 const loadFailed = ref(false)
 const acting = ref(false)
 
-/** 单价（模板 config.price，仅数字） */
+/** 单价（优先三级任务 config.price，回退模板 config.price，仅数字） */
 const amountText = computed(() => {
-  const price = task.value?.template?.config?.price
+  const price = task.value?.item?.config?.price ?? task.value?.template?.config?.price
   return price == null ? '' : Number(price).toFixed(2)
 })
 
-/** 计价单位 */
-const unitText = computed(() => task.value?.template?.config?.unit ?? '')
+/** 计价单位（优先三级任务 config.unit，回退模板 config.unit） */
+const unitText = computed(() => task.value?.item?.config?.unit ?? task.value?.template?.config?.unit ?? '')
 
 /** 是否为「我的任务」入口（有分派实例） */
 const fromMine = computed(() => assignmentId.value != null)
@@ -52,8 +52,45 @@ const canAccept = computed(() => assignmentStatus.value === 'PENDING')
 /** 大厅任务可接单（无分派实例） */
 const canClaim = computed(() => !fromMine.value && task.value != null)
 
-/** 执行标准（取自模板 config.exec_standard） */
-const execStandard = computed(() => task.value?.template?.config?.exec_standard || '-')
+/**
+ * 执行标准：顶层 task.exec_standard（后端已扁平透出）优先，
+ * 回退 item.config.exec_standard，再回退 template.config.exec_standard。
+ */
+const execStandard = computed(() => {
+  const val = task.value?.exec_standard
+    ?? task.value?.item?.config?.exec_standard
+    ?? task.value?.template?.config?.exec_standard
+  return val?.trim() || '-'
+})
+
+/**
+ * 执行要求：顶层 task.executor_requirement（后端已扁平透出）优先，
+ * 回退 item.config.executor_requirement，再回退 template.config.executor_requirement。
+ */
+const execRequirement = computed(() => {
+  const val = task.value?.executor_requirement
+    ?? task.value?.item?.config?.executor_requirement
+    ?? task.value?.template?.config?.executor_requirement
+  return val?.trim() || '-'
+})
+
+/**
+ * 归属路径分段：项目名 → 一级分类 → 二级模板。
+ * 三级任务名已作为页面主标题（taskDisplayName），此处不再重复展示。
+ */
+const belongingPath = computed(() => {
+  const segments: string[] = []
+  const projectName = task.value?.project?.name
+  const categoryName = task.value?.template?.category?.name
+  const templateName = task.value?.template?.name
+  if (projectName)
+    segments.push(projectName)
+  if (categoryName)
+    segments.push(categoryName)
+  if (templateName)
+    segments.push(templateName)
+  return segments
+})
 
 /** 分配方式文案 */
 const assignModeLabel = computed(() => ASSIGN_MODE_LABEL[task.value?.assign_mode ?? ''] ?? task.value?.assign_mode ?? '-')
@@ -113,7 +150,7 @@ async function handleClaim() {
   const confirmed = await new Promise<boolean>((resolve) => {
     uni.showModal({
       title: t('common.title'),
-      content: `${t('market.claimConfirm')}\n${task.value?.name ?? task.value?.task_no ?? ''} · ¥${amountText.value || '—'}`,
+      content: `${t('market.claimConfirm')}\n${taskDisplayName(task.value)} · ¥${amountText.value || '—'}`,
       success: res => resolve(res.confirm),
       fail: () => resolve(false),
     })
@@ -201,8 +238,19 @@ onLoad((query) => {
               {{ fromMine ? assignmentStatusInfo.label : assignModeLabel }}
             </view>
           </view>
-          <view class="mt-4 text-5 font-bold leading-snug">
-            {{ task.name ?? task.task_no ?? '' }}
+          <!-- 归属路径：项目名 / 一级分类 / 二级模板（三级任务名即标题） -->
+          <view
+            v-if="belongingPath.length"
+            class="mt-3 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-2.5"
+            style="opacity: 0.8"
+          >
+            <template v-for="(seg, idx) in belongingPath" :key="idx">
+              <view v-if="idx > 0" class="opacity-60">·</view>
+              <view>{{ seg }}</view>
+            </template>
+          </view>
+          <view class="mt-2 text-5 font-bold leading-snug">
+            {{ taskDisplayName(task) }}
           </view>
           <view class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-3" style="opacity: 0.9">
             <view>{{ t('market.period') }} {{ task.period ?? '-' }}</view>
@@ -234,6 +282,14 @@ onLoad((query) => {
             </view>
             <view class="wot-text-text-main mt-1.5 text-3 leading-relaxed">
               {{ execStandard }}
+            </view>
+          </view>
+          <view class="wot-border-border-main mt-4 border-t pt-4">
+            <view class="wot-text-text-auxiliary text-2.5">
+              执行要求
+            </view>
+            <view class="wot-text-text-main mt-1.5 text-3 leading-relaxed">
+              {{ execRequirement }}
             </view>
           </view>
         </view>

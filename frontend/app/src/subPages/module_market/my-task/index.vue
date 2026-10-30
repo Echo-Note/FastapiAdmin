@@ -3,7 +3,7 @@ import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
-import { useMarketListPage } from '@/composables/useMarketListPage'
+import type { AssignmentItem, MiniAssignmentGroup } from '@/api/module_market'
 import {
   ASSIGNMENT_STAGES,
   ASSIGNMENT_STATUS_MAP,
@@ -11,23 +11,10 @@ import {
   statusMeta,
   SUBMISSION_STAT_META,
   SUBMISSION_STAT_ORDER,
+  taskDisplayName,
 } from '@/constants'
 
 definePage({ name: 'market-my-task', style: { navigationBarTitleText: '我的任务', enablePullDownRefresh: true } })
-
-/** 分派单（对齐后端 AssignmentOutSchema，task 为任务摘要 name/period） */
-interface MyAssignmentItem {
-  id?: number
-  task_id?: number
-  status?: string
-  accepted_at?: string | null
-  submitted_at?: string | null
-  task?: {
-    id?: number
-    name?: string
-    period?: string
-  } | null
-}
 
 const { t } = useI18n()
 const toast = useToast()
@@ -46,19 +33,31 @@ const TAB_OPTIONS = [
 const activeTab = ref(0)
 const activeStatus = ref<string | undefined>()
 
-const { list, total, loading, reload, refreshData, loadNext, toFirst } = useMarketListPage<MyAssignmentItem>({
-  fetcher: p => MarketAPI.getMyAssignments({
-    ...p,
-    status: activeStatus.value,
-  }) as any,
-  onError: () => toast.error(t('common.loadFailed')),
-})
+/** 分组数据（分组接口不分页，一次性拉全） */
+const groups = ref<MiniAssignmentGroup[]>([])
+const loading = ref(false)
+
+/** 按项目分组拉取：首次/全部不传 status，切换 Tab 时传 status 筛选 */
+async function loadGroups() {
+  loading.value = true
+  try {
+    const params = activeStatus.value ? { status: activeStatus.value } : undefined
+    const data = await MarketAPI.getMyAssignmentsGrouped(params)
+    groups.value = data ?? []
+  }
+  catch {
+    toast.error(t('common.loadFailed'))
+  }
+  finally {
+    loading.value = false
+  }
+}
 
 function statusInfo(status?: string) {
   return statusMeta(ASSIGNMENT_STATUS_MAP, status)
 }
 
-/** 状态语义色 → 卡片左侧色条颜色 */
+/** 状态语义色 → 进度轨道/成果角标语义色 */
 const STATUS_BAR_COLOR: Record<string, string> = {
   info: 'var(--wot-grey-6)',
   primary: 'var(--wot-primary-6)',
@@ -124,13 +123,30 @@ function stageIndex(status?: string) {
   return ASSIGNMENT_STATUS_STAGE[status ?? ''] ?? 0
 }
 
+/** 分组头唯一 key：优先项目 id，回退项目名，最后回退索引 */
+function groupKey(group: MiniAssignmentGroup, index: number) {
+  return group.project_id ?? group.project_name ?? `group-${index}`
+}
+
+/** 归属路径：一级分类名 · 二级模板名（空段跳过） */
+function pathText(item: AssignmentItem) {
+  const category = item.task?.template?.category?.name
+  const template = item.task?.template?.name
+  return [category, template].filter(Boolean).join(' · ')
+}
+
+/** 执行要求（后端已扁平透出，空值不展示） */
+function executorRequirement(item: AssignmentItem) {
+  return item.task?.executor_requirement?.trim() || ''
+}
+
 function handleTabChange(e: { index: number }) {
   activeStatus.value = TAB_OPTIONS[e.index]?.value
-  toFirst()
+  loadGroups()
 }
 
 /** 卡片点击：已接收 / 进行中 → 提交成果页；其余（待接收/已提交/已审核/已结算）→ 详情页 */
-function goDetail(item: MyAssignmentItem) {
+function goDetail(item: AssignmentItem) {
   // 用 path 而非 name 跳转：@wot-ui/router 的 resolve 在 name 分支误把 to.params 当 query，
   // 导致 query 丢失；传 path 走 resolvePath 分支才能正确带上 query。
   const canFill = item.status === 'ACCEPTED' || item.status === 'SUBMITTING'
@@ -143,13 +159,9 @@ function goDetail(item: MyAssignmentItem) {
   })
 }
 
-onReachBottom(() => {
-  if (!loading.value)
-    loadNext()
-})
 onPullDownRefresh(async () => {
   try {
-    await Promise.all([refreshData(), loadSubmissionStats()])
+    await Promise.all([loadGroups(), loadSubmissionStats()])
   }
   finally {
     uni.stopPullDownRefresh()
@@ -157,7 +169,7 @@ onPullDownRefresh(async () => {
 })
 // 每次显示都刷新：从详情接收返回后状态已变，需重新拉取列表与成果统计
 onShow(() => {
-  reload()
+  loadGroups()
   loadSubmissionStats()
 })
 </script>
@@ -168,60 +180,76 @@ onShow(() => {
       <wd-tab v-for="opt in TAB_OPTIONS" :key="opt.label" :title="opt.label" />
     </wd-tabs>
 
-    <SkeletonPage v-if="loading && list.length === 0" :rows="5" search />
+    <SkeletonPage v-if="loading && groups.length === 0" :rows="5" search />
     <template v-else>
       <view class="px-3 pt-3">
-        <wd-empty v-if="!loading && list.length === 0" :tip="t('market.emptyMyTask')" />
-        <view
-          v-for="item in list"
-          :key="item.id"
-          class="my-card"
-          hover-class="my-card--active"
-          @click="goDetail(item)"
-        >
-          <view class="flex items-center justify-between gap-2">
-            <view class="my-card__title">
-              {{ item.task?.name ?? '-' }}
+        <wd-empty v-if="!loading && groups.length === 0" :tip="t('market.emptyMyTask')" />
+        <template v-for="(group, gi) in groups" :key="groupKey(group, gi)">
+          <!-- 分组头：项目名主文本 + 周期弱文本 -->
+          <view class="group-head">
+            <view class="group-head__name">
+              {{ group.project_name || '-' }}
             </view>
-            <wd-tag :type="statusInfo(item.status).type" plain round :icon="statusInfo(item.status).icon">
-              {{ statusInfo(item.status).label }}
-            </wd-tag>
-          </view>
-          <view class="mt-2 flex flex-wrap items-center justify-between gap-2">
-            <view class="my-card__meta">
-              {{ t('market.period') }} {{ item.task?.period ?? '-' }}
-            </view>
-            <view v-if="statItems(item.id).length" class="sub-stat">
-              <text
-                v-for="s in statItems(item.id)"
-                :key="s.key"
-                class="sub-stat__item"
-              >
-                <text class="sub-stat__dot" :style="{ background: STATUS_BAR_COLOR[s.type] }" />
-                <text class="sub-stat__num">{{ s.count }}</text>
-                <text class="sub-stat__label">{{ s.label }}</text>
-              </text>
+            <view v-if="group.period" class="group-head__period">
+              {{ group.period }}
             </view>
           </view>
-          <view class="stage-track mt-3" :style="{ '--track-color': barColor(item.status) }">
-            <view
-              v-for="(stage, i) in ASSIGNMENT_STAGES"
-              :key="stage.label"
-              class="stage-col"
-            >
-              <view class="stage-col__row">
-                <view class="stage-col__line stage-col__line--l" :class="{ on: i > 0 && i <= stageIndex(item.status) }" />
-                <view class="stage-col__dot" :class="{ on: i <= stageIndex(item.status) }" />
-                <view class="stage-col__line stage-col__line--r" :class="{ on: i < stageIndex(item.status) }" />
+          <view
+            v-for="item in group.assignments ?? []"
+            :key="item.id"
+            class="my-card"
+            hover-class="my-card--active"
+            @click="goDetail(item)"
+          >
+            <view class="flex items-center justify-between gap-2">
+              <view class="my-card__title">
+                {{ taskDisplayName(item.task) || '-' }}
               </view>
-              <text class="stage-col__label" :class="{ on: i <= stageIndex(item.status) }">{{ stage.label }}</text>
+              <wd-tag :type="statusInfo(item.status).type" plain round :icon="statusInfo(item.status).icon">
+                {{ statusInfo(item.status).label }}
+              </wd-tag>
+            </view>
+            <!-- 归属链路：一级分类名 · 二级模板名 -->
+            <view v-if="pathText(item)" class="my-card__path">
+              {{ pathText(item) }}
+            </view>
+            <view class="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <view class="my-card__meta">
+                {{ t('market.period') }} {{ item.task?.period ?? '-' }}
+              </view>
+              <view v-if="statItems(item.id).length" class="sub-stat">
+                <text
+                  v-for="s in statItems(item.id)"
+                  :key="s.key"
+                  class="sub-stat__item"
+                >
+                  <text class="sub-stat__dot" :style="{ background: STATUS_BAR_COLOR[s.type] }" />
+                  <text class="sub-stat__num">{{ s.count }}</text>
+                  <text class="sub-stat__label">{{ s.label }}</text>
+                </text>
+              </view>
+            </view>
+            <!-- 执行要求（有值才展示） -->
+            <view v-if="executorRequirement(item)" class="my-card__requirement">
+              <text class="my-card__requirement-label">执行要求</text>
+              <text>{{ executorRequirement(item) }}</text>
+            </view>
+            <view class="stage-track mt-3" :style="{ '--track-color': barColor(item.status) }">
+              <view
+                v-for="(stage, i) in ASSIGNMENT_STAGES"
+                :key="stage.label"
+                class="stage-col"
+              >
+                <view class="stage-col__row">
+                  <view class="stage-col__line stage-col__line--l" :class="{ on: i > 0 && i <= stageIndex(item.status) }" />
+                  <view class="stage-col__dot" :class="{ on: i <= stageIndex(item.status) }" />
+                  <view class="stage-col__line stage-col__line--r" :class="{ on: i < stageIndex(item.status) }" />
+                </view>
+                <text class="stage-col__label" :class="{ on: i <= stageIndex(item.status) }">{{ stage.label }}</text>
+              </view>
             </view>
           </view>
-        </view>
-      </view>
-      <wd-loading v-if="loading && list.length > 0" size="20px" class="mx-auto my-2 block" />
-      <view v-else-if="total > 0 && list.length >= total" class="wot-text-text-auxiliary my-2 text-center text-2.5">
-        {{ t('common.noMore') }}
+        </template>
       </view>
       <wd-gap height="100rpx" safe-area-bottom />
     </template>
@@ -229,6 +257,30 @@ onShow(() => {
 </template>
 
 <style lang="scss" scoped>
+/* 分组头：项目名 + 周期 */
+.group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12rpx;
+  margin: 8rpx 4rpx 16rpx;
+}
+.group-head__name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--wot-text-main);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-head__period {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--wot-text-auxiliary);
+}
+
 .my-card {
   padding: 24rpx;
   margin-bottom: 20rpx;
@@ -254,6 +306,13 @@ onShow(() => {
   white-space: nowrap;
 }
 
+.my-card__path {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--wot-text-auxiliary);
+}
+
 .my-card__meta {
   padding: 4rpx 14rpx;
   font-size: 22rpx;
@@ -261,6 +320,18 @@ onShow(() => {
   color: var(--wot-text-secondary);
   background: var(--wot-filled-content, #f2f3f5);
   border-radius: 8rpx;
+}
+
+.my-card__requirement {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: var(--wot-text-secondary);
+}
+.my-card__requirement-label {
+  margin-right: 8rpx;
+  font-size: 20rpx;
+  color: var(--wot-primary-6);
 }
 
 /* 成果进度角标：通过 / 待审 / 驳回 分组计数 */
