@@ -29,6 +29,7 @@ class NumberPrefix:
     PROJECT = "PRJ"  # 项目（market_project）
     TASK = "TK"  # 任务实例流水号（market_task.task_no）
     ARCHIVE = "ARC"  # 成果档案编号（market_submission.archive_no）
+    MEMBER = "U"  # C 端成员编号（market_member.member_no）
 
 
 class MarketNumberCounterModel(MappedBase):

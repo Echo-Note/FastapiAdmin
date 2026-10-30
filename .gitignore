@@ -91,3 +91,6 @@ backend/sql/**/*.sql
 
 # 生产初始化脚本的本地密钥/密码（模板 .env.example 可提交）
 ops/prod/.env
+
+# Playwright MCP 本地运行时产物（工具/快照/日志）
+.playwright-mcp/

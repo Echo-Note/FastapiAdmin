@@ -20,8 +20,11 @@ parent: foxwork-architecture
 | `config.py` | 任务配置 JSONB 的 Pydantic 权威定义（`TaskConfig` / `TaskItemConfig` / `SubmitRule`） |
 | `form_schema.py` | 动态采集表单的结构定义（`FormSchemaSection` → `FormSchemaField` / `FormSchemaColumn`） |
 | `numbering.py` | 业务编号 `{PREFIX}-{NNN}` 的 PG 计数器表原子分配 + `sync_counter` 对齐种子 |
+| `member/` | **C 端身份来源**：`market_member` 档案（存在即 C 端）+ 用户摘要 `{id, name, username, mobile}` 与批量查询 `load_user_briefs` |
 
 另有 `models.py` 作统一注册入口（解决 `TYPE_CHECKING` 下的循环外键，供脚本与测试一次性 import 全部模型）。
+
+**C 端用户标识：后端带摘要，前端不反查。** `market` 只持有 `sys_user.id`（无跨域 relationship），但所有运营列表都要回答「这是谁」——只存自增 `user_id` 时，重名或几个 `普通用户` 就无法区分。因此结算单与发放结果的出参都带 `user: {id, name, username, mobile}`，由 `member.load_user_briefs` 一次批量取。**不要再加 `market_member` 表或给 `sys_user` 加 `user_no`**：手机号已经是业务上真正的识别手段，编号层解决的是「改名后能否追溯」，成本大于收益（决定见 `TASK` 记录，2026-11）。
 
 ## 边界
 
@@ -38,6 +41,7 @@ parent: foxwork-architecture
 | [market/project](project/SPEC.md) | `market_company` `market_project` `market_project_item` `market_report` | task（`market_project_item` 指向三级任务或叶子模板） |
 | [market/payout](payout/SPEC.md) | `market_settlement` `market_settlement_item` `market_payout_config` `market_allowance` `market_allowance_detail` | task（读任务与成果做归集） |
 | [market/institution](institution/SPEC.md) | `market_institution` `market_institution_image` | 无（被 task 引用） |
+| [market/member](member/SPEC.md) | `market_member` | sys_user（只存 `user_id`） |
 | [market/dashboard](dashboard/SPEC.md) | 无自有表 | 全部（只读聚合） |
 | [market/product](product/SPEC.md) | `market_product` | task（读 `form_schema` 的 `product_role` 识别产品三要素列；成果提交/驳回重提后触发自动入库） |
 
@@ -57,7 +61,8 @@ parent: foxwork-architecture
 | 成果 | `SubmissionStatus` | `DRAFT`→`"DRAFT"`（历史/遗留，仅 dashboard 兼容统计）、`PENDING`→`"PENDING"`（提交即此）、`APPROVED`→`"APPROVED"`、`REJECTED`→`"REJECTED"`（可改后重提，`version` +1） |
 | 结算单 | `SettlementStatus` | `PENDING`→`"PENDING"`、`CALCULATED`→`"CALCULATED"`、`CONFIRMED`→`"CONFIRMED"`、`REPORTED`→`"REPORTED"`、`PAID`→`"PAID"` |
 | 报告 | `ReportStatus` | `DRAFT`→`"DRAFT"`、`GENERATED`→`"GENERATED"`、`SUBMITTED`→`"SUBMITTED"` |
-| 津贴明细 | `AllowanceStatus` | `PENDING`→`"PENDING"`、`PAID`→`"PAID"` |
+| 津贴明细 | `AllowanceStatus` | `PENDING`→`"PENDING"`（已写入）、`PAID`→`"PAID"`（无写入路径，二期打款才写） |
+| 结算单支付 | `PayStatus` | `SCHEDULED`→`"SCHEDULED"`（归集时已写入）、`PAID`→`"PAID"`（无写入路径，二期支付才写） |
 | 产品库审核 | `ProductAuditStatus` | `PENDING`→`"pending"`、`APPROVED`→`"approved"`、`REJECTED`→`"rejected"`（**小写**，与任务域状态区分） |
 
 > 注意大小写不是笔误：任务/分派/成果/结算等状态值一律**大写字符串**；产品库的审核状态与来源用**小写**。
@@ -66,12 +71,13 @@ parent: foxwork-architecture
 
 - `TaskStatus.SETTLING`：`TaskService.change_status` 允许的链是 PUBLISHED → IN_PROGRESS → COMPLETED → SETTLED → ARCHIVED，跳过 SETTLING；`SettlementService.settle` 只校验任务处于 COMPLETED，不推进任务状态。
 - `SettlementStatus.PAID`：没有支付实现（支付是非目标）。
-- `AllowanceStatus.PAID`：同上，津贴明细只被读。
+- `AllowanceStatus.PAID`、`PayStatus.PAID`：同上，只能在二期实际打款后写入。
 
-2026-11 修掉的两处（原为「枚举有效但永不写入」）：
+2026-11 修掉的「枚举有效但永不写入」：
 
-- 分派链补全：提交成果时 `ACCEPTED` → `SUBMITTED`；审核通过时 → `REVIEWED`；归集结算生成结算单时 → `SETTLED`。`SUBMITTING` 从未被写入过，直接删除。
+- 分派链补全：提交成果时 `ACCEPTED` → `SUBMITTED`；审核通过时先 `REVIEWED`、随即由自动归集推到 `SETTLED`。`SUBMITTING` 从未被写入过，直接删除。
 - 成果提交即 `PENDING`：`SubmissionService.create` 显式写 `status="PENDING"`，dashboard 的「待审核」按 `PENDING`（并兼容历史 `DRAFT`）统计，不再恒为 0。
+- 发放链补实：`market_settlement.paid_amount` / `pay_status=SCHEDULED` 与 `market_allowance` / `market_allowance_detail` 过去只有读路径，现在由归集时的封顶滚存写入（细节见 [market/payout](payout/SPEC.md)）。
 
 ## 已知取舍
 

@@ -34,11 +34,13 @@ from ..enums import (
 from ..form_schema import FormSchemaSection
 from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
 from ..numbering import NumberPrefix, next_code
+from ..payout.crud import SettlementCRUD
+from ..payout.service import PayoutService, SettlementService
 from ..product.service import ProductService
 from ..project.crud import ProjectCRUD
 from ..project.model import ProjectItemModel, ProjectModel
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
-from .model import AssignmentModel, TaskItemModel, TaskModel, TaskTemplateModel
+from .model import AssignmentModel, SubmissionModel, TaskItemModel, TaskModel, TaskTemplateModel
 from .schema import (
     AssignmentCreateSchema,
     AssignmentOutSchema,
@@ -50,7 +52,9 @@ from .schema import (
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
+    SubmissionReviewResultSchema,
     SubmissionReviewSchema,
+    SubmissionSettlementNoticeSchema,
     SubmissionTaskContextSchema,
     SubmissionUpdateSchema,
     TaskCategoryCreateSchema,
@@ -1242,9 +1246,13 @@ class SubmissionService:
         _apply_task_filter(cond)
         return await self._page_out(page_no=page_no, page_size=page_size, search=cond)
 
-    async def review(self, id: int, data: SubmissionReviewSchema) -> SubmissionOutSchema:
-        """审核成果：approved→APPROVED，否则 REJECTED+review_comment，回写 assignment.status。"""
-        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(id=id)
+    async def review(self, id: int, data: SubmissionReviewSchema) -> SubmissionReviewResultSchema:
+        """审核成果：approved→APPROVED，否则 REJECTED+review_comment，回写 assignment.status。
+
+        审核通过后**立即自动归集结算**（不再要求运营另点「归集结算」），归集为 best-effort：
+        审核已经生效是事实，归集失败不回滚审核，只把原因带回出参供前端提示。
+        """
+        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(id=id, preload=["assignment"])
         if submission.status not in {SubmissionStatus.DRAFT.value, SubmissionStatus.PENDING.value}:
             raise CustomException(msg="仅待审核状态的成果可审核")
         if data.approved:
@@ -1267,4 +1275,45 @@ class SubmissionService:
             id=submission.assignment_id,
             data={"status": target_status, "submitted_at": datetime.now(UTC)},
         )
-        return await self.detail(id=id)
+        settlement, warning = await self._auto_settle(submission) if data.approved else (None, None)
+        return SubmissionReviewResultSchema(
+            submission=await self.detail(id=id), settlement=settlement, warning=warning
+        )
+
+    async def _auto_settle(
+        self, submission: SubmissionModel
+    ) -> tuple[SubmissionSettlementNoticeSchema | None, str | None]:
+        """审核通过后自动归集：按 (任务, 成果月份) 调 ``SettlementService.settle``。
+
+        归集**不看任务状态**（``require_completed=False``）——审核是业务真实终点，卡「任务已完成」
+        只会让结算与发放数据一直空着；运营手动点「归集结算」仍保留该前置。
+
+        :return: (归集结果, 失败原因)；失败时归集结果为 None，原因用于提示运营手动补跑。
+        """
+        assignment = submission.assignment
+        try:
+            await SettlementService(self.auth, self.db).settle(
+                task_id=assignment.task_id, period=submission.period, require_completed=False
+            )
+            row = await SettlementCRUD(self.auth, self.db).get(
+                task_id=assignment.task_id, user_id=assignment.user_id, period=submission.period
+            )
+            result = await PayoutService(self.auth, self.db).summary(
+                user_id=assignment.user_id, period=submission.period
+            )
+        except Exception as exc:  # 归集失败不得让已生效的审核回滚
+            logger.exception(f"成果 {submission.id} 审核通过后自动归集失败")
+            return None, f"审核已生效，但自动归集失败：{getattr(exc, 'msg', None) or exc}"
+        if row is None:
+            return None, "审核已生效，但本次未生成结算单（请确认任务模板单价已配置）"
+        return (
+            SubmissionSettlementNoticeSchema(
+                task_id=assignment.task_id,
+                period=submission.period,
+                payable=row.payable_amount,
+                paid=result.paid,
+                rollover=result.rollover,
+                limit=result.limit,
+            ),
+            None,
+        )

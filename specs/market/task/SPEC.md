@@ -53,8 +53,8 @@ parent: market-domain
 
 - 一次提交 = 一个采集对象 × 一份采集表单，`period` 存月份字符串（如 `2026-03`）用于按月归集。
 - 采集数据存 `form_data` JSONB，结构由任务自带的 `form_schema` 决定；`ai_check_status` / `ai_check_result` 是为 AI 预检预留的列，当前没有写入路径。
-- 审核（`review`）走向 APPROVED / REJECTED，记审核人/意见/时间；驳回后用户修改重提，`version` +1。
-- 分派状态机每一环都有写入路径（2026-11 补全）：运营定向分派 → `PENDING`；C 端接收/接单 → `ACCEPTED`；提交成果 → `SUBMITTED`；审核通过 → `REVIEWED`（驳回回 `SUBMITTED` 等重提）；归集结算 → `SETTLED`。原 `SUBMITTING` 从未被写入，已从枚举删除。
+- 审核（`review`）走向 APPROVED / REJECTED，记审核人/意见/时间；驳回后用户修改重提，`version` +1。审核通过会**自动触发归集结算**（归集是 best-effort，失败不回滚审核），出参是 `SubmissionReviewResultSchema{submission, settlement, warning}` 而不是成果本体——详见 [market/payout](../payout/SPEC.md)。
+- 分派状态机每一环都有写入路径（2026-11 补全）：运营定向分派 → `PENDING`；C 端接收/接单 → `ACCEPTED`；提交成果 → `SUBMITTED`；审核通过 → `REVIEWED`，**同一请求内随即自动归集把分派推到 `SETTLED`**（驳回回 `SUBMITTED` 等重提）。所以 `REVIEWED` 在审核通过这条路径上是瞬时值，只在自动归集失败时停住。原 `SUBMITTING` 从未被写入，已从枚举删除。
 - **提交即 `PENDING`**：`SubmissionService.create` 显式写 `status="PENDING"`，并同时把分派推进到 `SUBMITTED`；不再有「提交后停在 DRAFT」的中间态（`review` 仍接受 `DRAFT`/`PENDING` 以兼容历史数据）。
 - **同月去重由「分派行锁 + 查重」保证**：`create` 先对 `market_assignment` 该行 `SELECT … FOR UPDATE`，再按模板 `submit_rule.cadence` 判断——`monthly`/`once` 同月只允许一份（驳回的那份不占位），`unlimited`（如会议服务）不限。`market_submission` 上**故意不加唯一约束**：定额/会议任务需要同月多份，加唯一约束就得把 cadence 冗余成列并做部分索引，收益不如行锁直接。
 - **草稿只在本机**：C 端「提交成果」页把填写中的表单按分派维度存进 `uni.setStorageSync('market-submission-draft:<assignmentId>')`（800ms 防抖），刷新/退出重进自动恢复并提示，提交成功后清除。后端不保存未提交的表单，所以 `PENDING` 的语义严格等于「运营待审核」。

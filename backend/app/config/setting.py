@@ -138,7 +138,11 @@ class Settings(BaseSettings):
     # ================================================= #
     # ***************** 第三方 OAuth 登录（可选）********* #
     # ================================================= #
-    OAUTH_DEFAULT_ROLE_IDS: list[int] = [2]
+    # C 端（普通用户）角色。微信小程序首次登录自动注册的用户是 **C 端用户**，
+    # 历史默认值是 `[2]`（管理员）——那意味着每个注册的 C 端用户都拿到管理员
+    # 菜单与数据范围，是一个提权漏洞。这里改为「普通用户」角色 id。
+    # 注意：它是**角色主键 id**，重新种子后 id 可能变化，部署时用环境变量覆盖。
+    OAUTH_DEFAULT_ROLE_IDS: list[int] = [3]
     OAUTH_FRONTEND_FALLBACK: str = "http://127.0.0.1:5173/login"
     OAUTH_GITHUB_CLIENT_ID: str = ""
     OAUTH_GITHUB_CLIENT_SECRET: str = ""

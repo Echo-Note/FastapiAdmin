@@ -2046,6 +2046,150 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — 发放封顶/津贴滚存落地 + 成果审核通过自动归集
+
+#### 1. 原因
+
+运营把成果审通过后，「结算管理」与「发放管理」两页始终为空。查证后的结论是三层缺口叠加，不是显示问题：
+
+1. `SubmissionService.review` 只改 `market_submission.status` 与 `market_assignment.status`，**从不触发归集**；
+2. `SettlementService.settle` 只有运营手点「归集结算」一个入口，且要求任务先被判定 `COMPLETED`，而审核通过并不推进任务状态；
+3. `docs/02` §5 的发放算法（封顶 + 滚存）从未实现：`payout_limit` 只用于展示，`market_allowance` / `market_allowance_detail` **只有读路径、没有写路径**，两张表恒空。`specs/market/payout` 早已把它记为「已确认的缺口」。
+
+#### 2. 改法
+
+- **`settle` 改重算 + 参数化前置**：新增 `require_completed` 开关（审核自动归集传 `False`，运营手动归集仍要求任务 `COMPLETED`）；已存在的 `task+user+period` 结算单从「跳过」改成「更新 qty/payable + 同步明细」（`_sync_item`：有则更新、多条收敛为一条）。
+- **`PayoutService.apply(user_id, period)`**：按「用户 × 周期」整体算 `pending = 当月应发合计 + 期初津贴`、`paid = min(pending, limit)`、`rollover = pending - paid`，写 `market_allowance.balance`、upsert `allowance_detail(amount=期末累计未发放)`，并把 `paid` 按结算单 id 顺序**贪心分摊**回 `paid_amount` + `pay_status=SCHEDULED`。
+- **审核通过自动归集**：`review` 在 `approved=True` 落库后调 `settle(require_completed=False)`，出参由 `SubmissionOutSchema` 换成 `SubmissionReviewResultSchema{submission, settlement, warning}`；归集失败只写 `warning`、**不回滚审核**。
+- **`GET /market/payout/results`**：按 用户×周期 聚合结算单应发，再补齐期初/额度/实发/期末，分组分页都在 SQL 侧。
+- **前端**：审核「通过」前弹二次确认（说明会真的产生结算单），成功后弹归集结果并可跳结算单；发放管理页加「发放结果」页签（同页 `ElTabs`，不新增菜单）。
+- 新增 `PayStatus` 枚举；`AllowanceStatus` docstring 从「被下月消费」改成「二期实际打款后写入」。
+
+#### 3. 关键口径（下次改前先读）
+
+- **封顶是「用户 × 周期」而不是「结算单 × 周期」**：`Σ payables` 必须是该用户该月**所有任务**的结算单之和，按单条结算单算封顶会让人多做多得、上限失效。
+- **期初余额只取最近一条上期明细的 `amount`，不能求和多行**：明细存的是「该期期末累计未发放」（已把期初算进待发额），多行求和会把滚存重复计一次。
+- **算期初时不看 `allowance_detail.status`**：重算某期时 status 可能已被改写，依赖「PENDING 才算」会在二次重算时把期初余额丢掉。
+- **贪心分摊必然让额度耗尽后创建的单显示 0**——这是封顶的真实反映。不选按比例分摊是因为会有分币舍入残差（`Σ 行实发 ≠ 当月实发`），且新增一张结算单会改变所有历史行的值。
+- **自动路径不看任务状态，手动路径仍看**：审核是业务真实终点；运营显式归集保留「任务已完成」前置是刻意的严谨性，不是遗留。
+
+#### 4. 踩坑
+
+- **测试库是 session 级共享**（`conftest` 只建一次），而发放口径依赖「该用户该期的全部结算单 + 上期账本」，早先的用例会污染后面的用例——第一版新增的 7 条发放测试全红，原因不是算法错而是脏数据。解法是加 `_reset_payout_state(user_id)` 用同步 `engine.begin()` 清掉该用户的结算/津贴/额度，比改断言值可靠。
+- **`pnpm` 不在 PATH**：前端校验改用 `./node_modules/.bin/{vue-tsc,eslint,stylelint,vitest}` 直跑。
+- `prettier --check` 对改动过的两个 `.vue` 不通过，但 `git show HEAD:` 取出改前版本同样不通过——仓库既有状态（`lint:prettier` 脚本本身是 `--write`），没有顺手格式化以免制造无关 diff。
+
+#### 5. 验证
+
+- 后端：`uv run pytest` **335 passed**（新增/改写 9 条：封顶全额、超限截断+滚存入账、同月两任务共享一次封顶且 `Σ paid_amount == 实发`、上期滚存计入下期待发、重复归集幂等、审核即 SETTLED、手动归集仍要求 COMPLETED、归集失败不回滚审核、驳回不产生结算单）；`uv run ruff check` 通过。
+- 前端：`vue-tsc --noEmit --skipLibCheck` 通过；`eslint` / `stylelint` 0 error；`vitest` 41 passed。
+- 浏览器实机未点验二次确认与「发放结果」页签。
+
+---
+
+### 2026-11-01 — 「审核完还是空的」收尾：历史补算脚本 + 用户摘要 + 两个误导性标签
+
+#### 1. 现象与真相
+
+功能上线后运营反馈「结算管理和发放管理还是空的」。查库后确认**不是代码没生效**（新路由 `/market/payout/results` 已 200），而是数据状态：
+
+- `market_submission` 里 2 条 `APPROVED` 都产生在改动**之前**，自动归集不会回溯；`market_task` 全是 `PUBLISHED/DRAFT`，手动「归集结算」又被「仅已完成可归集」挡住——两头都堵。
+- `market_payout_config` 0 行，「发放管理」默认停在「发放额度配置」页签，看起来当然还是空。
+
+#### 2. 改法
+
+- **新增 `app/scripts/backfill_settlement.py`**（幂等、缺省 dry-run、`--apply` 落库）：把所有 `APPROVED` 成果按 `(任务, 月份)` 重放归集，`require_completed=False`。已在 dev 库执行，得到 2 条结算单（2000 / 100，同属 user 3 / 2026-10），`发放结果` 显示 `应发 2100 / 实发 2100 / 滚存 0`。
+- **C 端用户标识：后端带摘要**。新增 `apps/modules/market/member.py`：`MarketUserBriefSchema{id,name,username,mobile}` + `load_user_briefs(db, ids)` 批量查询；`SettlementOutSchema` 与 `PayoutResultOutSchema` 增 `user`，前端结算/发放结果展示「昵称 + 手机号」，拿不到才回退 `#id`。**不新增 `market_member` 表、也不给 `sys_user` 加 `user_no`**：手机号已是业务识别手段，编号层的收益（改名后追溯）不值这个成本。
+- **修两个误导性标签**：结算单「已付金额」改「实发金额」、`SCHEDULED` 显示「待打款」（一期不打款，叫「已付」是错的）；「发放管理」默认页签改成「发放结果」（额度配置天然可为空，先看到数据才不会被当成页面坏了）。
+- 端到端验了一次真实链路（C 端提交 → 审核通过 → 响应带回 `settlement{payable,paid,rollover}`），**验证数据已清理**（含它自动建的机构与产品、并把分派状态回退），只留补算产生的真实记录。
+
+#### 3. 在真库里验证过什么
+
+- `GET /market/settlements/list` → 2 条，带 `paid_amount` / `pay_status=SCHEDULED` / `user{普通用户,13800138002}`
+- `GET /market/payout/results` → 1 条：`2026-10 应发 2100 / 期初 0 / 额度 20000 / 实发 2100 / 滚存 0`
+- `uv run pytest` → 336 passed（新增 1 条锁用户摘要）；`vue-tsc` / `eslint` 通过
+
+#### 4. 口径
+
+- **升级后必须手动跑一次补算脚本**，否则历史已通过成果永远不会进结算与发放。这是刻意的：隐式写财务数据比多一条命令危险。
+
+---
+
+### 2026-11-01 — 新增 C 端成员档案 `market_member`：身份与权限分开
+
+#### 1. 原因
+
+运营问「以后新增用户，怎么知道是 C 端还是 B 端」，顺着查下去发现现状比「没有标识」严重：
+
+- 只有一张 `sys_user`，运营与 C 端共用，靠 `sys_user_roles` 多对多挂角色；**代码里没有任何地方判定 C 端**。
+- `/market/mini/*` 全部只校验 `get_current_user`（登录即可），没有角色校验。
+- 微信小程序首次登录走 `auto_register_login_user`，默认角色是 `OAUTH_DEFAULT_ROLE_IDS = [2]`，而**角色 2 是「管理员」**（`data_scope=3` 全量数据）。也就是说每个微信注册的 C 端用户都被授了管理员权限，一旦登录 Web 端就是管理员菜单。
+
+根因是**身份与权限混在一个概念里**：角色是多对多，用它推断「是不是 C 端」必然模棱两可。
+
+#### 2. 改法
+
+- **新增 `market_member`**（`user_id` 唯一 + `member_no`(U-NNNN) + `status`）：**存在档案 = 是 C 端**。market 域自建，不侵入基座 `sys_user`。
+- **三条建档路径，全部幂等**：
+  1. `/market/mini/*` 的认证依赖从 `get_current_user` 换成 `require_market_member`（15 处），首访 lazy ensure；
+  2. 微信登录编排里 best-effort 补一手（**延迟 import**，基座不硬依赖定制域，失败不影响登录）；
+  3. 运营端「成员管理」页手动纳入已有用户。
+- **修提权漏洞**：`OAUTH_DEFAULT_ROLE_IDS` 默认值 `[2]` → `[3]`（普通用户），并加注释说明它是角色主键、部署时可用环境变量覆盖。
+- **停用的成员直接拒绝 C 端接口**（含读），不会因再次访问自愈回启用。
+- **编号**：`NumberPrefix.MEMBER = "U"`，复用 `numbering.next_code` 的原子计数器。
+- **运营端**：`/market/members/{list,detail,create,update}` + 前端「市场管理 → 成员管理」页（纳入/启停）；结算单、发放结果、成员列表的出参统一带 `user{id,name,username,mobile}` 摘要。
+
+#### 3. 上线步骤（重要，少一步页面就是空的）
+
+1. 启动即自动生成迁移（本次为 `market_member` 建表），确认 `alembic_version` 已推进；
+2. `PYTHONPATH=. uv run python -m app.scripts.backfill_member --apply` —— 按**行为证据**（接过单/提交过成果/有津贴结算记录）给存量 C 端用户建档；
+3. `PYTHONPATH=. uv run python -m app.scripts.sync_member_menu --apply` —— 把「成员管理」菜单写进已有库（种子导入是「表有数据就整体跳过」，改 `sys_menu.json` 只对新库生效）；
+4. 非超管角色还需在「角色管理」里勾选新菜单（超管无需授权）。
+
+#### 4. 踩坑
+
+- **`status_code=` 静态护栏**：`tests/test_error_code_single_source.py` 只白名单「以 `@Router.xxx(` 开头的那一行」，多行装饰器里换行写的 `status_code=201` 会被判违规。保持创建类接口的装饰器写成单行（与 payout 一致）。
+- **`member.py` 撞名**：先把用户摘要写成 `market/member.py`，随后要建 `market/member/` 包放模型，二者不能共存——把摘要挪进 `member/brief.py`，由 `member/__init__.py` 重新导出，调用方无感。
+- **测试库共享**：成员表同样受 session 级共享影响，用例里用 `_delete_member(user_id)` 从「未建档」开始，而不是假设空表。
+
+#### 5. 验证
+
+- `uv run pytest` **341 passed**（新增 5 条：首访建档、重复访问仍单条、停用被拒且不自愈、纳入幂等 + 列表带用户摘要、成员编号不重复）；`uv run ruff check` 通过。
+- 真库（dev）核对：`GET /market/members/list` → `U-0001 / ACTIVE / 普通用户 / 13800138002`；菜单 `成员管理` 已写入（id 216–219）。
+- 前端：`vue-tsc` 通过；`eslint` / `stylelint` 0 error；`vitest` 41 passed。浏览器实机点验未做（Playwright profile 被占用）。
+
+---
+
+### 2026-11-01 — 补齐市场管理菜单图标
+
+#### 1. 现象
+
+「市场管理」树里只有 4 个目录（类型 1）有图标，**12 个页面菜单（类型 2）全是 `icon: None`**，侧栏是一排空白。
+对比其它模块（系统管理/监控管理）所有类型 2 菜单都带 `ri:*` 图标——所以这是市场域补功能时漏掉的，不是设计。
+
+#### 2. 改法
+
+- `sys_menu.json` 给 12 个类型 2 节点补 Remix Icon（`ri:` 前缀，项目自带 `@iconify-json/ri`，离线可用）：
+  项目 `folder-chart-line` / 报告管理 `file-chart-line` / 医药公司 `building-line` / 任务 `list-check-2` /
+  任务审核 `shield-check-line` / 任务目录 `list-unordered` / 结算管理 `calculator-line` /
+  发放管理 `hand-coin-line` / 机构管理 `building-2-line` / 图片归集 `image-2-line` /
+  产品库 `medicine-bottle-line` / 成员管理 `team-line`。
+- 新增 `app/scripts/sync_menu_icons.py`：按「父路径/名称」匹配，**只覆盖 icon 一个字段**，不动运营手改过的排序/名称。
+  原因同 `sync_member_menu.py`——种子导入是「表有数据就整体跳过」，改 `sys_menu.json` 只对新库生效。
+
+#### 3. 口径
+
+- **图标名必须先确认在随包图标集里**：`node_modules/@iconify-json/ri/icons.json` 是离线来源，
+  写一个不存在的名字侧栏只会渲染空白，且不报错。补图标时先拿这份 JSON 校验。
+- 每个类型 2 页面配**互不相同**的图标；同模块内重复会在侧栏里看不出层级。
+
+#### 4. 验证
+
+- `python -m app.scripts.sync_menu_icons --apply` → 12 条全部更新；
+  递归查询 `sys_menu` 后市场管理树下 17 个 1/2 级节点图标全部非空。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -2131,3 +2275,7 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 21. **「列存在、没人写」的字段在运营端永远是空的——`OutSchema` 漏一个嵌套对象就够**（2026-11-01）
    - 现象：成果审核弹窗里「机构 / 对象名称 / 档案号 / 区域」四格全空。逐个查证：`institution` 只有 `institution_id`、`SubmissionOutSchema` 没有 `institution` 字段（前端写 `institution.name` 永远取不到）；`subject_name` / `region` / `archive_no` 在 model、schema、前端都存在，但**全库没有任何代码写入**（C 端只提交 `form_data`，`archive_no` 连编号前缀都没定义）。同一弹窗里采集数据还全是英文字段名——前端当时只有硬编码的分节名映射，字段名/子表列名无映射。
    - 结论：① 排查「页面空」先分清**三件事**——出参 Schema 有没有这个字段、DB 里有没有值、有没有代码写过它；只补前端渲染是最常见的错误修法。② C 端只提交 `form_data` 时，运营端要展示的摘要列（对象名称/区域）应由**后端**从 `form_data` 推导落库，不要让前端拼；存量行用「读详情时只补空值自愈」代替迁移脚本。③ `form_data` 的英文 key → 中文标签**只能查任务自带的 `form_schema`**（`detail` 接口回填），禁止在前端维护第二份静态映射表（与硬口径 4 同源）。
+
+22. **共享测试库上测「按用户 × 周期聚合」的口径，必须自己清表——否则红的是脏数据不是逻辑**（2026-11-01）
+   - 现象：新写的 7 条发放算法测试首轮全红，失败信息看着像算法错（比如「应发 == 实发」不成立、结算单条数对不上）。实际原因是 `conftest` 的测试库只建一次（session 级共享），前面用例给同一个 `user` 账号留下了 2026-11 的结算单与津贴账本，而发放口径依赖「该用户该期的**全部**结算单之和 + 上期账本」——脏数据把每条断言都顶偏了。
+   - 结论：凡测试依赖「某用户某周期的全量聚合」，开头必须先 `_reset_payout_state(user_id)`（同步 `engine.begin()` 直删 `market_settlement` / `market_settlement_item` / `market_allowance` / `market_allowance_detail` / `market_payout_config`）。不要靠改断言值迁就——那会把「跨任务共享封顶」这个真正被测的行为一起改掉。

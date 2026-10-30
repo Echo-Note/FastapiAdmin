@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.enums import RedisInitKeyConfig
 from app.config.setting import settings
-from app.core.base_schema import AuthSchema
+from app.core.base_schema import AuthSchema, CoreUserSchema
 from app.core.exceptions import CustomException
 from app.core.logger import logger
 from app.core.redis_crud import RedisCURD
@@ -287,6 +287,24 @@ async def ensure_wx_user(
     return user
 
 
+async def _ensure_market_member(db: AsyncSession, user: UserModel) -> None:
+    """给刚登录/注册的微信用户补建 C 端成员档案（best-effort）。
+
+    为什么放在这里而不是只靠 ``/market/mini/*`` 的 lazy ensure：登录是用产成为 C 端成员的
+    语义时刻，运营在成员管理页应能立刻看到新用户，而不是等他先点什么。
+
+    为什么用延迟 import：`system` 是基座、`market` 是定制域，基座不应该硬依赖定制域。
+    这里只做一个单向、尽力而为的钩子：market 模块缺失或建档失败都不影响登录。
+    """
+    try:
+        from app.modules.market.member.service import MemberService
+
+        auth = AuthSchema(user=CoreUserSchema(id=user.id, username=user.username, name=user.name))
+        await MemberService(auth, db).ensure_for_user(user.id)
+    except Exception:  # 建档失败不能让登录失败
+        logger.exception(f"微信登录后补建 C 端成员档案失败: {user.id}")
+
+
 async def get_wx_login_user(
     *,
     db: AsyncSession,
@@ -334,6 +352,7 @@ async def wx_mini_login(
     session_data = await code2session(code=code)
     openid = session_data["openid"]
     user = await get_wx_login_user(db=db, openid=openid, nickname=nickname, avatar=avatar)
+    await _ensure_market_member(db, user)
     token = await LoginService.create_token(
         request=request,
         redis=redis,
@@ -357,6 +376,7 @@ async def wx_mini_phone_login(
     """
     phone = await get_phone_number(redis=redis, code=code)
     user = await get_wx_phone_login_user(db=db, phone=phone)
+    await _ensure_market_member(db, user)
     token = await LoginService.create_token(
         request=request,
         redis=redis,

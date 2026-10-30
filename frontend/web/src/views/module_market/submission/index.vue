@@ -68,7 +68,8 @@
 
 <script setup lang="ts">
 import { h } from "vue";
-import SubmissionAPI, { type SubmissionTable } from "@/api/module_market/submission";
+import { ElMessage, ElMessageBox } from "element-plus";
+import SubmissionAPI, { type SubmissionReviewResult, type SubmissionTable } from "@/api/module_market/submission";
 import UserAPI from "@/api/module_system/user";
 import ProjectAPI from "@/api/module_market/project";
 import TaskTemplateAPI from "@/api/module_market/task-template";
@@ -85,6 +86,7 @@ defineOptions({ name: "MarketSubmission", inheritAttrs: false });
 
 const dictStore = useDictStore();
 const route = useRoute();
+const router = useRouter();
 
 /** 深链：运营工作台「待办队列」点进来时带 ?status=PENDING，直接只看待审核 */
 const initialStatus = typeof route.query.status === "string" ? route.query.status : undefined;
@@ -253,15 +255,67 @@ async function handleReviewSubmit() {
   } catch {
     return;
   }
+
+  // 二次提醒：通过即自动归集结算，这一步会真的产生结算单与实发金额，不能误点
+  if (reviewForm.value.approved) {
+    try {
+      await ElMessageBox.confirm(
+        `审核通过后将立即归集结算：按任务单价 × 本月已通过成果数，计入该用户「${reviewData.value.period ?? "本月"}」的应发金额，并受其当月发放额度封顶。确定通过吗？`,
+        "确认通过并归集结算",
+        { type: "warning", confirmButtonText: "通过并归集", cancelButtonText: "再看看" },
+      );
+    } catch {
+      return; // 用户取消，不提交审核
+    }
+  }
+
   reviewSubmitting.value = true;
+  let outcome: SubmissionReviewResult | undefined;
   try {
-    await SubmissionAPI.reviewSubmission(reviewData.value.id, { approved: reviewForm.value.approved, review_comment: reviewForm.value.review_comment });
+    const res = await SubmissionAPI.reviewSubmission(reviewData.value.id, {
+      approved: reviewForm.value.approved,
+      review_comment: reviewForm.value.review_comment,
+    });
+    outcome = res.data.data;
     reviewVisible.value = false;
     await refreshData();
   } catch {
     // 错误已由拦截器提示
   } finally {
     reviewSubmitting.value = false;
+  }
+  if (outcome) await showReviewOutcome(outcome);
+}
+
+/** 归集结果提示：给出本次归集的应发/实发/滚存，可一键跳去结算单；归集失败只提示原因（审核已生效） */
+async function showReviewOutcome(outcome: SubmissionReviewResult) {
+  if (outcome.warning) {
+    ElMessage.warning(outcome.warning);
+    return;
+  }
+  const notice = outcome.settlement;
+  if (!notice) return;
+  const amount = (value?: number) => Number(value ?? 0).toFixed(2);
+  try {
+    await ElMessageBox.alert(
+      `<div style="line-height:1.9;font-size:13px">
+        <div>结算月份：<b>${notice.period}</b></div>
+        <div>本任务应发：<b>￥${amount(notice.payable)}</b></div>
+        <div>该用户当月实发：<b>￥${amount(notice.paid)}</b>（当月发放额度 ￥${amount(notice.limit)}）</div>
+        <div>滚入下月津贴：<b>￥${amount(notice.rollover)}</b></div>
+      </div>`,
+      "归集结算完成",
+      {
+        dangerouslyUseHTMLString: true,
+        type: "success",
+        confirmButtonText: "查看结算单",
+        showCancelButton: true,
+        cancelButtonText: "关闭",
+      },
+    );
+    await router.push({ path: "/market/settlement", query: { task_id: String(notice.task_id ?? "") } });
+  } catch {
+    // 点「关闭」不跳转
   }
 }
 

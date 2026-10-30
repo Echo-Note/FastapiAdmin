@@ -8,6 +8,7 @@ from app.modules.dbconsole.controller import DbConsoleRouter
 from app.modules.generator.gencode.controller import GenRouter
 from app.modules.market.dashboard.controller import DashboardRouter
 from app.modules.market.institution.controller import InstitutionImageRouter, InstitutionRouter
+from app.modules.market.member.controller import MemberRouter
 from app.modules.market.mini_controller import MiniRouter
 from app.modules.market.payout.controller import PayoutRouter, SettlementRouter
 from app.modules.market.product.controller import ProductRouter
@@ -92,6 +93,7 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
         SubmissionRouter,
         SettlementRouter,
         PayoutRouter,
+        MemberRouter,
         InstitutionRouter,
         InstitutionImageRouter,
     ],

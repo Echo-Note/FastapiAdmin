@@ -5,6 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
+from app.modules.market.member import MarketUserBriefSchema
 
 
 class SettlementItemOutSchema(BaseSchema):
@@ -28,11 +29,12 @@ class SettlementOutSchema(BaseSchema, UserBySchema):
 
     task_id: int = Field(description="任务ID")
     user_id: int = Field(description="C端用户ID")
+    user: MarketUserBriefSchema | None = Field(default=None, description="C端用户摘要(昵称/账号/手机号)")
     period: str = Field(description="结算月份(如 2026-03)")
     qty: int = Field(description="归集成果数量")
     payable_amount: Decimal = Field(description="应发金额")
-    paid_amount: Decimal | None = Field(default=None, description="实发金额(预留)")
-    pay_status: str | None = Field(default=None, description="支付状态(预留)")
+    paid_amount: Decimal | None = Field(default=None, description="实发金额(受当月发放额度封顶，未归集时为空)")
+    pay_status: str | None = Field(default=None, description="支付状态(SCHEDULED=已算出待打款)")
     status: str = Field(description="结算单状态")
     items: list[SettlementItemOutSchema] = Field(default_factory=list, description="结算明细")
 
@@ -44,6 +46,30 @@ class SettlementQueryParam(BaseQueryParam, UserByQueryParam):
     user_id: int | None = Field(default=None, description="C端用户ID", json_schema_extra={"q": "eq"})
     period: str | None = Field(default=None, description="结算月份", json_schema_extra={"q": "eq"})
     status: str | None = Field(default=None, description="结算单状态", json_schema_extra={"q": "eq"})
+
+
+class PayoutResultOutSchema(BaseModel):
+    """发放结果（用户 × 周期）响应模型。
+
+    口径见 ``service.py`` 顶部注释：
+    ``待发 = 应发 + 期初津贴``，``实发 = min(待发, 额度)``，``期末津贴 = 待发 - 实发``。
+    """
+
+    user_id: int = Field(description="C端用户ID")
+    user: MarketUserBriefSchema | None = Field(default=None, description="C端用户摘要(昵称/账号/手机号)")
+    period: str = Field(description="周期(如 2026-10)")
+    payable: Decimal = Field(description="当月应发合计(跨任务的结算单 payable 之和)")
+    prev_balance: Decimal = Field(description="期初津贴余额(上期期末未发放额)")
+    limit: Decimal = Field(description="当月发放额度")
+    paid: Decimal = Field(description="当月实发(受额度封顶)")
+    rollover: Decimal = Field(description="期末津贴余额(滚入下月)")
+
+
+class PayoutResultQueryParam(BaseModel):
+    """发放结果查询参数（按用户 / 周期筛，均为等值）。"""
+
+    user_id: int | None = Field(default=None, ge=1, description="C端用户ID")
+    period: str | None = Field(default=None, max_length=16, description="周期(如 2026-10)")
 
 
 class PayoutConfigOutSchema(BaseSchema, UserBySchema):

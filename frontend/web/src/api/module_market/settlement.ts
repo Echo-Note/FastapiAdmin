@@ -46,6 +46,14 @@ export interface SettlementPageQuery extends PageQuery, UserByQueryParams {
   status?: string;
 }
 
+/** C 端用户摘要（对齐后端 MarketUserBriefSchema）：由后端带回，前端不再反查用户表 */
+export interface MarketUserBrief {
+  id?: number;
+  name?: string;
+  username?: string;
+  mobile?: string | null;
+}
+
 export interface SettlementItemRow {
   settlement_id?: number;
   category_name?: string;
@@ -59,6 +67,8 @@ export interface SettlementItemRow {
 export interface SettlementTable extends BaseType {
   task_id?: number;
   user_id?: number;
+  /** C 端用户摘要：昵称/账号/手机号 */
+  user?: MarketUserBrief | null;
   period?: string;
   qty?: number;
   payable_amount?: number;

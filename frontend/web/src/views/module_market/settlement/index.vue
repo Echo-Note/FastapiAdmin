@@ -36,6 +36,7 @@
     <ElDialog v-model="detailVisible" title="结算单详情" width="840px">
       <FaDescriptions :column="4" :data="detailData" :items="detailItems">
         <template #userName="{ row }">{{ resolveUserName(row) }}</template>
+        <template #payStatus="{ row }">{{ payStatusText(row?.pay_status as string | null | undefined) }}</template>
       </FaDescriptions>
       <ElDivider content-position="left">结算明细</ElDivider>
       <ElTable :data="detailData.items ?? []" size="small" border max-height="360px">
@@ -100,6 +101,10 @@ const statusOptions = computed<OptionType[]>(() =>
   (dictStore.getDictArray("market_settlement_status") ?? []).map((d) => ({ value: d.dict_value, label: d.dict_label }))
 );
 
+/** 支付状态目前只可能是 SCHEDULED（归集已算实发、等二期打款） */
+const PAY_STATUS_TEXT: Record<string, string> = { SCHEDULED: "待打款", PAID: "已打款" };
+const payStatusText = (value?: string | null) => (value ? (PAY_STATUS_TEXT[value] ?? value) : "—");
+
 const searchForm = ref<{ task_id?: number; user_id?: number; period?: string; status?: string }>({ task_id: undefined, user_id: undefined, period: undefined, status: undefined });
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
@@ -140,12 +145,13 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
       columnsFactory: resolveStatusColumns<SettlementTable>(() => [
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "task_id", label: "任务ID", width: 90 },
-        { prop: "user_id", label: "结算对象", minWidth: 130, formatter: (row: SettlementTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
+        { prop: "user_name", label: "结算对象", minWidth: 140, formatter: (row: SettlementTable) => userLabel(row) },
+        { prop: "user.mobile", label: "手机号", width: 130, formatter: (row: SettlementTable) => row.user?.mobile ?? "—" },
         { prop: "period", label: "结算月份", width: 100 },
         { prop: "qty", label: "结算数量", width: 90, align: "right" },
         { prop: "payable_amount", label: "应付金额", width: 110, align: "right" },
-        { prop: "paid_amount", label: "已付金额", width: 110, align: "right", formatter: (row: SettlementTable) => row.paid_amount ?? "—" },
-        { prop: "pay_status", label: "支付状态", width: 100, formatter: (row: SettlementTable) => row.pay_status ?? "—" },
+        { prop: "paid_amount", label: "实发金额", width: 110, align: "right", formatter: (row: SettlementTable) => row.paid_amount ?? "—" },
+        { prop: "pay_status", label: "支付状态", width: 100, formatter: (row: SettlementTable) => payStatusText(row.pay_status) },
         { prop: "status", label: "状态", width: 92, status: settlementStatusMap.value },
         { prop: "created_time", label: "创建时间", width: 168, showOverflowTooltip: true },
         { prop: "operation", label: "操作", width: 150, fixed: "right", align: "center", formatter: (row: SettlementTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
@@ -158,12 +164,13 @@ const detailData = ref<Partial<SettlementTable>>({});
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
   { label: "任务ID", prop: "task_id" },
   { label: "结算对象", prop: "user_id", slot: "userName" },
+  { label: "手机号", prop: "user.mobile" },
   { label: "结算月份", prop: "period" },
   { label: "状态", prop: "status", tag: { map: settlementStatusMap.value } },
   { label: "结算数量", prop: "qty" },
   { label: "应付金额", prop: "payable_amount" },
-  { label: "已付金额", prop: "paid_amount" },
-  { label: "支付状态", prop: "pay_status" },
+  { label: "实发金额", prop: "paid_amount" },
+  { label: "支付状态", prop: "pay_status", slot: "payStatus" },
   { label: "创建时间", prop: "created_time" },
 ];
 
@@ -174,8 +181,12 @@ async function openDetail(id: number) {
 }
 
 function resolveUserName(row: Record<string, unknown> | null): string {
-  const uid = row?.user_id as number | undefined;
-  return uid ? (userMap.value[uid] ?? `#${uid}`) : "—";
+  return userLabel(row as SettlementTable);
+}
+
+/** 结算对象：优先用后端带回的昵称，拿不到才回退到 ID（不再靠前端反查用户表） */
+function userLabel(row: SettlementTable): string {
+  return row.user?.name || (row.user_id ? `#${row.user_id}` : "—");
 }
 
 async function confirmRow(row: SettlementTable) {

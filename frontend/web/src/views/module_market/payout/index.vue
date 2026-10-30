@@ -1,45 +1,77 @@
-<!-- 发放管理：发放额度配置 CRUD + 津贴账户/明细查询 -->
+<!-- 发放管理：发放额度配置 CRUD + 发放结果（应发/实发/滚存）+ 津贴账户/明细查询 -->
 <template>
   <div class="fa-full-height">
-    <FaSearchBar
-      v-show="showSearchBar"
-      ref="searchBarRef"
-      v-model="searchForm"
-      :items="searchItems"
-      :is-expand="false"
-      :show-expand="true"
-      :show-reset="true"
-      :show-search="true"
-      @search="handleSearch"
-      @reset="onResetSearch"
-    />
+    <ElTabs v-model="activeTab">
+      <ElTabPane label="发放额度配置" name="config">
+        <FaSearchBar
+          v-show="showSearchBar"
+          ref="searchBarRef"
+          v-model="searchForm"
+          :items="searchItems"
+          :is-expand="false"
+          :show-expand="true"
+          :show-reset="true"
+          :show-search="true"
+          @search="handleSearch"
+          @reset="onResetSearch"
+        />
 
-    <ElCard class="fa-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
-      <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <FaTableHeaderLeft
-            :remove-ids="selectedIds"
-            :perm-create="['module_market:payout:create']"
-            :perm-delete="['module_market:payout:delete']"
-            :delete-loading="batchDeleting"
-            @add="handleAdd"
-            @delete="handleBatchDelete"
+        <ElCard class="fa-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
+          <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
+            <template #left>
+              <FaTableHeaderLeft
+                :remove-ids="selectedIds"
+                :perm-create="['module_market:payout:create']"
+                :perm-delete="['module_market:payout:delete']"
+                :delete-loading="batchDeleting"
+                @add="handleAdd"
+                @delete="handleBatchDelete"
+              />
+              <ElButton :disabled="false" @click="openAllowanceDialog">津贴账户/明细</ElButton>
+            </template>
+          </FaTableHeader>
+
+          <FaTable
+            ref="faTableRef"
+            :loading="loading"
+            :data="data"
+            :columns="columns"
+            :pagination="pagination"
+            @selection-change="onTableSelectionChange"
+            @pagination:size-change="handleSizeChange"
+            @pagination:current-change="handleCurrentChange"
           />
-          <ElButton :disabled="false" @click="openAllowanceDialog">津贴账户/明细</ElButton>
-        </template>
-      </FaTableHeader>
+        </ElCard>
+      </ElTabPane>
 
-      <FaTable
-        ref="faTableRef"
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @selection-change="onTableSelectionChange"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
-      />
-    </ElCard>
+      <!-- 发放结果：审核通过即归集，这里看到封顶后的实发与滚入下月的津贴 -->
+      <ElTabPane label="发放结果" name="result">
+        <FaSearchBar
+          ref="resultSearchBarRef"
+          v-model="resultSearchForm"
+          :items="resultSearchItems"
+          :is-expand="false"
+          :show-expand="true"
+          :show-reset="true"
+          :show-search="true"
+          @search="handleResultSearch"
+          @reset="onResetResultSearch"
+        />
+
+        <ElCard class="fa-table-card" style="margin-top: 12px">
+          <FaTableHeader v-model:columns="resultColumnChecks" :loading="resultLoading" @refresh="refreshResultData" />
+
+          <FaTable
+            :loading="resultLoading"
+            :data="resultData"
+            :columns="resultColumns"
+            :pagination="resultPagination"
+            @pagination:size-change="handleResultSizeChange"
+            @pagination:current-change="handleResultCurrentChange"
+          />
+        </ElCard>
+      </ElTabPane>
+    </ElTabs>
 
     <!-- 新增发放额度配置对话框 -->
     <ElDialog v-model="createVisible" title="新增发放额度配置" width="520px" :close-on-click-modal="false">
@@ -118,6 +150,7 @@
 <script setup lang="ts">
 import PayoutAPI, {
   type PayoutConfigTable,
+  type PayoutResultTable,
   type AllowanceTable,
   type AllowanceDetailTable,
 } from "@/api/module_market/payout";
@@ -133,6 +166,13 @@ import { useFormDraft } from "@/hooks/core/useFormDraft";
 defineOptions({ name: "MarketPayout", inheritAttrs: false });
 
 const dictStore = useDictStore();
+
+/** 两个标签页：额度配置（可编辑）与发放结果（只读核算结果）
+ *
+ * 默认落在「发放结果」：额度配置天然可以是空的（没人配就用默认 20000），
+ * 而发放结果是真实业务数据，先看到它才不会被误认为「页面坏了」。
+ */
+const activeTab = ref("result");
 
 // ── 字典：津贴状态 ──
 const allowanceStatusMap = computed<Record<string, { type: StatusType; text: string }>>(() =>
@@ -188,6 +228,60 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
       ]),
     },
   });
+
+// ── 发放结果（用户 × 周期的核算结果，只读）──
+const resultSearchForm = ref<{ user_id?: number; period?: string }>({ user_id: undefined, period: undefined });
+const resultSearchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
+
+const resultSearchItems = computed<SearchFormItem[]>(() => [
+  { label: "用户", key: "user_id", type: "select", props: { placeholder: "请选择用户", options: userOptions.value, filterable: true, clearable: true }, span: 8 },
+  { label: "周期", key: "period", type: "input", placeholder: "如 2026-11", clearable: true, span: 8 },
+]);
+
+const amountText = (value?: number) => (value == null ? "—" : Number(value).toFixed(2));
+
+/** 发放结果里的「用户」：优先用后端带回的昵称，拿不到才回退到 ID */
+const resultUserLabel = (row: PayoutResultTable) => row.user?.name || (row.user_id ? `#${row.user_id}` : "—");
+
+const {
+  columns: resultColumns,
+  columnChecks: resultColumnChecks,
+  data: resultData,
+  loading: resultLoading,
+  pagination: resultPagination,
+  getData: getResultData,
+  replaceSearchParams: replaceResultSearchParams,
+  resetSearchParams: resetResultSearchParams,
+  handleSizeChange: handleResultSizeChange,
+  handleCurrentChange: handleResultCurrentChange,
+  refreshData: refreshResultData,
+} = useTable({
+  core: {
+    apiFn: PayoutAPI.listPayoutResult,
+    apiParams: { page_no: 1, page_size: 10 },
+    columnsFactory: () => [
+      { type: "globalIndex", width: 56, label: "序号" },
+      { prop: "period", label: "周期", width: 100 },
+      { prop: "user_name", label: "用户", minWidth: 140, formatter: (row: PayoutResultTable) => resultUserLabel(row) },
+      { prop: "user.mobile", label: "手机号", width: 130, formatter: (row: PayoutResultTable) => row.user?.mobile ?? "—" },
+      { prop: "payable", label: "应发金额", width: 120, align: "right", formatter: (row: PayoutResultTable) => amountText(row.payable) },
+      { prop: "prev_balance", label: "期初津贴", width: 120, align: "right", formatter: (row: PayoutResultTable) => amountText(row.prev_balance) },
+      { prop: "limit", label: "当月额度", width: 120, align: "right", formatter: (row: PayoutResultTable) => amountText(row.limit) },
+      { prop: "paid", label: "实发金额", width: 120, align: "right", formatter: (row: PayoutResultTable) => amountText(row.paid) },
+      { prop: "rollover", label: "滚入下月津贴", width: 140, align: "right", formatter: (row: PayoutResultTable) => amountText(row.rollover) },
+    ],
+  },
+});
+
+async function handleResultSearch(params: Record<string, unknown>) {
+  replaceResultSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);
+  await getResultData();
+}
+
+async function onResetResultSearch() {
+  resultSearchForm.value = { user_id: undefined, period: undefined };
+  await resetResultSearchParams();
+}
 
 // ── 新增发放额度配置 ──
 const createVisible = ref(false);

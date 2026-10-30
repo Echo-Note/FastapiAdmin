@@ -20,7 +20,7 @@ const SubmissionAPI = {
   },
 
   reviewSubmission(id: number, body: { approved: boolean; review_comment?: string }) {
-    return request<ApiResponse<SubmissionTable>>({
+    return request<ApiResponse<SubmissionReviewResult>>({
       url: `${API_PATH}/review/${id}`,
       method: "post",
       data: body,
@@ -29,6 +29,23 @@ const SubmissionAPI = {
 };
 
 export default SubmissionAPI;
+
+/** 审核通过自动归集后的发放结果快照（对齐后端 SubmissionSettlementNoticeSchema） */
+export interface SubmissionSettlementNotice {
+  task_id?: number;
+  period?: string;
+  payable?: number;
+  paid?: number;
+  rollover?: number;
+  limit?: number;
+}
+
+/** 审核结果（对齐后端 SubmissionReviewResultSchema）：归集是 best-effort，失败只回 warning */
+export interface SubmissionReviewResult {
+  submission?: SubmissionTable;
+  settlement?: SubmissionSettlementNotice | null;
+  warning?: string | null;
+}
 
 export interface SubmissionPageQuery extends PageQuery, UserByQueryParams {
   assignment_id?: number;

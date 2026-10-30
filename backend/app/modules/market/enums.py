@@ -91,10 +91,32 @@ class ReportStatus(StrEnum):
 
 
 class AllowanceStatus(StrEnum):
-    """个人任务津贴明细状态：待发（未发放，滚入下月）→ 已发（被下月发放消费）。"""
+    """个人任务津贴明细状态：待发（滚入下月）→ 已发（二期实际打款后写入）。
+
+    ``amount`` 存的是该期**期末累计未发放余额**（已把期初余额算进待发额），因此算法侧
+    只读「最近一条上期明细的 amount」，**不看 status**——重算某期时若还依赖 status 判断
+    「是否已被下期消费」，二次重算就会把期初余额丢掉。
+    """
 
     PENDING = "PENDING"
     PAID = "PAID"
+
+
+class PayStatus(StrEnum):
+    """结算单支付状态（一期只算不打款）。
+
+    ``SCHEDULED``：已算出实发金额、进入待打款队列——归集时写入，二期支付完成后才置 ``PAID``。
+    """
+
+    SCHEDULED = "SCHEDULED"
+    PAID = "PAID"
+
+
+class MemberStatus(StrEnum):
+    """C 端成员档案状态：启用（可正常接单/提交）→ 停用（保留档案与历史，但拒绝写操作）。"""
+
+    ACTIVE = "ACTIVE"
+    DISABLED = "DISABLED"
 
 
 class ProjectStatus(StrEnum):

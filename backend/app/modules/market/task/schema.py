@@ -5,6 +5,7 @@
 ``UserByQueryParam``，配合 ``json_schema_extra={"q": ...}`` 控制操作符。
 """
 
+from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -476,3 +477,30 @@ class SubmissionReviewSchema(BaseModel):
 
     approved: bool = Field(description="是否通过")
     review_comment: str | None = Field(default=None, description="审核意见(驳回时建议填写)")
+
+
+class SubmissionSettlementNoticeSchema(BaseModel):
+    """审核通过触发的自动归集结果（只带前端提示需要的几个数）。
+
+    ``payable`` 是**本任务本用户**该月的应发；``paid`` / ``rollover`` / ``limit`` 是
+    **该用户当月整体**的实发、期末津贴与额度（发放封顶按「用户 × 周期」算，不是按单任务）。
+    """
+
+    task_id: int = Field(description="任务ID")
+    period: str = Field(description="归集月份(如 2026-03)")
+    payable: Decimal = Field(description="本任务本用户当月应发")
+    paid: Decimal = Field(description="该用户当月实发(受额度封顶)")
+    rollover: Decimal = Field(description="该用户当月期末津贴(滚入下月)")
+    limit: Decimal = Field(description="该用户当月发放额度")
+
+
+class SubmissionReviewResultSchema(BaseModel):
+    """成果审核结果：审核后的成果 + 自动归集结果。
+
+    归集是 best-effort：审核已经生效是事实，归集失败不回滚审核结果，而是把原因放在
+    ``warning`` 里让前端原样提示运营（可稍后手动补跑归集）。
+    """
+
+    submission: SubmissionOutSchema = Field(description="审核后的成果")
+    settlement: SubmissionSettlementNoticeSchema | None = Field(default=None, description="自动归集结果(驳回时为空)")
+    warning: str | None = Field(default=None, description="审核已生效但归集失败的提示(成功时为空)")

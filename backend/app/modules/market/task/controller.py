@@ -23,6 +23,7 @@ from .schema import (
     CatalogUsageSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
+    SubmissionReviewResultSchema,
     SubmissionReviewSchema,
     SubmissionUpdateSchema,
     TaskBatchPublishResultSchema,
@@ -447,7 +448,7 @@ async def delete_submission_controller(
     return SuccessResponse(msg="删除成果成功")
 
 
-@SubmissionRouter.post("/review/{id}", summary="审核成果", response_model=ResponseSchema[SubmissionOutSchema])
+@SubmissionRouter.post("/review/{id}", summary="审核成果", response_model=ResponseSchema[SubmissionReviewResultSchema])
 async def review_submission_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:submission:review"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],

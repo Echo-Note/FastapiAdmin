@@ -18,6 +18,8 @@ from .schema import (
     PayoutConfigOutSchema,
     PayoutConfigQueryParam,
     PayoutConfigUpdateSchema,
+    PayoutResultOutSchema,
+    PayoutResultQueryParam,
     SettlementOutSchema,
     SettlementQueryParam,
 )
@@ -78,6 +80,19 @@ async def get_payout_list_controller(
 ) -> JSONResponse:
     result = await PayoutService(auth, db).page(page_no=page.page_no, page_size=page.page_size, search=search, order_by=page.order_by)
     return SuccessResponse(data=result, msg="查询发放额度配置成功")
+
+
+@PayoutRouter.get("/results", summary="查询发放结果", response_model=ResponseSchema[PageResultSchema[PayoutResultOutSchema]])
+async def get_payout_results_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:payout:query"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    page: Annotated[PaginationQueryParam, Depends()],
+    search: Annotated[PayoutResultQueryParam, Query()],
+) -> JSONResponse:
+    result = await PayoutService(auth, db).results(
+        page_no=page.page_no, page_size=page.page_size, user_id=search.user_id, period=search.period
+    )
+    return SuccessResponse(data=result, msg="查询发放结果成功")
 
 
 @PayoutRouter.get("/detail/{id}", summary="查询发放额度配置详情", response_model=ResponseSchema[PayoutConfigOutSchema])

@@ -2,7 +2,9 @@
 
 统一挂载小程序端接口：任务大厅、任务单详情、我的任务、分派单详情、接收任务、大厅接单、
 提交成果、我的成果、我的发放/津贴、机构列表。
-认证使用 ``get_current_user``（登录用户），不要求运营端 RBAC 权限码。
+认证使用 ``require_market_member``：要求登录、**并保证该用户有启用的 C 端成员档案**
+（`market_member`，首次访问自动建档），不要求运营端 RBAC 权限码。
+「是不是 C 端」由档案判定，不看角色——角色是多对多的权限概念，用它推断身份会模棱两可。
 """
 
 from typing import Annotated, Literal
@@ -14,12 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.response import ResponseSchema, SuccessResponse
 from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam, UploadResponseSchema
-from app.core.dependencies import db_getter, get_current_user, redis_getter
+from app.core.dependencies import db_getter, redis_getter
 from app.core.router_class import OperationLogRoute
 from app.modules.common.file.service import FileService
 
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
+from .member.dependencies import require_market_member
 from .payout.service import PayoutService
 from .product.schema import ProductSearchItemSchema, ProductSearchQueryParam
 from .product.service import ProductService
@@ -41,7 +44,7 @@ MiniRouter = APIRouter(route_class=OperationLogRoute, prefix="/mini", tags=["市
 
 @MiniRouter.get("/tasks", summary="任务大厅(公开接单任务)", response_model=ResponseSchema[PageResultSchema[TaskOutSchema]])
 async def mini_task_hall_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     redis: Annotated[Redis, Depends(redis_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
@@ -53,7 +56,7 @@ async def mini_task_hall_controller(
 
 @MiniRouter.get("/tasks/grouped", summary="任务大厅分组(按项目)", response_model=ResponseSchema[list[MiniTaskGroupSchema]])
 async def mini_task_hall_grouped_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
 ) -> JSONResponse:
     """任务大厅分组：复用大厅可见性语义，一次性返回全部可见任务并按项目分组。"""
@@ -63,7 +66,7 @@ async def mini_task_hall_grouped_controller(
 
 @MiniRouter.get("/tasks/{id}", summary="任务单详情", response_model=ResponseSchema[TaskOutSchema])
 async def mini_task_detail_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
 ) -> JSONResponse:
@@ -74,7 +77,7 @@ async def mini_task_detail_controller(
 
 @MiniRouter.get("/assignments", summary="我的任务", response_model=ResponseSchema[PageResultSchema[AssignmentOutSchema]])
 async def mini_my_assignments_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
     search: Annotated[AssignmentQueryParam, Query()],
@@ -85,7 +88,7 @@ async def mini_my_assignments_controller(
 
 @MiniRouter.get("/assignments/grouped", summary="我的任务分组(按项目)", response_model=ResponseSchema[list[MiniAssignmentGroupSchema]])
 async def mini_my_assignments_grouped_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     search: Annotated[AssignmentQueryParam, Query()],
 ) -> JSONResponse:
@@ -96,7 +99,7 @@ async def mini_my_assignments_grouped_controller(
 
 @MiniRouter.get("/assignments/{id}", summary="分派单详情", response_model=ResponseSchema[AssignmentOutSchema])
 async def mini_assignment_detail_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="分派ID", ge=1)],
 ) -> JSONResponse:
@@ -107,7 +110,7 @@ async def mini_assignment_detail_controller(
 
 @MiniRouter.post("/assignments/{id}/accept", summary="接收任务", response_model=ResponseSchema[AssignmentOutSchema])
 async def mini_accept_assignment_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="分派ID", ge=1)],
 ) -> JSONResponse:
@@ -117,7 +120,7 @@ async def mini_accept_assignment_controller(
 
 @MiniRouter.post("/tasks/{id}/claim", summary="大厅接单", response_model=ResponseSchema[AssignmentOutSchema])
 async def mini_claim_task_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     redis: Annotated[Redis, Depends(redis_getter)],
     id: Annotated[int, Path(description="任务ID", ge=1)],
@@ -128,7 +131,7 @@ async def mini_claim_task_controller(
 
 @MiniRouter.post("/submissions", summary="提交成果", response_model=ResponseSchema[SubmissionOutSchema])
 async def mini_create_submission_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     data: Annotated[SubmissionCreateSchema, Body(description="提交成果参数")],
 ) -> JSONResponse:
@@ -138,7 +141,7 @@ async def mini_create_submission_controller(
 
 @MiniRouter.put("/submissions/{id}", summary="修改成果(草稿/驳回重提)", response_model=ResponseSchema[SubmissionOutSchema])
 async def mini_update_submission_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="成果ID", ge=1)],
     data: Annotated[SubmissionUpdateSchema, Body(description="修改成果参数")],
@@ -149,7 +152,7 @@ async def mini_update_submission_controller(
 
 @MiniRouter.get("/submissions", summary="我的成果", response_model=ResponseSchema[PageResultSchema[SubmissionOutSchema]])
 async def mini_my_submissions_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
     search: Annotated[SubmissionQueryParam, Query()],
@@ -160,7 +163,7 @@ async def mini_my_submissions_controller(
 
 @MiniRouter.get("/payout", summary="我的发放/津贴", response_model=ResponseSchema[dict])
 async def mini_my_payout_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     period: Annotated[str, Query(description="周期(如 2026-03)")],
 ) -> JSONResponse:
@@ -172,7 +175,7 @@ async def mini_my_payout_controller(
     "/products/search", summary="产品检索(产品库, 提交成果自动填充)", response_model=ResponseSchema[list[ProductSearchItemSchema]]
 )
 async def mini_product_search_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     search: Annotated[ProductSearchQueryParam, Query()],
 ) -> JSONResponse:
@@ -187,7 +190,7 @@ async def mini_product_search_controller(
 
 @MiniRouter.get("/institutions", summary="机构列表(提交成果选择)", response_model=ResponseSchema[PageResultSchema[InstitutionOutSchema]])
 async def mini_institution_list_controller(
-    auth: Annotated[AuthSchema, Security(get_current_user)],
+    auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],
     redis: Annotated[Redis, Depends(redis_getter)],
     page: Annotated[PaginationQueryParam, Depends()],
@@ -214,7 +217,7 @@ async def mini_institution_list_controller(
     "/upload",
     summary="C端上传文件(提交成果图片/附件)",
     response_model=ResponseSchema[UploadResponseSchema],
-    dependencies=[Security(get_current_user)],
+    dependencies=[Security(require_market_member)],
 )
 async def mini_upload_controller(
     request: Request,

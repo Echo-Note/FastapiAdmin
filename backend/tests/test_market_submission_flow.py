@@ -8,6 +8,7 @@
 """
 
 import uuid
+from decimal import Decimal
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -79,6 +80,67 @@ def _assignment_status(client: TestClient, ops: dict[str, str], assignment_id: i
     return client.get(f"/market/assignments/detail/{assignment_id}", headers=ops).json()["data"]["status"]
 
 
+def _assignment_user_id(client: TestClient, ops: dict[str, str], assignment_id: int) -> int:
+    return client.get(f"/market/assignments/detail/{assignment_id}", headers=ops).json()["data"]["user_id"]
+
+
+def _review(client: TestClient, ops: dict[str, str], submission_id: int, approved: bool = True) -> dict[str, Any]:
+    resp = client.post(
+        f"/market/submissions/review/{submission_id}",
+        headers=ops,
+        json={"approved": approved, "review_comment": "通过" if approved else "驳回"},
+    )
+    assert resp.json()["success"] is True, resp.text
+    return resp.json()["data"]
+
+
+def _set_payout_limit(client: TestClient, ops: dict[str, str], user_id: int, period: str, limit: str) -> None:
+    resp = client.post(
+        "/market/payout/create",
+        headers=ops,
+        json={"user_id": user_id, "period": period, "payout_limit": limit},
+    )
+    assert resp.json()["success"] is True, resp.text
+
+
+def _payout_result(client: TestClient, ops: dict[str, str], user_id: int, period: str) -> dict[str, Any]:
+    resp = client.get("/market/payout/results", headers=ops, params={"page_no": 1, "page_size": 10, "user_id": user_id, "period": period})
+    assert resp.json()["success"] is True, resp.text
+    items = resp.json()["data"]["items"]
+    assert len(items) == 1, items
+    return items[0]
+
+
+def _reset_payout_state(user_id: int) -> None:
+    """清空该用户的结算 / 津贴 / 额度数据。
+
+    测试库是 session 级共享（conftest 只建一次），早先的测试会留下同用户同月份的结算单与
+    津贴账本；发放口径又依赖「该用户该期的全部结算单 + 上期账本」，不清就会互相污染。
+    """
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "DELETE FROM market_settlement_item WHERE settlement_id IN "
+                "(SELECT id FROM market_settlement WHERE user_id = :u)"
+            ),
+            {"u": user_id},
+        )
+        conn.execute(text("DELETE FROM market_settlement WHERE user_id = :u"), {"u": user_id})
+        conn.execute(text("DELETE FROM market_allowance_detail WHERE user_id = :u"), {"u": user_id})
+        conn.execute(text("DELETE FROM market_allowance WHERE user_id = :u"), {"u": user_id})
+        conn.execute(text("DELETE FROM market_payout_config WHERE user_id = :u"), {"u": user_id})
+
+
+def _settlements(client: TestClient, ops: dict[str, str], user_id: int, period: str) -> list[dict[str, Any]]:
+    resp = client.get(
+        "/market/settlements/list",
+        headers=ops,
+        params={"page_no": 1, "page_size": 50, "user_id": user_id, "period": period},
+    )
+    assert resp.json()["success"] is True, resp.text
+    return resp.json()["data"]["items"]
+
+
 def _submit(
     client: TestClient,
     user: dict[str, str],
@@ -124,34 +186,56 @@ class TestSubmissionStateMachine:
         # 换个月份可以正常提交
         assert _submit(test_client, user, assignment_id, period="2026-12").json()["success"] is True
 
-    def test_review_approve_writes_reviewed_and_settle_writes_settled(
+    def test_review_approve_auto_settles_and_writes_settled(
         self, test_client: TestClient, auth_headers: dict[str, str]
     ) -> None:
-        """审核通过 → 分派 REVIEWED；归集结算 → 分派 SETTLED。"""
+        """审核通过即刻自动归集：分派直接 SETTLED，出参带回本次发放结果。"""
         user = _login(test_client, "user", "123456")
-        task_id, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        _reset_payout_state(_assignment_user_id(test_client, auth_headers, assignment_id))
         submitted = _submit(test_client, user, assignment_id).json()["data"]
 
-        reviewed = test_client.post(
-            f"/market/submissions/review/{submitted['id']}",
-            headers=auth_headers,
-            json={"approved": True, "review_comment": "通过"},
-        )
-        assert reviewed.json()["success"] is True, reviewed.text
-        assert reviewed.json()["data"]["status"] == "APPROVED"
-        assert _assignment_status(test_client, auth_headers, assignment_id) == "REVIEWED"
+        data = _review(test_client, auth_headers, submitted["id"])
+        assert data["submission"]["status"] == "APPROVED"
+        assert data["warning"] is None
 
-        # 运营判定任务完成 → 才能归集结算
-        done = test_client.post(
-            f"/market/tasks/status/{task_id}", headers=auth_headers, json={"status": "COMPLETED"}
-        )
-        assert done.json()["success"] is True, done.text
+        notice = data["settlement"]
+        assert notice is not None
+        assert notice["period"] == "2026-11"
+        assert Decimal(notice["payable"]) > 0
+        assert Decimal(notice["paid"]) == Decimal(notice["payable"])
+        assert Decimal(notice["rollover"]) == 0
+        # 审核即归集，分派状态机直接走到最后一环，不需要运营再点「归集结算」
+        assert _assignment_status(test_client, auth_headers, assignment_id) == "SETTLED"
 
-        settled = test_client.post(
+    def test_manual_settle_still_requires_completed_task(
+        self, test_client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """自动归集不看任务状态，但运营手动「归集结算」仍要求任务已完成。"""
+        user = _login(test_client, "user", "123456")
+        task_id, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+        _review(test_client, auth_headers, submitted["id"])
+
+        denied = test_client.post(
             "/market/settlements/settle", headers=auth_headers, json={"task_id": task_id, "period": "2026-11"}
         )
-        assert settled.json()["success"] is True, settled.text
-        assert _assignment_status(test_client, auth_headers, assignment_id) == "SETTLED"
+        assert denied.json()["success"] is False
+        assert "已完成" in denied.json()["msg"]
+
+        done = test_client.post(f"/market/tasks/status/{task_id}", headers=auth_headers, json={"status": "COMPLETED"})
+        assert done.json()["success"] is True, done.text
+        # 任务完成后再手动重跑一次：幂等，不新增结算单、金额不变
+        before = _settlements(test_client, auth_headers, user_id, "2026-11")
+        rerun = test_client.post(
+            "/market/settlements/settle", headers=auth_headers, json={"task_id": task_id, "period": "2026-11"}
+        )
+        assert rerun.json()["success"] is True, rerun.text
+        after = _settlements(test_client, auth_headers, user_id, "2026-11")
+        assert len(after) == len(before) == 1
+        assert after[0]["payable_amount"] == before[0]["payable_amount"]
 
     def test_dashboard_pending_counts_submitted(
         self, test_client: TestClient, auth_headers: dict[str, str]
@@ -274,3 +358,196 @@ class TestSubmissionReviewPayload:
         assert submitted["subject_type"] == "staff"
         assert submitted["subject_name"] == "受访同学"
         assert submitted["institution_id"] is None
+
+
+class TestPayoutAlgorithm:
+    """发放封顶 + 津贴滚存（按「用户 × 周期」算，不是按结算单）。
+
+    口径：待发 = 当月应发合计 + 期初津贴；实发 = min(待发, 额度)；期末津贴 = 待发 - 实发。
+    """
+
+    def test_payable_under_limit_pays_in_full(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """应发不超额度：实发 = 应发，无滚存。"""
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+        _set_payout_limit(test_client, auth_headers, user_id, "2026-11", "20000")
+
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+        notice = _review(test_client, auth_headers, submitted["id"])["settlement"]
+
+        assert Decimal(notice["payable"]) == Decimal(notice["paid"])
+        assert Decimal(notice["rollover"]) == 0
+        assert Decimal(notice["limit"]) == Decimal("20000")
+
+        result = _payout_result(test_client, auth_headers, user_id, "2026-11")
+        assert Decimal(result["payable"]) == Decimal(notice["payable"])
+        assert Decimal(result["paid"]) == Decimal(notice["paid"])
+
+    def test_limit_caps_paid_and_rolls_rest_into_allowance(
+        self, test_client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """应发超额度：实发被截到额度，差额进个人津贴，结算单实发合计等于实发。"""
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+        _set_payout_limit(test_client, auth_headers, user_id, "2026-11", "100")
+
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+        notice = _review(test_client, auth_headers, submitted["id"])["settlement"]
+
+        payable = Decimal(notice["payable"])
+        assert payable > Decimal("100")
+        assert Decimal(notice["paid"]) == Decimal("100")
+        assert Decimal(notice["rollover"]) == payable - Decimal("100")
+
+        rows = _settlements(test_client, auth_headers, user_id, "2026-11")
+        assert len(rows) == 1
+        assert Decimal(rows[0]["paid_amount"]) == Decimal("100")
+        assert rows[0]["pay_status"] == "SCHEDULED"
+
+        allowance = test_client.get(
+            "/market/payout/allowance", headers=auth_headers, params={"page_no": 1, "page_size": 50}
+        ).json()["data"]["items"]
+        balance = next(Decimal(row["balance"]) for row in allowance if row["user_id"] == user_id)
+        assert balance == payable - Decimal("100")
+
+    def test_two_tasks_same_month_share_one_limit(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """封顶按「用户 × 月」而不是按任务：两张结算单合计应发超额度时按 id 顺序贪心分摊。"""
+        user = _login(test_client, "user", "123456")
+        _, first_assignment = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, first_assignment)
+        _reset_payout_state(user_id)
+        _, second_assignment = _prepare_claimed_task(test_client, auth_headers, user)
+
+        first = _submit(test_client, user, first_assignment).json()["data"]
+        second = _submit(test_client, user, second_assignment).json()["data"]
+        _review(test_client, auth_headers, first["id"])
+
+        cap = Decimal("2000")
+        _set_payout_limit(test_client, auth_headers, user_id, "2026-11", "2000")
+        notice = _review(test_client, auth_headers, second["id"])["settlement"]
+
+        payable = Decimal(notice["payable"]) * 2  # 两个任务同价同月
+        assert payable > cap
+        assert Decimal(notice["paid"]) == cap
+        assert Decimal(notice["rollover"]) == payable - cap
+
+        rows = sorted(_settlements(test_client, auth_headers, user_id, "2026-11"), key=lambda row: row["id"])
+        assert len(rows) == 2
+        # 贪心分摊：Σ paid_amount == 实发，且额度耗尽后创建的单显示 0 而不是乱填
+        assert sum(Decimal(row["paid_amount"]) for row in rows) == cap
+        assert Decimal(rows[0]["paid_amount"]) == min(Decimal(rows[0]["payable_amount"]), cap)
+
+        result = _payout_result(test_client, auth_headers, user_id, "2026-11")
+        assert Decimal(result["payable"]) == payable
+        assert Decimal(result["paid"]) == cap
+        assert Decimal(result["rollover"]) == payable - cap
+
+    def test_rollover_counts_into_next_period_pending(
+        self, test_client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        """上期滚存参与下期待发：下期实发 = min(下期应发 + 上期津贴, 额度)。"""
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+
+        _set_payout_limit(test_client, auth_headers, user_id, "2026-11", "1")
+        november = _submit(test_client, user, assignment_id, period="2026-11").json()["data"]
+        prev_rollover = Decimal(_review(test_client, auth_headers, november["id"])["settlement"]["rollover"])
+        assert prev_rollover > 0
+
+        _set_payout_limit(test_client, auth_headers, user_id, "2026-12", "20000")
+        december = _submit(test_client, user, assignment_id, period="2026-12").json()["data"]
+        notice = _review(test_client, auth_headers, december["id"])["settlement"]
+
+        payable = Decimal(notice["payable"])
+        assert Decimal(notice["paid"]) == payable + prev_rollover, "下期实发必须把上期滚存算进待发"
+        assert Decimal(notice["rollover"]) == 0
+
+    def test_repeated_settle_is_idempotent(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """重复归集不新增结算单、不叠加金额（重算而非累加）。"""
+        user = _login(test_client, "user", "123456")
+        task_id, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+        _set_payout_limit(test_client, auth_headers, user_id, "2026-11", "100")
+
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+        first = _review(test_client, auth_headers, submitted["id"])["settlement"]
+
+        assert test_client.post(f"/market/tasks/status/{task_id}", headers=auth_headers, json={"status": "COMPLETED"}).json()["success"]
+        for _ in range(2):
+            assert test_client.post(
+                "/market/settlements/settle", headers=auth_headers, json={"task_id": task_id, "period": "2026-11"}
+            ).json()["success"]
+
+        rows = _settlements(test_client, auth_headers, user_id, "2026-11")
+        assert len(rows) == 1
+        assert Decimal(rows[0]["payable_amount"]) == Decimal(first["payable"])
+        assert Decimal(rows[0]["paid_amount"]) == Decimal("100")
+
+    def test_settle_failure_does_not_rollback_review(
+        self, test_client: TestClient, auth_headers: dict[str, str], monkeypatch: Any
+    ) -> None:
+        """归集失败不影响已生效的审核：成果仍 APPROVED，原因通过 warning 回传。"""
+        from app.modules.market.payout.service import SettlementService
+
+        async def _boom(*args: Any, **kwargs: Any) -> None:
+            raise RuntimeError("模板单价缺失")
+
+        monkeypatch.setattr(SettlementService, "settle", _boom)
+
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+
+        data = _review(test_client, auth_headers, submitted["id"])
+        assert data["submission"]["status"] == "APPROVED"
+        assert data["settlement"] is None
+        assert "归集失败" in data["warning"]
+        assert _assignment_status(test_client, auth_headers, assignment_id) == "REVIEWED"
+
+    def test_reject_produces_no_settlement(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """驳回不触发归集，也不生成结算单。"""
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+
+        data = _review(test_client, auth_headers, submitted["id"], approved=False)
+        assert data["submission"]["status"] == "REJECTED"
+        assert data["settlement"] is None
+        assert _settlements(test_client, auth_headers, user_id, "2026-11") == []
+        assert _assignment_status(test_client, auth_headers, assignment_id) == "SUBMITTED"
+
+
+class TestPayoutUserBrief:
+    """结算单与发放结果必须自带 C 端用户摘要：只靠 user_id 前端认不出人。"""
+
+    def test_settlement_and_result_carry_user_brief(
+        self, test_client: TestClient, auth_headers: dict[str, str]
+    ) -> None:
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        user_id = _assignment_user_id(test_client, auth_headers, assignment_id)
+        _reset_payout_state(user_id)
+
+        submitted = _submit(test_client, user, assignment_id).json()["data"]
+        _review(test_client, auth_headers, submitted["id"])
+
+        rows = _settlements(test_client, auth_headers, user_id, "2026-11")
+        assert rows, "归集后应有结算单"
+        brief = rows[0]["user"]
+        assert brief["id"] == user_id
+        assert brief["name"] == "普通用户"
+        assert brief["username"] == "user"
+        assert brief["mobile"], "手机号是运营真正的识别手段，不能为空"
+
+        result = _payout_result(test_client, auth_headers, user_id, "2026-11")
+        assert result["user"]["id"] == user_id
+        assert result["user"]["mobile"] == brief["mobile"]
