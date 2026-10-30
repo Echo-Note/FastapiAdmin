@@ -54,7 +54,19 @@ parent: market-domain
 - 一次提交 = 一个采集对象 × 一份采集表单，`period` 存月份字符串（如 `2026-03`）用于按月归集。
 - 采集数据存 `form_data` JSONB，结构由任务自带的 `form_schema` 决定；`ai_check_status` / `ai_check_result` 是为 AI 预检预留的列，当前没有写入路径。
 - 审核（`review`）走向 APPROVED / REJECTED，记审核人/意见/时间；驳回后用户修改重提，`version` +1。
-- 审核通过后分派推进到 `REVIEWED`，结算完成后才到 `SETTLED`（由 payout 侧驱动）。
+- 审核通过后分派回写为 `SUBMITTED`（`review` 里写 `SUBMITTED` + `submitted_at`）。`SUBMITTING` / `REVIEWED` / `SETTLED` 三个枚举值虽然定义了，但**当前没有任何写入路径**，结算也不回写分派（2026-11 核对，本条已按代码订正）。
+- 提交后的成果状态是 `DRAFT`（`create` 不传 `status`，走模型默认），没有「提交即 `PENDING`」这一步；`review` 接受 `DRAFT` 与 `PENDING` 两种入参。
+- 「单月单对象只提交一次」目前**没有数据库唯一约束兜底**（`market_submission` 上没有 `UniqueConstraint`），只有业务层校验；并发重提不受阻。
+
+## 采集表单与真实采集表对齐
+
+- `form_schema` 的字段来源是运营手上的真实 Excel 采集表（`docs/materials/任务/...`），不是开发臆造的结构；机构管理 5 类共 26 个三级任务（`ITEM-0001`..`ITEM-0026`）的字段定义收敛在 `backend/app/modules/market/task/collection_schema.py` 的 `ITEM_FORM_SCHEMAS`。
+- 该模块**只是种子与存量订正的生成源**，运行时真相仍是库里 `config.form_schema`。订正入口 `app/scripts/apply_collection_schema.py`（`--seed` / `--db` / `--dry-run`，幂等，`--db` 深拷贝后回写因为 JSONB 列 `mutable=False`）。
+- 分节顺序与采集表一致：`execution_info`（区域 + 机构类型专属字段 + 执行人自动填充 + 执行日期）→ 工作区分节（`type=table` 多行子表 + 表后 `exception_note` 异常说明）→ `management_verification`（门头照片）。
+- **字段 key 是已提交成果 `form_data` 的结构契约**：退役语义的旧 key 不复用（库存盘点 `stock_qty`=库存数量，新的「实盘数量」用 `actual_qty`）。
+- 竞品调研的行刻意用 `competitor_name` / `competitor_spec` / `competitor_manufacturer`，不复用产品三要素 key —— 否则竞品会被 C 端当成自家产品检索、并被自动写进产品库（见 [market/product](../product/SPEC.md)）。
+- 产品三要素列（`product_name` / `product_spec` / `manufacturer`）带 `product_role`（`name` / `spec` / `manufacturer`），C 端据此触发产品库联想与回填。
+- 素材里没有采集表的三级任务（`ITEM-0027` 进销存数据收集、`ITEM-0028` 流向数据收集）不做臆造，保持原样。App 侧子表单元格按列类型渲染（`date` / `number` / `select` / `image` / `file` 各用对应控件），不再一律文本输入。
 
 ## 已知取舍
 

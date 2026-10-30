@@ -39,6 +39,7 @@ parent: foxwork-architecture
 | [market/payout](payout/SPEC.md) | `market_settlement` `market_settlement_item` `market_payout_config` `market_allowance` `market_allowance_detail` | task（读任务与成果做归集） |
 | [market/institution](institution/SPEC.md) | `market_institution` `market_institution_image` | 无（被 task 引用） |
 | [market/dashboard](dashboard/SPEC.md) | 无自有表 | 全部（只读聚合） |
+| [market/product](product/SPEC.md) | `market_product` | task（读 `form_schema` 的 `product_role` 识别产品三要素列；成果提交/驳回重提后触发自动入库） |
 
 `task ↔ project` 是**双向边而非循环依赖**：任务带 `project_id`（任务侧按项目筛选），项目带 `market_project_item`（项目侧决定发布哪些任务单元）。两条边服务两条不同的聚合路径，对应「项目对外、任务对内」。
 
@@ -58,8 +59,10 @@ parent: foxwork-architecture
 | 报告 `ReportStatus` | DRAFT → GENERATED → SUBMITTED |
 | 津贴明细 `AllowanceStatus` | PENDING → PAID |
 
-三个**只有枚举值、没有写入路径**的状态要当心，不要以为业务已覆盖：
+四个**只有枚举值、没有写入路径**的状态要当心，不要以为业务已覆盖：
 
+- `AssignmentStatus.SUBMITTING` / `REVIEWED` / `SETTLED`：代码只写 `PENDING`（定向分派）→ `ACCEPTED`（接收/接单）→ `SUBMITTED`（审核通过时回写），结算不回写分派状态；`specs/market/task` 曾写的「审核通过→REVIEWED、结算后→SETTLED」与代码不一致（2026-11 核对，已在该 spec 订正）。
+- `SubmissionStatus.PENDING`：`SubmissionService.create` 不写 `status`，落库即 `DRAFT`；全仓没有把成果写成 `PENDING` 的路径，因此 dashboard 按 `status=PENDING` 统计的「待审核成果」恒为 0（实际要审的是 `DRAFT`）。这是已记录的缺陷，尚未修。
 - `TaskStatus.SETTLING`：`TaskService.change_status` 允许的链是 PUBLISHED → IN_PROGRESS → COMPLETED → SETTLED → ARCHIVED，跳过 SETTLING；`SettlementService.settle` 只校验任务处于 COMPLETED，不推进任务状态。
 - `SettlementStatus.PAID`：没有支付实现（支付是非目标）。
 - `AllowanceStatus.PAID`：同上，津贴明细只被读。

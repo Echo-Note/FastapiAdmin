@@ -1827,6 +1827,40 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — C 端提交成果字段缺失的根因修复（采集表对齐）+ 新增产品库模块
+
+#### 1. 原因（三因叠加，不是单点 bug）
+
+用户反馈 App「提交成果」页面字段比运营手上的 Excel 采集表少很多，且不是个例。排查结论：
+
+1. **主因 · 种子模板数据从未对齐真实采集表**：`backend/sql/market_task_item.json` 的 `form_schema` 是早期占位结构。例：民营医疗管理「配送协调」只有 4 列（产品名称/批号/配送数量/配送时间），真实采集表有 8 列（+产品规格/生产企业/验收情况/配送商业）；所有采集表下方的「异常说明」种子完全没有；执行信息缺机构类型专属字段（基层：机构类型/上级管理主体；民营：单体／集团/所属集团；零售：连锁／单体/所属连锁总部；商业：商业公司名称）；库存盘点/价格核查/销售对账/竞品调研的列名整体错位。
+2. **次因 · App 子表单元格不区分列类型**：`submission-form/index.vue` 的 `table` 分支对每列一律渲染 `wd-input`，`date`/`number`/`select`/`image` 列都拿不到对应控件。
+3. **陷阱 · 只改种子 JSON 修不好已初始化的库**：`initialize.py` 的 `__init_data` 是「表已有数据则整体跳过」，不会覆盖既有记录，必须走一次性订正脚本。
+
+#### 2. 改法
+
+- 新增 `backend/app/modules/market/task/collection_schema.py`：用「机构类型专属执行信息 + 工作区列定义」拼出机构管理 5 类 26 个三级任务（`ITEM-0001`..`ITEM-0026`）的 `FormSchema`，导出 `ITEM_FORM_SCHEMAS`。它是**种子与存量订正的唯一生成源**，运行时不读它（运行时真相仍是库里 `config.form_schema`）。
+- 新增 `backend/app/scripts/apply_collection_schema.py`：`--seed` 重写种子 JSON（26 条）、`--db` 就地订正库内记录（深拷贝后回写，JSONB 列 `mutable=False` 才认变更）、`--dry-run` 只打印；幂等。
+- `FormSchemaColumn` 增加 `product_role`（name/spec/manufacturer）；App 子表按列类型渲染，三套选择器与上传收敛为统一的 `ValueTarget`（`rowIndex=null` 即单值字段）；Web 表单设计器补子列选项与产品库角色编辑。
+- 新增产品库子模块 `market/product`：`market_product` 以 `(name, spec, manufacturer)` 判重；C 端 `GET /market/mini/products/search` 可见集 = `approved` ∪（`pending` 且本人提交）；成果提交/驳回重提后把库里没有的产品自动入库为 `pending`（判重键已存在则跳过，单条失败用 savepoint 隔离，不影响成果落库）；运营端 `/market/products/*` 提供 CRUD + 批量审核，菜单「市场管理 → 产品库」。
+- 关键命名取舍：竞品调研的行用 `competitor_*` 前缀而非产品三要素 key，避免竞品被当成自家产品检索并自动写进产品库；退役语义的旧 key 不复用（库存盘点 `stock_qty`=库存数量 → 新「实盘数量」用 `actual_qty`）。
+- 范围之外（素材缺失或本轮未做）：市场档案信息调研 5 张、专项调研 7 模板×2（docx 问卷）、会议服务 3 模板（当前还没有三级任务）、市场宣传 2 模板；`ITEM-0027` 进销存数据收集 / `ITEM-0028` 流向数据收集 在素材里没有采集表，不臆造字段。
+
+#### 3. 验证
+
+- 后端：`uv run pytest` **314 passed**（新增 `test_market_collection_schema.py` 39 例锁定「种子 ≡ 生成源」，`test_market_product.py` 9 例覆盖判重/可见性/自动入库）；`uv run ruff check app tests` 通过。
+- Web：`vue-tsc --noEmit` 通过，新增文件 `eslint`/`stylelint` 通过。
+- App：`vue-tsc --noEmit` 通过，改动文件 `eslint` 0 error（4 条 warning 为存量）。
+- **存量库必须手动订正一次**：`cd backend && PYTHONPATH=. uv run python -m app.scripts.apply_collection_schema --db --dry-run` 确认后去掉 `--dry-run` 再跑；并到「菜单管理」补「产品库」菜单（种子只在空表时导入）。
+
+#### 4. 顺带记录（Hindsight 记忆纠偏时发现，本轮未修）
+
+- 成果 `create` 不写 `status` → 落库即 `DRAFT`，而 dashboard 按 `status=PENDING` 统计「待审核成果」→ 该计数恒为 0。
+- `AssignmentStatus` 的 `SUBMITTING`/`REVIEWED`/`SETTLED` 定义了却没有任何写入路径，结算也不回写分派状态。
+- `market_submission` 没有任何唯一约束，「单月单对象只提交一次」只靠业务层，并发重提无 DB 兜底。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
