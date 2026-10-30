@@ -219,13 +219,17 @@ class TestProductAutoIngest:
     def test_resubmit_does_not_duplicate_pending(
         self, test_client: TestClient, auth_headers: dict[str, str]
     ) -> None:
-        """同一产品重复提交只入库一次（判重键已存在则跳过）。"""
+        """同一分派同月重复提交被拒，产品也不会重复入库。"""
         user_headers = _login(test_client, "user", "123456")
         assignment_id = self._claim_assignment(test_client, auth_headers, user_headers)
 
         product = ("重复提交测试药", "2g", "重复提交测试厂")
         assert self._submit(test_client, user_headers, assignment_id, product).json()["success"]
-        assert self._submit(test_client, user_headers, assignment_id, product).json()["success"]
+
+        # 同分派同月份第二次提交：被提交节奏校验拦下（不再是静默成功）
+        again = self._submit(test_client, user_headers, assignment_id, product)
+        assert again.json()["success"] is False
+        assert "本月已提交" in again.json()["msg"]
 
         rows = test_client.get(
             "/market/products/list",

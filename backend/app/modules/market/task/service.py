@@ -26,6 +26,7 @@ from ..enums import (
     ProjectStatus,
     SubjectType,
     SubmissionStatus,
+    SubmitCadence,
     TaskStatus,
 )
 from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
@@ -940,21 +941,36 @@ class SubmissionService:
         )
 
     async def create(self, data: SubmissionCreateSchema) -> SubmissionOutSchema:
-        """创建成果（草稿状态），并按模板采集对象类型归集机构。
+        """提交成果（落库即 ``PENDING`` 待审核），并按模板采集对象类型归集机构。
 
         采集对象类型以任务模板 ``TaskConfig.subject_type`` 为准（前端传值仅作兜底）；
         当对象为机构时，从 ``form_data`` 提取机构名称/区域/等级，按模板名映射机构类型后
         归集机构（同名复用、否则创建），回填 ``institution_id``。运营端不再手动预置机构。
+
+        并发与去重：先对分派行加 ``FOR UPDATE`` 锁，再按模板 ``submit_rule.cadence`` 判断本月是否
+        已提交——``monthly`` / ``once`` 只允许一份，``unlimited``（如会议服务）不限。行锁保证两个
+        并发请求不会同时通过查重；``market_submission`` 上没有唯一约束（定额任务需要单月多份）。
         """
         assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(
             id=data.assignment_id, msg="分配记录不存在", preload=["task", "task.template", "task.item"]
         )
+        # 先锁分派行：同一分派的并发提交在此串行化
+        await self.db.execute(
+            select(AssignmentModel.id).where(AssignmentModel.id == data.assignment_id).with_for_update()
+        )
         template = assignment.task.template
+        template_config = TaskConfig.model_validate(template.config)
+        await self._ensure_period_not_submitted(
+            assignment_id=data.assignment_id,
+            period=data.period,
+            cadence=template_config.submit_rule.cadence,
+        )
         subject_type = (template.config or {}).get("subject_type", data.subject_type)
 
         create_data = data.model_dump()
         create_data["user_id"] = self.auth.user.id
         create_data["subject_type"] = subject_type
+        create_data["status"] = SubmissionStatus.PENDING.value
 
         if subject_type == SubjectType.INSTITUTION.value:
             info = extract_institution_info(data.form_data)
@@ -968,11 +984,31 @@ class SubmissionService:
                 )
 
         submission = await SubmissionCRUD(self.auth, self.db).create(data=create_data)
+        # 提交动作回写分派状态：首次提交 → SUBMITTED（审核通过后才会推进到 REVIEWED）
+        if assignment.status in {AssignmentStatus.ACCEPTED.value, AssignmentStatus.PENDING.value}:
+            await AssignmentCRUD(self.auth, self.db).update(
+                id=assignment.id,
+                data={"status": AssignmentStatus.SUBMITTED.value, "submitted_at": datetime.now(UTC)},
+            )
         # 产品库自动入库：成果里出现库里没有的产品时写待审记录（失败不阻断提交，见 ProductService）
         await ProductService(self.auth, self.db).ingest_from_form_data(
             data.form_data, _resolve_form_schema(assignment.task)
         )
         return await self.detail(id=submission.id)
+
+    async def _ensure_period_not_submitted(self, assignment_id: int, period: str, cadence: str) -> None:
+        """按提交节奏校验同一分派在同一月份是否已提交过成果。
+
+        ``monthly`` / ``once`` 只允许一份（驳回的那份不算占用，允许改后重提）；
+        ``unlimited`` 不限（如会议服务）。调用方需先对分派行加锁，否则并发下会双通过。
+        """
+        if cadence == SubmitCadence.UNLIMITED.value:
+            return
+        existing = await SubmissionCRUD(self.auth, self.db).get_list(
+            search={"assignment_id": assignment_id, "period": period, "status": ("notin", [SubmissionStatus.REJECTED.value])}
+        )
+        if existing:
+            raise CustomException(msg=f"本月已提交过该任务的成果（{period}），请勿重复提交")
 
     async def update(self, id: int, data: SubmissionUpdateSchema) -> SubmissionOutSchema:
         """更新成果（草稿/驳回状态可改，驳回重提版本 +1）。"""
@@ -1033,10 +1069,10 @@ class SubmissionService:
             }
         )
         await SubmissionCRUD(self.auth, self.db).update(id=id, data=update_data)
-        # 回写分派状态：通过→SUBMITTED，驳回→SUBMITTED（保留已提交，允许重提）
-        if data.approved:
-            await AssignmentCRUD(self.auth, self.db).update(
-                id=submission.assignment_id,
-                data={"status": "SUBMITTED", "submitted_at": datetime.now(UTC)},
-            )
+        # 回写分派状态：通过 → REVIEWED（本项目所有成果审完即视为审核完成）；驳回 → SUBMITTED（等重提）
+        target_status = AssignmentStatus.REVIEWED.value if data.approved else AssignmentStatus.SUBMITTED.value
+        await AssignmentCRUD(self.auth, self.db).update(
+            id=submission.assignment_id,
+            data={"status": target_status, "submitted_at": datetime.now(UTC)},
+        )
         return await self.detail(id=id)

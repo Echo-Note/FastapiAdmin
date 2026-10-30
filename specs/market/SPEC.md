@@ -49,23 +49,29 @@ parent: foxwork-architecture
 
 取值定义在 `enums.py`，service 以 `.value` 字符串写入。状态流转都是**单向**的，由各 Service 自己校验顺序。
 
-| 实体 | 状态链 |
-|---|---|
-| 项目 `ProjectStatus` | DRAFT → IN_PROGRESS → COMPLETED → CLOSED |
-| 任务 `TaskStatus` | DRAFT → PUBLISHED → IN_PROGRESS → COMPLETED → SETTLED → ARCHIVED |
-| 分派 `AssignmentStatus` | PENDING → ACCEPTED → SUBMITTING → SUBMITTED → REVIEWED → SETTLED |
-| 成果 `SubmissionStatus` | DRAFT → PENDING → APPROVED / REJECTED（驳回可改，`version` +1） |
-| 结算单 `SettlementStatus` | PENDING → CALCULATED → CONFIRMED → REPORTED → PAID |
-| 报告 `ReportStatus` | DRAFT → GENERATED → SUBMITTED |
-| 津贴明细 `AllowanceStatus` | PENDING → PAID |
+| 实体 | 枚举类 | 成员 → 落库值 |
+|---|---|---|
+| 项目 | `ProjectStatus` | `DRAFT`→`"DRAFT"`、`IN_PROGRESS`→`"IN_PROGRESS"`、`COMPLETED`→`"COMPLETED"`、`CLOSED`→`"CLOSED"` |
+| 任务 | `TaskStatus` | `DRAFT`→`"DRAFT"`、`PUBLISHED`→`"PUBLISHED"`、`IN_PROGRESS`→`"IN_PROGRESS"`、`COMPLETED`→`"COMPLETED"`、`SETTLING`→`"SETTLING"`、`SETTLED`→`"SETTLED"`、`ARCHIVED`→`"ARCHIVED"` |
+| 分派 | `AssignmentStatus` | `PENDING`→`"PENDING"`、`ACCEPTED`→`"ACCEPTED"`、`SUBMITTED`→`"SUBMITTED"`、`REVIEWED`→`"REVIEWED"`、`SETTLED`→`"SETTLED"`（`SUBMITTING` 已于 2026-11 删除） |
+| 成果 | `SubmissionStatus` | `DRAFT`→`"DRAFT"`（历史/遗留，仅 dashboard 兼容统计）、`PENDING`→`"PENDING"`（提交即此）、`APPROVED`→`"APPROVED"`、`REJECTED`→`"REJECTED"`（可改后重提，`version` +1） |
+| 结算单 | `SettlementStatus` | `PENDING`→`"PENDING"`、`CALCULATED`→`"CALCULATED"`、`CONFIRMED`→`"CONFIRMED"`、`REPORTED`→`"REPORTED"`、`PAID`→`"PAID"` |
+| 报告 | `ReportStatus` | `DRAFT`→`"DRAFT"`、`GENERATED`→`"GENERATED"`、`SUBMITTED`→`"SUBMITTED"` |
+| 津贴明细 | `AllowanceStatus` | `PENDING`→`"PENDING"`、`PAID`→`"PAID"` |
+| 产品库审核 | `ProductAuditStatus` | `PENDING`→`"pending"`、`APPROVED`→`"approved"`、`REJECTED`→`"rejected"`（**小写**，与任务域状态区分） |
 
-四个**只有枚举值、没有写入路径**的状态要当心，不要以为业务已覆盖：
+> 注意大小写不是笔误：任务/分派/成果/结算等状态值一律**大写字符串**；产品库的审核状态与来源用**小写**。
 
-- `AssignmentStatus.SUBMITTING` / `REVIEWED` / `SETTLED`：代码只写 `PENDING`（定向分派）→ `ACCEPTED`（接收/接单）→ `SUBMITTED`（审核通过时回写），结算不回写分派状态；`specs/market/task` 曾写的「审核通过→REVIEWED、结算后→SETTLED」与代码不一致（2026-11 核对，已在该 spec 订正）。
-- `SubmissionStatus.PENDING`：`SubmissionService.create` 不写 `status`，落库即 `DRAFT`；全仓没有把成果写成 `PENDING` 的路径，因此 dashboard 按 `status=PENDING` 统计的「待审核成果」恒为 0（实际要审的是 `DRAFT`）。这是已记录的缺陷，尚未修。
+仍在的「只有枚举值、没有写入路径」的状态（2026-11 已清理掉分派与成果两处）：
+
 - `TaskStatus.SETTLING`：`TaskService.change_status` 允许的链是 PUBLISHED → IN_PROGRESS → COMPLETED → SETTLED → ARCHIVED，跳过 SETTLING；`SettlementService.settle` 只校验任务处于 COMPLETED，不推进任务状态。
 - `SettlementStatus.PAID`：没有支付实现（支付是非目标）。
 - `AllowanceStatus.PAID`：同上，津贴明细只被读。
+
+2026-11 修掉的两处（原为「枚举有效但永不写入」）：
+
+- 分派链补全：提交成果时 `ACCEPTED` → `SUBMITTED`；审核通过时 → `REVIEWED`；归集结算生成结算单时 → `SETTLED`。`SUBMITTING` 从未被写入过，直接删除。
+- 成果提交即 `PENDING`：`SubmissionService.create` 显式写 `status="PENDING"`，dashboard 的「待审核」按 `PENDING`（并兼容历史 `DRAFT`）统计，不再恒为 0。
 
 ## 已知取舍
 

@@ -463,6 +463,80 @@ function initFormData() {
   }
 }
 
+/**
+ * 本地草稿自动保存：用户填了一半刷新页面 / 退出小程序后再进来，已填内容还在。
+ *
+ * 不占用后端成果状态（提交即 PENDING），草稿只存在本机 storage，按分派维度隔离；
+ * 提交成功后清掉。读取失败（数据损坏/结构变更）时静默丢弃，不影响正常填写。
+ */
+const DRAFT_STORAGE_PREFIX = 'market-submission-draft:'
+/** 草稿恢复完成前不写存储，避免用初始空值覆盖已保存内容 */
+const draftReady = ref(false)
+let draftTimer: ReturnType<typeof setTimeout> | null = null
+
+function draftStorageKey(): string | null {
+  return assignmentId.value ? `${DRAFT_STORAGE_PREFIX}${assignmentId.value}` : null
+}
+
+/** 恢复本地草稿：按分节/字段覆盖已初始化的表单（只覆盖草稿里确实存在的键） */
+function restoreDraft() {
+  const key = draftStorageKey()
+  if (!key)
+    return
+  try {
+    const raw = uni.getStorageSync(key)
+    if (!raw)
+      return
+    const saved = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw)) as Record<string, Record<string, any>>
+    for (const [sectionCode, fields] of Object.entries(saved ?? {})) {
+      if (!fields || typeof fields !== 'object')
+        continue
+      Object.assign(sectionData(sectionCode), fields)
+    }
+    toast.success('已恢复上次未提交的内容')
+  }
+  catch {
+    // 草稿损坏就当没有，不影响填写
+    uni.removeStorageSync(key)
+  }
+}
+
+/** 落盘当前表单内容（失败静默，草稿不影响主流程） */
+function persistDraft() {
+  const key = draftStorageKey()
+  if (!key || !draftReady.value)
+    return
+  try {
+    uni.setStorageSync(key, JSON.stringify(formData))
+  }
+  catch {
+    // 存储满了/不可用时忽略
+  }
+}
+
+function clearDraft() {
+  const key = draftStorageKey()
+  if (key)
+    uni.removeStorageSync(key)
+  draftReady.value = false
+}
+
+/** 表单变更后 800ms 防抖落盘 */
+watch(
+  formData,
+  () => {
+    if (!draftReady.value)
+      return
+    if (draftTimer)
+      clearTimeout(draftTimer)
+    draftTimer = setTimeout(() => {
+      draftTimer = null
+      persistDraft()
+    }, 800)
+  },
+  { deep: true },
+)
+
 /** 是否空值 */
 function isBlank(v: any): boolean {
   return v === undefined || v === null || v === ''
@@ -522,6 +596,8 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await MarketAPI.createSubmission(buildPayload())
+    // 已提交成功：本地草稿没有保留价值，清掉避免下次进来看到旧内容
+    clearDraft()
     toast.success(t('market.submitSuccess'))
     setTimeout(() => router.replace({ name: 'market-my-task' }), 300)
   }
@@ -554,6 +630,8 @@ async function loadAssignment() {
     formLoading.value = false
   }
   initFormData()
+  restoreDraft()
+  draftReady.value = true
 }
 
 onLoad((query) => {

@@ -1918,6 +1918,33 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — 成果/分派状态机补全 + 同月提交去重 + C 端本地草稿
+
+#### 1. 三个缺陷与定案
+
+| 缺陷 | 原状 | 定案 |
+|---|---|---|
+| 成果提交后状态 | `create` 不写 `status`，落库即 `DRAFT`；dashboard 按 `PENDING` 统计「待审核」→ **恒为 0** | 提交即 `PENDING`；dashboard 待审核按 `PENDING` 统计并兼容历史 `DRAFT` |
+| 分派状态机 | `SUBMITTING`/`REVIEWED`/`SETTLED` 定义了但从不写入，结算也不回写 | 补全：提交→`SUBMITTED`、审核通过→`REVIEWED`、归集结算→`SETTLED`；`SUBMITTING` 从未写入，删除 |
+| 同月重复提交 | `market_submission` 无任何唯一约束，只靠业务层，并发能双提交 | 分派行 `SELECT … FOR UPDATE` + 按 `submit_rule.cadence` 查重（monthly/once 同月一份，unlimited 不限）；故意不加唯一约束（定额/会议任务需同月多份） |
+
+顺带满足用户提出的「填一半刷新/关闭要保留内容」：**草稿只存本机**（`uni.setStorageSync('market-submission-draft:<assignmentId>')`，800ms 防抖，恢复时提示，提交成功清除），后端不存未提交表单——这样 `PENDING` 严格等于「待运营审核」。
+
+#### 2. 关键实现点
+
+- `SubmissionService.create`：先 `with_for_update()` 锁分派行，再 `_ensure_period_not_submitted()` 查重（排除 `REJECTED` 以允许改后重提），最后 `status="PENDING"` + 回写分派 `SUBMITTED`。
+- `SubmissionService.review`：通过 → 成果 `APPROVED` 且分派 `REVIEWED`；驳回 → 成果 `REJECTED` 且分派回 `SUBMITTED`（等重提）。
+- `SettlementService.settle`：生成结算单后把该分派置 `SETTLED`。
+- `enums.AssignmentStatus` 删 `SUBMITTING`；`test_market_enums` 增断言防回潮。
+
+#### 3. 验证
+
+- 新增 `tests/test_market_submission_flow.py` 4 个用例：提交写 `PENDING` + 分派 `SUBMITTED`、同月重复提交被拒（换月可提交）、审核通过 `REVIEWED` + 结算 `SETTLED`、dashboard 待审核计数不再恒 0。
+- `test_market_product` 的重复提交用例随之改为「第二次被拦下且产品只入库一次」。
+- `uv run pytest`（`fastapiadmin_test`）→ **322 passed**；`ruff check` 通过；App `vue-tsc` 通过、`eslint` 0 error（4 条存量 warning）。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。

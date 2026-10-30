@@ -49,12 +49,13 @@ class TestEnums:
         assert ProjectStatus.CLOSED.value == "CLOSED"
 
     def test_assignment_status_values(self) -> None:
+        """分派状态机：待接收 → 已接收 → 已提交 → 已审核 → 已结算（无 SUBMITTING）。"""
         assert AssignmentStatus.PENDING.value == "PENDING"
         assert AssignmentStatus.ACCEPTED.value == "ACCEPTED"
-        assert AssignmentStatus.SUBMITTING.value == "SUBMITTING"
         assert AssignmentStatus.SUBMITTED.value == "SUBMITTED"
         assert AssignmentStatus.REVIEWED.value == "REVIEWED"
         assert AssignmentStatus.SETTLED.value == "SETTLED"
+        assert not hasattr(AssignmentStatus, "SUBMITTING"), "SUBMITTING 从未被写入，已从状态机删除"
 
     def test_submission_status_values(self) -> None:
         assert SubmissionStatus.DRAFT.value == "DRAFT"

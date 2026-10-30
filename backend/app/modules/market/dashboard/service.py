@@ -159,7 +159,9 @@ class DashboardService:
             ),
             submission=SubmissionStatSchema(
                 total=submission_total or 0,
-                pending=submission_rows.get(SubmissionStatus.PENDING.value, 0),
+                # 「待审核」= PENDING，并兼容历史 DRAFT 数据（提交动作在 2026-11 前写的是 DRAFT）
+                pending=submission_rows.get(SubmissionStatus.PENDING.value, 0)
+                + submission_rows.get(SubmissionStatus.DRAFT.value, 0),
                 approved=submission_rows.get(SubmissionStatus.APPROVED.value, 0),
                 rejected=submission_rows.get(SubmissionStatus.REJECTED.value, 0),
             ),
@@ -220,7 +222,9 @@ class DashboardService:
                     SubmissionModel.is_deleted.is_(False),
                     AssignmentModel.is_deleted.is_(False),
                     TaskModel.is_deleted.is_(False),
-                    SubmissionModel.status == SubmissionStatus.PENDING.value,
+                    SubmissionModel.status.in_(
+                        [SubmissionStatus.PENDING.value, SubmissionStatus.DRAFT.value]
+                    ),
                 )
                 .order_by(SubmissionModel.created_time.desc())
                 .limit(QUEUE_LIMIT)

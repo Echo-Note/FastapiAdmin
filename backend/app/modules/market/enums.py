@@ -46,11 +46,18 @@ class SubmitCadence(StrEnum):
 
 
 class AssignmentStatus(StrEnum):
-    """分派/接收状态机：待接收 → 已接收 → 进行中 → 已提交 → 已审核 → 已结算。"""
+    """分派/接收状态机：待接收 → 已接收 → 已提交 → 已审核 → 已结算。
+
+    写入时机（缺一不可，否则状态会停在中间值）：
+    - PENDING：运营定向分派时（``batch_assign``，source=assigned）；
+    - ACCEPTED：C 端接收（``accept``）或大厅接单（``claim``）；
+    - SUBMITTED：首次提交成果，以及审核驳回后等重提；
+    - REVIEWED：成果审核通过（``SubmissionService.review``）；
+    - SETTLED：归集结算生成结算单（``SettlementService.settle``）。
+    """
 
     PENDING = "PENDING"
     ACCEPTED = "ACCEPTED"
-    SUBMITTING = "SUBMITTING"
     SUBMITTED = "SUBMITTED"
     REVIEWED = "REVIEWED"
     SETTLED = "SETTLED"

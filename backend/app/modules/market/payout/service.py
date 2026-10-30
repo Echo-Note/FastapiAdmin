@@ -9,7 +9,7 @@ from app.core.exceptions import CustomException
 from app.utils.common_util import search_to_dict
 
 from ..config import TaskConfig
-from ..enums import SettlementStatus, SubmissionStatus, TaskStatus
+from ..enums import AssignmentStatus, SettlementStatus, SubmissionStatus, TaskStatus
 from ..task.crud import AssignmentCRUD, SubmissionCRUD, TaskCRUD
 from .crud import AllowanceCRUD, AllowanceDetailCRUD, PayoutConfigCRUD, SettlementCRUD, SettlementItemCRUD
 from .schema import (
@@ -110,6 +110,10 @@ class SettlementService:
                     "qty": approved_qty,
                     "amount": payable,
                 }
+            )
+            # 归集结算完成 → 该分派推进到 SETTLED（分派状态机的最后一个节点）
+            await AssignmentCRUD(self.auth, self.db).update(
+                id=assignment.id, data={"status": AssignmentStatus.SETTLED.value}
             )
             results.append(await self.detail(id=settlement.id))
 
