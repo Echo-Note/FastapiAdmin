@@ -18,7 +18,7 @@ from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
 from ..config import TaskConfig, TaskItemConfig
-from ..enums import AssignmentSource, AssignMode, SubjectType, SubmissionStatus, TaskStatus
+from ..enums import AssignmentSource, AssignmentStatus, AssignMode, SubjectType, SubmissionStatus, TaskStatus
 from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
 from ..numbering import NumberPrefix, next_code
 from ..project.crud import ProjectCRUD
@@ -56,16 +56,20 @@ from .schema import (
     TaskUpdateSchema,
 )
 
-# 模板输出含 category + items（三级任务），需预加载其审计关系与子任务
+# 模板输出含 category + items（三级任务），需预加载其审计关系与子任务的审计关系
 _TEMPLATE_PRELOAD = [
     "category",
     "category.created_by",
     "category.updated_by",
     "items",
+    "items.created_by",
+    "items.updated_by",
 ]
 
-# 任务输出含 template（含 category + items），需预加载两层关系及其审计关系
+# 任务输出含 template（含 category + items），需预加载自身审计关系、两层关系及其审计关系
 _TASK_PRELOAD = [
+    "created_by",
+    "updated_by",
     "template",
     "template.created_by",
     "template.updated_by",
@@ -73,6 +77,8 @@ _TASK_PRELOAD = [
     "template.category.created_by",
     "template.category.updated_by",
     "template.items",
+    "template.items.created_by",
+    "template.items.updated_by",
 ]
 
 # 分派输出含 task（复用任务预加载链，加 task. 前缀）
@@ -412,14 +418,26 @@ class TaskService:
         return await self.detail(id=id)
 
     async def hall_tasks(self, redis: Redis, page_no: int, page_size: int) -> PageResultSchema[TaskOutSchema]:
-        """任务大厅：status=PUBLISHED 且 assign_mode=open 的任务列表。
+        """任务大厅：status=PUBLISHED 且 assign_mode=open、且当前用户未领取的任务列表。
+
+        按用户隔离：某用户领取（claimed）后，仅该用户的大厅不再展示此任务，
+        其他用户的大厅仍正常展示（任务本身仍为 open，可被其他人领取）。
 
         参数 ``redis`` 为接口预留（C 端大厅调用方统一传入），当前大厅过滤为纯数据库查询，
         接单计数走 ``AssignmentService.claim`` 的 Redis 计数器。
         """
         del redis  # 预留参数，当前未使用
         offset = (page_no - 1) * page_size
-        search = {"status": TaskStatus.PUBLISHED.value, "assign_mode": AssignMode.OPEN.value}
+        # 当前用户已领取的任务 id 列表，大厅需排除这些任务
+        claimed = await AssignmentCRUD(self.auth, self.db).get_list(
+            search={"user_id": self.auth.user.id, "source": AssignmentSource.CLAIMED.value}
+        )
+        claimed_ids = [a.task_id for a in claimed]
+        search = {
+            "status": TaskStatus.PUBLISHED.value,
+            "assign_mode": AssignMode.OPEN.value,
+            "id": ("notin", claimed_ids),
+        }
         return await TaskCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
@@ -534,7 +552,14 @@ class AssignmentService:
         return await self.detail(id=id)
 
     async def claim(self, task_id: int, redis: Redis) -> AssignmentOutSchema:
-        """大厅接单：为当前用户生成 claimed 分派，幂等防重。"""
+        """大厅接单：为当前用户生成 claimed 分派，幂等防重。
+
+        用户主动接单即视为「已接收」，分派直接置为 ``ACCEPTED`` 并写入接收时间
+        （区别于运营定向分派 assigned 的 ``PENDING`` 待接收，需用户再确认接收）。
+
+        接单不改动任务的分配方式（任务仍为公开大厅，其他用户仍可在大厅看到并接单），
+        仅对当前用户隐藏该任务——大厅查询按「当前用户是否已领取」过滤。
+        """
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=task_id, msg="任务不存在")
         if task.assign_mode != AssignMode.OPEN.value:
             raise CustomException(msg="该任务不是公开大厅任务，不可接单")
@@ -546,7 +571,13 @@ class AssignmentService:
         if existing:
             return await self.detail(id=existing[0].id)
         assignment = await AssignmentCRUD(self.auth, self.db).create(
-            data={"task_id": task_id, "user_id": self.auth.user.id, "source": AssignmentSource.CLAIMED.value}
+            data={
+                "task_id": task_id,
+                "user_id": self.auth.user.id,
+                "source": AssignmentSource.CLAIMED.value,
+                "status": AssignmentStatus.ACCEPTED.value,
+                "accepted_at": datetime.now(UTC),
+            }
         )
         claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{task_id}"
         await RedisCURD(redis).incr(claim_key)

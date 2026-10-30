@@ -352,7 +352,7 @@ class CRUDBase[ModelType: ModelMixin, CreateSchemaType, UpdateSchemaType]:
     def _resolve_condition(attr: ColumnElement, value: tuple) -> list[ColumnElement]:
         """元组条件 `(seq, val)` → SQLAlchemy condition。
 
-        seq 支持：None / not None / date / month / like / in / between / 比较操作符。
+        seq 支持：None / not None / date / month / like / in / notin / between / 比较操作符。
 
         date 返回 [>=当天0:00, <第二天0:00) 的范围，
         month 返回 [>=1号0:00, <下月1号0:00) 的范围。
@@ -383,6 +383,10 @@ class CRUDBase[ModelType: ModelMixin, CreateSchemaType, UpdateSchemaType]:
             if isinstance(val, (list, tuple, set)) and len(val) == 0:
                 return [false()]  # 空集合查询 = 永假条件
             return [attr.in_(val)]
+        if seq == "notin":
+            if isinstance(val, (list, tuple, set)) and len(val) == 0:
+                return []  # 空集合排除 = 不附加任何条件
+            return [attr.notin_(val)]
         if seq == "between" and isinstance(val, (list, tuple)) and len(val) == 2:
             return [attr.between(val[0], val[1])]
 
