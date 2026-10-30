@@ -8,6 +8,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -21,13 +22,47 @@
             },
             "hospital_level": {
               "label": "医院等级",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "三级甲等",
+                  "value": "三级甲等"
+                },
+                {
+                  "label": "三级乙等",
+                  "value": "三级乙等"
+                },
+                {
+                  "label": "二级甲等",
+                  "value": "二级甲等"
+                },
+                {
+                  "label": "二级乙等",
+                  "value": "二级乙等"
+                },
+                {
+                  "label": "一级",
+                  "value": "一级"
+                },
+                {
+                  "label": "未定级",
+                  "value": "未定级"
+                }
+              ]
             },
             "hospital_nature": {
               "label": "医院性质",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "公立",
+                  "value": "公立"
+                },
+                {
+                  "label": "民营",
+                  "value": "民营"
+                }
+              ]
             },
             "executor": {
               "label": "执行人",
@@ -40,43 +75,36 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "医院门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "delivery_coordination",
           "name": "配送协调",
+          "required": true,
           "fields": {
             "delivery_coordination": {
               "label": "配送协调",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
-                  "type": "text"
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
                 },
                 {
                   "name": "product_spec",
                   "label": "产品规格",
-                  "type": "text"
+                  "type": "text",
+                  "product_role": "spec"
                 },
                 {
                   "name": "manufacturer",
                   "label": "生产企业",
-                  "type": "text"
+                  "type": "text",
+                  "product_role": "manufacturer"
                 },
                 {
                   "name": "batch_no",
@@ -96,12 +124,47 @@
                 {
                   "name": "acceptance",
                   "label": "验收情况",
+                  "type": "select",
+                  "options": [
+                    {
+                      "label": "验收入库",
+                      "value": "验收入库"
+                    },
+                    {
+                      "label": "部分入库",
+                      "value": "部分入库"
+                    },
+                    {
+                      "label": "拒收",
+                      "value": "拒收"
+                    }
+                  ]
+                },
+                {
+                  "name": "distributor",
+                  "label": "配送商业",
                   "type": "text"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -117,6 +180,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -130,13 +194,47 @@
             },
             "hospital_level": {
               "label": "医院等级",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "三级甲等",
+                  "value": "三级甲等"
+                },
+                {
+                  "label": "三级乙等",
+                  "value": "三级乙等"
+                },
+                {
+                  "label": "二级甲等",
+                  "value": "二级甲等"
+                },
+                {
+                  "label": "二级乙等",
+                  "value": "二级乙等"
+                },
+                {
+                  "label": "一级",
+                  "value": "一级"
+                },
+                {
+                  "label": "未定级",
+                  "value": "未定级"
+                }
+              ]
             },
             "hospital_nature": {
               "label": "医院性质",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "公立",
+                  "value": "公立"
+                },
+                {
+                  "label": "民营",
+                  "value": "民营"
+                }
+              ]
             },
             "executor": {
               "label": "执行人",
@@ -149,53 +247,77 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "inventory_check",
+          "name": "库存盘点",
+          "required": true,
+          "fields": {
+            "inventory_check": {
+              "label": "库存盘点",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
+                  "type": "text"
+                },
+                {
+                  "name": "expiry_date",
+                  "label": "有效期至",
+                  "type": "date"
+                },
+                {
+                  "name": "actual_qty",
+                  "label": "实盘数量",
+                  "type": "number"
+                },
+                {
+                  "name": "diff_qty",
+                  "label": "盘点差异",
+                  "type": "number"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "医院门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "inventory_check",
-          "name": "库存盘点",
-          "fields": {
-            "inventory_check": {
-              "label": "库存盘点",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "product_spec",
-                  "label": "产品规格",
-                  "type": "text"
-                },
-                {
-                  "name": "stock_qty",
-                  "label": "库存数量",
-                  "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "盘点时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -211,6 +333,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -224,13 +347,47 @@
             },
             "hospital_level": {
               "label": "医院等级",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "三级甲等",
+                  "value": "三级甲等"
+                },
+                {
+                  "label": "三级乙等",
+                  "value": "三级乙等"
+                },
+                {
+                  "label": "二级甲等",
+                  "value": "二级甲等"
+                },
+                {
+                  "label": "二级乙等",
+                  "value": "二级乙等"
+                },
+                {
+                  "label": "一级",
+                  "value": "一级"
+                },
+                {
+                  "label": "未定级",
+                  "value": "未定级"
+                }
+              ]
             },
             "hospital_nature": {
               "label": "医院性质",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "公立",
+                  "value": "公立"
+                },
+                {
+                  "label": "民营",
+                  "value": "民营"
+                }
+              ]
             },
             "executor": {
               "label": "执行人",
@@ -243,53 +400,72 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "price_check",
+          "name": "价格核查",
+          "required": true,
+          "fields": {
+            "price_check": {
+              "label": "价格核查",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "listed_price",
+                  "label": "挂网价",
+                  "type": "number"
+                },
+                {
+                  "name": "purchase_price",
+                  "label": "采购价",
+                  "type": "number"
+                },
+                {
+                  "name": "sale_price",
+                  "label": "销售价",
+                  "type": "number"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "医院门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "price_check",
-          "name": "价格核查",
-          "fields": {
-            "price_check": {
-              "label": "价格核查",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "product_spec",
-                  "label": "产品规格",
-                  "type": "text"
-                },
-                {
-                  "name": "retail_price",
-                  "label": "零售价",
-                  "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "核查时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -305,6 +481,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -318,13 +495,47 @@
             },
             "hospital_level": {
               "label": "医院等级",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "三级甲等",
+                  "value": "三级甲等"
+                },
+                {
+                  "label": "三级乙等",
+                  "value": "三级乙等"
+                },
+                {
+                  "label": "二级甲等",
+                  "value": "二级甲等"
+                },
+                {
+                  "label": "二级乙等",
+                  "value": "二级乙等"
+                },
+                {
+                  "label": "一级",
+                  "value": "一级"
+                },
+                {
+                  "label": "未定级",
+                  "value": "未定级"
+                }
+              ]
             },
             "hospital_nature": {
               "label": "医院性质",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "公立",
+                  "value": "公立"
+                },
+                {
+                  "label": "民营",
+                  "value": "民营"
+                }
+              ]
             },
             "executor": {
               "label": "执行人",
@@ -337,42 +548,37 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "医院门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "competitor_research",
           "name": "竞品调研",
+          "required": true,
           "fields": {
             "competitor_research": {
               "label": "竞品调研",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "competitor_name",
-                  "label": "竞品名称",
-                  "type": "text"
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true
                 },
                 {
                   "name": "competitor_spec",
-                  "label": "竞品规格",
+                  "label": "规格",
                   "type": "text"
                 },
                 {
-                  "name": "manufacturer",
+                  "name": "competitor_manufacturer",
                   "label": "生产企业",
+                  "type": "text"
+                },
+                {
+                  "name": "brand",
+                  "label": "品牌",
                   "type": "text"
                 },
                 {
@@ -381,14 +587,38 @@
                   "type": "number"
                 },
                 {
-                  "name": "remark",
-                  "label": "备注",
+                  "name": "sales_volume",
+                  "label": "销量",
+                  "type": "number"
+                },
+                {
+                  "name": "department",
+                  "label": "科室",
                   "type": "text"
                 }
               ]
+            },
+            "advantage": {
+              "label": "优势",
+              "type": "textarea"
+            },
+            "disadvantage": {
+              "label": "劣势",
+              "type": "textarea"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -404,6 +634,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -417,13 +648,47 @@
             },
             "hospital_level": {
               "label": "医院等级",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "三级甲等",
+                  "value": "三级甲等"
+                },
+                {
+                  "label": "三级乙等",
+                  "value": "三级乙等"
+                },
+                {
+                  "label": "二级甲等",
+                  "value": "二级甲等"
+                },
+                {
+                  "label": "二级乙等",
+                  "value": "二级乙等"
+                },
+                {
+                  "label": "一级",
+                  "value": "一级"
+                },
+                {
+                  "label": "未定级",
+                  "value": "未定级"
+                }
+              ]
             },
             "hospital_nature": {
               "label": "医院性质",
-              "type": "text",
-              "required": true
+              "type": "select",
+              "options": [
+                {
+                  "label": "公立",
+                  "value": "公立"
+                },
+                {
+                  "label": "民营",
+                  "value": "民营"
+                }
+              ]
             },
             "executor": {
               "label": "执行人",
@@ -436,32 +701,40 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "医院门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "sales_reconciliation",
           "name": "销售对账",
+          "required": true,
           "fields": {
             "sales_reconciliation": {
               "label": "销售对账",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
@@ -470,19 +743,30 @@
                   "type": "number"
                 },
                 {
-                  "name": "sales_amount",
-                  "label": "销售金额",
+                  "name": "return_qty",
+                  "label": "退损数量",
                   "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "对账时间",
-                  "type": "date"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -498,16 +782,27 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "org_type": {
+              "label": "机构类型",
+              "type": "text",
+              "placeholder": "如 事业单位/公益二类事业单位"
+            },
+            "supervisor": {
+              "label": "上级管理主体",
+              "type": "text",
+              "placeholder": "如 江北区卫生健康委员会"
             },
             "executor": {
               "label": "执行人",
@@ -520,33 +815,36 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "delivery_coordination",
           "name": "配送协调",
+          "required": true,
           "fields": {
             "delivery_coordination": {
               "label": "配送协调",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
-                  "type": "text"
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
                 },
                 {
                   "name": "batch_no",
@@ -562,11 +860,51 @@
                   "name": "delivery_time",
                   "label": "配送时间",
                   "type": "date"
+                },
+                {
+                  "name": "acceptance",
+                  "label": "验收情况",
+                  "type": "select",
+                  "options": [
+                    {
+                      "label": "验收入库",
+                      "value": "验收入库"
+                    },
+                    {
+                      "label": "部分入库",
+                      "value": "部分入库"
+                    },
+                    {
+                      "label": "拒收",
+                      "value": "拒收"
+                    }
+                  ]
+                },
+                {
+                  "name": "distributor",
+                  "label": "配送商业",
+                  "type": "text"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -582,16 +920,27 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "org_type": {
+              "label": "机构类型",
+              "type": "text",
+              "placeholder": "如 事业单位/公益二类事业单位"
+            },
+            "supervisor": {
+              "label": "上级管理主体",
+              "type": "text",
+              "placeholder": "如 江北区卫生健康委员会"
             },
             "executor": {
               "label": "执行人",
@@ -604,48 +953,77 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "inventory_check",
           "name": "库存盘点",
+          "required": true,
           "fields": {
             "inventory_check": {
               "label": "库存盘点",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
-                  "name": "stock_qty",
-                  "label": "库存数量",
+                  "name": "expiry_date",
+                  "label": "有效期至",
+                  "type": "date"
+                },
+                {
+                  "name": "actual_qty",
+                  "label": "实盘数量",
                   "type": "number"
                 },
                 {
-                  "name": "check_time",
-                  "label": "盘点时间",
-                  "type": "date"
+                  "name": "diff_qty",
+                  "label": "盘点差异",
+                  "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -661,16 +1039,27 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "org_type": {
+              "label": "机构类型",
+              "type": "text",
+              "placeholder": "如 事业单位/公益二类事业单位"
+            },
+            "supervisor": {
+              "label": "上级管理主体",
+              "type": "text",
+              "placeholder": "如 江北区卫生健康委员会"
             },
             "executor": {
               "label": "执行人",
@@ -683,48 +1072,72 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "price_check",
           "name": "价格核查",
+          "required": true,
           "fields": {
             "price_check": {
               "label": "价格核查",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
-                  "type": "text"
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
                 },
                 {
-                  "name": "retail_price",
-                  "label": "零售价",
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "listed_price",
+                  "label": "挂网价",
                   "type": "number"
                 },
                 {
-                  "name": "check_time",
-                  "label": "核查时间",
-                  "type": "date"
+                  "name": "purchase_price",
+                  "label": "采购价",
+                  "type": "number"
+                },
+                {
+                  "name": "sale_price",
+                  "label": "销售价",
+                  "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -740,16 +1153,27 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "org_type": {
+              "label": "机构类型",
+              "type": "text",
+              "placeholder": "如 事业单位/公益二类事业单位"
+            },
+            "supervisor": {
+              "label": "上级管理主体",
+              "type": "text",
+              "placeholder": "如 江北区卫生健康委员会"
             },
             "executor": {
               "label": "执行人",
@@ -762,32 +1186,37 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "competitor_research",
           "name": "竞品调研",
+          "required": true,
           "fields": {
             "competitor_research": {
               "label": "竞品调研",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "competitor_name",
-                  "label": "竞品名称",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "name": "competitor_spec",
+                  "label": "规格",
+                  "type": "text"
+                },
+                {
+                  "name": "competitor_manufacturer",
+                  "label": "生产企业",
+                  "type": "text"
+                },
+                {
+                  "name": "brand",
+                  "label": "品牌",
                   "type": "text"
                 },
                 {
@@ -796,14 +1225,38 @@
                   "type": "number"
                 },
                 {
-                  "name": "remark",
-                  "label": "备注",
+                  "name": "sales_volume",
+                  "label": "销量",
+                  "type": "number"
+                },
+                {
+                  "name": "department",
+                  "label": "科室",
                   "type": "text"
                 }
               ]
+            },
+            "advantage": {
+              "label": "优势",
+              "type": "textarea"
+            },
+            "disadvantage": {
+              "label": "劣势",
+              "type": "textarea"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -819,16 +1272,27 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "org_type": {
+              "label": "机构类型",
+              "type": "text",
+              "placeholder": "如 事业单位/公益二类事业单位"
+            },
+            "supervisor": {
+              "label": "上级管理主体",
+              "type": "text",
+              "placeholder": "如 江北区卫生健康委员会"
             },
             "executor": {
               "label": "执行人",
@@ -841,32 +1305,40 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "sales_reconciliation",
           "name": "销售对账",
+          "required": true,
           "fields": {
             "sales_reconciliation": {
               "label": "销售对账",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
@@ -875,14 +1347,30 @@
                   "type": "number"
                 },
                 {
-                  "name": "sales_amount",
-                  "label": "销售金额",
+                  "name": "return_qty",
+                  "label": "退损数量",
                   "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -898,16 +1386,35 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "entity_type": {
+              "label": "单体／集团",
+              "type": "select",
+              "options": [
+                {
+                  "label": "单体",
+                  "value": "单体"
+                },
+                {
+                  "label": "集团",
+                  "value": "集团"
+                }
+              ]
+            },
+            "group_name": {
+              "label": "所属集团",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -920,33 +1427,36 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "delivery_coordination",
           "name": "配送协调",
+          "required": true,
           "fields": {
             "delivery_coordination": {
               "label": "配送协调",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
-                  "type": "text"
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
                 },
                 {
                   "name": "batch_no",
@@ -962,11 +1472,51 @@
                   "name": "delivery_time",
                   "label": "配送时间",
                   "type": "date"
+                },
+                {
+                  "name": "acceptance",
+                  "label": "验收情况",
+                  "type": "select",
+                  "options": [
+                    {
+                      "label": "验收入库",
+                      "value": "验收入库"
+                    },
+                    {
+                      "label": "部分入库",
+                      "value": "部分入库"
+                    },
+                    {
+                      "label": "拒收",
+                      "value": "拒收"
+                    }
+                  ]
+                },
+                {
+                  "name": "distributor",
+                  "label": "配送商业",
+                  "type": "text"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -982,16 +1532,35 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "entity_type": {
+              "label": "单体／集团",
+              "type": "select",
+              "options": [
+                {
+                  "label": "单体",
+                  "value": "单体"
+                },
+                {
+                  "label": "集团",
+                  "value": "集团"
+                }
+              ]
+            },
+            "group_name": {
+              "label": "所属集团",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1004,48 +1573,77 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "inventory_check",
           "name": "库存盘点",
+          "required": true,
           "fields": {
             "inventory_check": {
               "label": "库存盘点",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
-                  "name": "stock_qty",
-                  "label": "库存数量",
+                  "name": "expiry_date",
+                  "label": "有效期至",
+                  "type": "date"
+                },
+                {
+                  "name": "actual_qty",
+                  "label": "实盘数量",
                   "type": "number"
                 },
                 {
-                  "name": "check_time",
-                  "label": "盘点时间",
-                  "type": "date"
+                  "name": "diff_qty",
+                  "label": "盘点差异",
+                  "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1061,16 +1659,35 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "entity_type": {
+              "label": "单体／集团",
+              "type": "select",
+              "options": [
+                {
+                  "label": "单体",
+                  "value": "单体"
+                },
+                {
+                  "label": "集团",
+                  "value": "集团"
+                }
+              ]
+            },
+            "group_name": {
+              "label": "所属集团",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1083,48 +1700,72 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "price_check",
           "name": "价格核查",
+          "required": true,
           "fields": {
             "price_check": {
               "label": "价格核查",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
-                  "type": "text"
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
                 },
                 {
-                  "name": "retail_price",
-                  "label": "零售价",
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "listed_price",
+                  "label": "挂网价",
                   "type": "number"
                 },
                 {
-                  "name": "check_time",
-                  "label": "核查时间",
-                  "type": "date"
+                  "name": "purchase_price",
+                  "label": "采购价",
+                  "type": "number"
+                },
+                {
+                  "name": "sale_price",
+                  "label": "销售价",
+                  "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1140,16 +1781,35 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "entity_type": {
+              "label": "单体／集团",
+              "type": "select",
+              "options": [
+                {
+                  "label": "单体",
+                  "value": "单体"
+                },
+                {
+                  "label": "集团",
+                  "value": "集团"
+                }
+              ]
+            },
+            "group_name": {
+              "label": "所属集团",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1162,32 +1822,37 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "competitor_research",
           "name": "竞品调研",
+          "required": true,
           "fields": {
             "competitor_research": {
               "label": "竞品调研",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "competitor_name",
-                  "label": "竞品名称",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "name": "competitor_spec",
+                  "label": "规格",
+                  "type": "text"
+                },
+                {
+                  "name": "competitor_manufacturer",
+                  "label": "生产企业",
+                  "type": "text"
+                },
+                {
+                  "name": "brand",
+                  "label": "品牌",
                   "type": "text"
                 },
                 {
@@ -1196,14 +1861,38 @@
                   "type": "number"
                 },
                 {
-                  "name": "remark",
-                  "label": "备注",
+                  "name": "sales_volume",
+                  "label": "销量",
+                  "type": "number"
+                },
+                {
+                  "name": "department",
+                  "label": "科室",
                   "type": "text"
                 }
               ]
+            },
+            "advantage": {
+              "label": "优势",
+              "type": "textarea"
+            },
+            "disadvantage": {
+              "label": "劣势",
+              "type": "textarea"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1219,16 +1908,35 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
               "type": "region",
               "required": true
             },
-            "org_name": {
-              "label": "机构名称",
+            "hospital_name": {
+              "label": "医院名称",
               "type": "text",
               "required": true
+            },
+            "entity_type": {
+              "label": "单体／集团",
+              "type": "select",
+              "options": [
+                {
+                  "label": "单体",
+                  "value": "单体"
+                },
+                {
+                  "label": "集团",
+                  "value": "集团"
+                }
+              ]
+            },
+            "group_name": {
+              "label": "所属集团",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1241,32 +1949,40 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "机构门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "sales_reconciliation",
           "name": "销售对账",
+          "required": true,
           "fields": {
             "sales_reconciliation": {
               "label": "销售对账",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
@@ -1275,14 +1991,30 @@
                   "type": "number"
                 },
                 {
-                  "name": "sales_amount",
-                  "label": "销售金额",
+                  "name": "return_qty",
+                  "label": "退损数量",
                   "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "医院门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1298,6 +2030,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1308,6 +2041,24 @@
               "label": "药店名称",
               "type": "text",
               "required": true
+            },
+            "chain_type": {
+              "label": "连锁／单体",
+              "type": "select",
+              "options": [
+                {
+                  "label": "连锁",
+                  "value": "连锁"
+                },
+                {
+                  "label": "单体",
+                  "value": "单体"
+                }
+              ]
+            },
+            "chain_headquarter": {
+              "label": "所属连锁总部",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1320,53 +2071,36 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "display_optimization",
+          "name": "陈列优化",
+          "required": true,
+          "fields": {
+            "display_photo": {
+              "label": "陈列照片",
+              "type": "image",
+              "required": true
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "药店门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "display_optimization",
-          "name": "陈列优化",
-          "fields": {
-            "display_optimization": {
-              "label": "陈列优化",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "position",
-                  "label": "陈列位置",
-                  "type": "text"
-                },
-                {
-                  "name": "qty",
-                  "label": "陈列数量",
-                  "type": "number"
-                },
-                {
-                  "name": "time",
-                  "label": "陈列时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -1382,6 +2116,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1392,6 +2127,24 @@
               "label": "药店名称",
               "type": "text",
               "required": true
+            },
+            "chain_type": {
+              "label": "连锁／单体",
+              "type": "select",
+              "options": [
+                {
+                  "label": "连锁",
+                  "value": "连锁"
+                },
+                {
+                  "label": "单体",
+                  "value": "单体"
+                }
+              ]
+            },
+            "chain_headquarter": {
+              "label": "所属连锁总部",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1404,32 +2157,40 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "药店门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "delivery_coordination",
           "name": "配送协调",
+          "required": true,
           "fields": {
             "delivery_coordination": {
               "label": "配送协调",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
@@ -1441,11 +2202,51 @@
                   "name": "delivery_time",
                   "label": "配送时间",
                   "type": "date"
+                },
+                {
+                  "name": "acceptance",
+                  "label": "验收情况",
+                  "type": "select",
+                  "options": [
+                    {
+                      "label": "验收入库",
+                      "value": "验收入库"
+                    },
+                    {
+                      "label": "部分入库",
+                      "value": "部分入库"
+                    },
+                    {
+                      "label": "拒收",
+                      "value": "拒收"
+                    }
+                  ]
+                },
+                {
+                  "name": "distributor",
+                  "label": "配送商业",
+                  "type": "text"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "药店门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1461,6 +2262,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1471,6 +2273,24 @@
               "label": "药店名称",
               "type": "text",
               "required": true
+            },
+            "chain_type": {
+              "label": "连锁／单体",
+              "type": "select",
+              "options": [
+                {
+                  "label": "连锁",
+                  "value": "连锁"
+                },
+                {
+                  "label": "单体",
+                  "value": "单体"
+                }
+              ]
+            },
+            "chain_headquarter": {
+              "label": "所属连锁总部",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1483,48 +2303,77 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "inventory_check",
+          "name": "库存盘点",
+          "required": true,
+          "fields": {
+            "inventory_check": {
+              "label": "库存盘点",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
+                  "type": "text"
+                },
+                {
+                  "name": "expiry_date",
+                  "label": "有效期至",
+                  "type": "date"
+                },
+                {
+                  "name": "actual_qty",
+                  "label": "实盘数量",
+                  "type": "number"
+                },
+                {
+                  "name": "diff_qty",
+                  "label": "盘点差异",
+                  "type": "number"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "药店门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "inventory_check",
-          "name": "库存盘点",
-          "fields": {
-            "inventory_check": {
-              "label": "库存盘点",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "stock_qty",
-                  "label": "库存数量",
-                  "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "盘点时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -1540,6 +2389,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1550,6 +2400,24 @@
               "label": "药店名称",
               "type": "text",
               "required": true
+            },
+            "chain_type": {
+              "label": "连锁／单体",
+              "type": "select",
+              "options": [
+                {
+                  "label": "连锁",
+                  "value": "连锁"
+                },
+                {
+                  "label": "单体",
+                  "value": "单体"
+                }
+              ]
+            },
+            "chain_headquarter": {
+              "label": "所属连锁总部",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1562,48 +2430,72 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "price_check",
+          "name": "价格核查",
+          "required": true,
+          "fields": {
+            "price_check": {
+              "label": "价格核查",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "listed_price",
+                  "label": "挂网价",
+                  "type": "number"
+                },
+                {
+                  "name": "purchase_price",
+                  "label": "采购价",
+                  "type": "number"
+                },
+                {
+                  "name": "sale_price",
+                  "label": "销售价",
+                  "type": "number"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "药店门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "price_check",
-          "name": "价格核查",
-          "fields": {
-            "price_check": {
-              "label": "价格核查",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "retail_price",
-                  "label": "零售价",
-                  "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "核查时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -1619,6 +2511,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1629,6 +2522,24 @@
               "label": "药店名称",
               "type": "text",
               "required": true
+            },
+            "chain_type": {
+              "label": "连锁／单体",
+              "type": "select",
+              "options": [
+                {
+                  "label": "连锁",
+                  "value": "连锁"
+                },
+                {
+                  "label": "单体",
+                  "value": "单体"
+                }
+              ]
+            },
+            "chain_headquarter": {
+              "label": "所属连锁总部",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1641,32 +2552,37 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "药店门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "competitor_research",
           "name": "竞品调研",
+          "required": true,
           "fields": {
             "competitor_research": {
               "label": "竞品调研",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "competitor_name",
-                  "label": "竞品名称",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "name": "competitor_spec",
+                  "label": "规格",
+                  "type": "text"
+                },
+                {
+                  "name": "competitor_manufacturer",
+                  "label": "生产企业",
+                  "type": "text"
+                },
+                {
+                  "name": "brand",
+                  "label": "品牌",
                   "type": "text"
                 },
                 {
@@ -1675,14 +2591,38 @@
                   "type": "number"
                 },
                 {
-                  "name": "remark",
-                  "label": "备注",
+                  "name": "sales_volume",
+                  "label": "销量",
+                  "type": "number"
+                },
+                {
+                  "name": "department",
+                  "label": "科室",
                   "type": "text"
                 }
               ]
+            },
+            "advantage": {
+              "label": "优势",
+              "type": "textarea"
+            },
+            "disadvantage": {
+              "label": "劣势",
+              "type": "textarea"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "药店门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1698,6 +2638,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1708,6 +2649,24 @@
               "label": "药店名称",
               "type": "text",
               "required": true
+            },
+            "chain_type": {
+              "label": "连锁／单体",
+              "type": "select",
+              "options": [
+                {
+                  "label": "连锁",
+                  "value": "连锁"
+                },
+                {
+                  "label": "单体",
+                  "value": "单体"
+                }
+              ]
+            },
+            "chain_headquarter": {
+              "label": "所属连锁总部",
+              "type": "text"
             },
             "executor": {
               "label": "执行人",
@@ -1720,32 +2679,40 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "药店门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "sales_reconciliation",
           "name": "销售对账",
+          "required": true,
           "fields": {
             "sales_reconciliation": {
               "label": "销售对账",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
@@ -1754,14 +2721,30 @@
                   "type": "number"
                 },
                 {
-                  "name": "sales_amount",
-                  "label": "销售金额",
+                  "name": "return_qty",
+                  "label": "退损数量",
                   "type": "number"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "药店门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1777,6 +2760,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1799,53 +2783,72 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "bidding_procurement",
+          "name": "招标采购",
+          "required": true,
+          "fields": {
+            "bidding_procurement": {
+              "label": "招标采购",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "bid_batch",
+                  "label": "招标批次",
+                  "type": "text"
+                },
+                {
+                  "name": "bid_entity",
+                  "label": "招标主体",
+                  "type": "text"
+                },
+                {
+                  "name": "bid_progress",
+                  "label": "项目进度",
+                  "type": "text"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "商业公司门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "bidding_procurement",
-          "name": "招标采购",
-          "fields": {
-            "bidding_procurement": {
-              "label": "招标采购",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "bid_project",
-                  "label": "招标项目",
-                  "type": "text"
-                },
-                {
-                  "name": "bid_price",
-                  "label": "中标价格",
-                  "type": "number"
-                },
-                {
-                  "name": "time",
-                  "label": "采购时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -1861,6 +2864,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1883,32 +2887,40 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "商业公司门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "delivery_coordination",
           "name": "配送协调",
+          "required": true,
           "fields": {
             "delivery_coordination": {
               "label": "配送协调",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "product_name",
                   "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "产品规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
                   "type": "text"
                 },
                 {
@@ -1920,11 +2932,51 @@
                   "name": "delivery_time",
                   "label": "配送时间",
                   "type": "date"
+                },
+                {
+                  "name": "acceptance",
+                  "label": "验收情况",
+                  "type": "select",
+                  "options": [
+                    {
+                      "label": "验收入库",
+                      "value": "验收入库"
+                    },
+                    {
+                      "label": "部分入库",
+                      "value": "部分入库"
+                    },
+                    {
+                      "label": "拒收",
+                      "value": "拒收"
+                    }
+                  ]
+                },
+                {
+                  "name": "terminal_org",
+                  "label": "终端机构",
+                  "type": "text"
                 }
               ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "商业公司门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
@@ -1940,6 +2992,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -1962,48 +3015,77 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "inventory_check",
+          "name": "库存盘点",
+          "required": true,
+          "fields": {
+            "inventory_check": {
+              "label": "库存盘点",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "batch_no",
+                  "label": "批号",
+                  "type": "text"
+                },
+                {
+                  "name": "expiry_date",
+                  "label": "有效期至",
+                  "type": "date"
+                },
+                {
+                  "name": "actual_qty",
+                  "label": "实盘数量",
+                  "type": "number"
+                },
+                {
+                  "name": "diff_qty",
+                  "label": "盘点差异",
+                  "type": "number"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "商业公司门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "inventory_check",
-          "name": "库存盘点",
-          "fields": {
-            "inventory_check": {
-              "label": "库存盘点",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "stock_qty",
-                  "label": "库存数量",
-                  "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "盘点时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -2019,6 +3101,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -2041,48 +3124,72 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "price_check",
+          "name": "价格核查",
+          "required": true,
+          "fields": {
+            "price_check": {
+              "label": "价格核查",
+              "type": "table",
+              "required": true,
+              "columns": [
+                {
+                  "name": "product_name",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true,
+                  "product_role": "name"
+                },
+                {
+                  "name": "product_spec",
+                  "label": "规格",
+                  "type": "text",
+                  "product_role": "spec"
+                },
+                {
+                  "name": "manufacturer",
+                  "label": "生产企业",
+                  "type": "text",
+                  "product_role": "manufacturer"
+                },
+                {
+                  "name": "listed_price",
+                  "label": "挂网价",
+                  "type": "number"
+                },
+                {
+                  "name": "purchase_price",
+                  "label": "采购价",
+                  "type": "number"
+                },
+                {
+                  "name": "sale_price",
+                  "label": "销售价",
+                  "type": "number"
+                }
+              ]
+            },
+            "exception_note": {
+              "label": "异常说明",
+              "type": "textarea",
+              "placeholder": "无异常请填「无」"
+            }
+          }
         },
         {
           "code": "management_verification",
           "name": "管理核实",
+          "required": true,
           "fields": {
             "door_photo": {
               "label": "商业公司门头照片",
               "type": "image",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "price_check",
-          "name": "价格核查",
-          "fields": {
-            "price_check": {
-              "label": "价格核查",
-              "type": "table",
-              "columns": [
-                {
-                  "name": "product_name",
-                  "label": "产品名称",
-                  "type": "text"
-                },
-                {
-                  "name": "retail_price",
-                  "label": "零售价",
-                  "type": "number"
-                },
-                {
-                  "name": "check_time",
-                  "label": "核查时间",
-                  "type": "date"
-                }
-              ]
-            }
-          },
-          "required": true
+          }
         }
       ]
     },
@@ -2098,6 +3205,7 @@
         {
           "code": "execution_info",
           "name": "执行信息",
+          "required": true,
           "fields": {
             "region": {
               "label": "区域",
@@ -2120,32 +3228,37 @@
               "type": "date",
               "required": true
             }
-          },
-          "required": true
-        },
-        {
-          "code": "management_verification",
-          "name": "管理核实",
-          "fields": {
-            "door_photo": {
-              "label": "商业公司门头照片",
-              "type": "image",
-              "required": true
-            }
-          },
-          "required": true
+          }
         },
         {
           "code": "competitor_research",
           "name": "竞品调研",
+          "required": true,
           "fields": {
             "competitor_research": {
               "label": "竞品调研",
               "type": "table",
+              "required": true,
               "columns": [
                 {
                   "name": "competitor_name",
-                  "label": "竞品名称",
+                  "label": "产品名称",
+                  "type": "text",
+                  "required": true
+                },
+                {
+                  "name": "competitor_spec",
+                  "label": "规格",
+                  "type": "text"
+                },
+                {
+                  "name": "competitor_manufacturer",
+                  "label": "生产企业",
+                  "type": "text"
+                },
+                {
+                  "name": "brand",
+                  "label": "品牌",
                   "type": "text"
                 },
                 {
@@ -2154,14 +3267,38 @@
                   "type": "number"
                 },
                 {
-                  "name": "remark",
-                  "label": "备注",
+                  "name": "sales_volume",
+                  "label": "销量",
+                  "type": "number"
+                },
+                {
+                  "name": "department",
+                  "label": "科室",
                   "type": "text"
                 }
               ]
+            },
+            "advantage": {
+              "label": "优势",
+              "type": "textarea"
+            },
+            "disadvantage": {
+              "label": "劣势",
+              "type": "textarea"
             }
-          },
-          "required": true
+          }
+        },
+        {
+          "code": "management_verification",
+          "name": "管理核实",
+          "required": true,
+          "fields": {
+            "door_photo": {
+              "label": "商业公司门头照片",
+              "type": "image",
+              "required": true
+            }
+          }
         }
       ]
     },
