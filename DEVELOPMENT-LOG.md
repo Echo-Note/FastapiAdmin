@@ -1526,6 +1526,81 @@ C 端市场任务 5 个页面（任务大厅/我的任务/任务详情/提交成
 
 ---
 
+### 2026-10-30 — 修复 C 端任务/工单详情跳转 query 丢失导致加载失败
+
+#### 1. 原因
+
+任务大厅/我的任务点击任务卡片进入详情页后「加载失败」，且后端日志只有 `/market/mini/tasks`、`/market/mini/assignments` 列表请求，无 `/market/mini/tasks/{id}`、`/market/mini/assignments/{id}` 详情请求。根因：跳转用 `router.push({ name: 'xxx', query: {...} })`，而 `@wot-ui/router@1.1.2` 的 `resolve` 在 `to.name` 分支误写 `const finalQuery = to.params || {}`（应为 `to.query`），导致 `query` 被丢弃、跳转 URL 不带参数。详情页 `onLoad` 拿不到 `task_id`/`assignment_id`，`load()` 两个分支都不触发请求，`task` 为 null → 显示「加载失败」。
+
+#### 2. 修改内容
+
+将 4 处 `router.push({ name, query })` 改为 `router.push({ path, query })`（走 `resolvePath` 分支，query 正确拼进 URL）：
+- `task-hall/index.vue`：跳任务详情带 `task_id`
+- `my-task/index.vue`：跳任务详情带 `assignment_id`
+- `task-detail/index.vue`：跳提交页带 `assignment_id`
+- `tickets/index.vue`：跳工单详情带 `id`（同根因，一并修复）
+
+#### 3. 关键口径
+
+`@wot-ui/router` 的 `router.push({ name, query })` 会丢 query（库 bug）。凡需传参的跨页跳转，一律用 `path`（`resolvePath` 分支正确处理 query），不要用 `name`。
+
+---
+
+### 2026-10-30 — 重建本地开发库清理市场演示数据
+
+#### 1. 背景
+
+C 端「我的任务」出现 5 条 `test-*`/`demo-*` 任务（`user` 账号），排查确认是 `super` 演示「定向分派」功能时把演示项目（`test`/`demo`）下的 direct 任务分派给了 `user`。代码过滤（`my_assignments` 的 `user_id = auth.user.id`）正确，属演示数据残留而非隔离缺陷。按用户要求直接重建本地开发库。
+
+#### 2. 操作
+
+停后端 → `DROP DATABASE fastapiadmin WITH (FORCE)` + `CREATE DATABASE` → 重启后端自举（`create_all` + 种子导入）。重建后 `market_task`/`market_assignment`/`market_project` 均 0，种子分类 6 / 模板 18 / 三级任务 51 / 用户 3 正常，后端 8001 就绪。
+
+#### 3. 备注
+
+- 本地库重建流程：OrbStack 容器 `docker --context orbstack exec postgres psql ...`，先停 `main.py run` 进程再 drop（否则连接占用）；重启即触发 `InitializeData.init_db()`。
+- 演示账号 `super`/`admin`/`user` 密码均 `123456`（seed 固定，生产必须改）。
+
+---
+
+### 2026-10-30 — 任务大厅按用户隔离「已领取」任务 + 领取后自动返回大厅
+
+#### 1. 需求
+
+- 任务大厅领取任务成功后，自动返回任务大厅。
+- 领取后任务从**当前用户**的大厅消失（出现在「我的任务」），但**其他用户的大厅仍可见**（其他用户还没领取）。
+
+#### 2. 实现
+
+- 后端 `TaskService.hall_tasks`：查询当前用户已领取（`source=claimed`）的 `task_id` 列表，用 `("notin", claimed_ids)` 条件从大厅结果中排除。任务本身**不改** `assign_mode`（仍为 `open`，其他用户可领）。
+- 后端 `CRUDBase._resolve_condition`：新增 `notin` 操作符（空集合返回无排除条件）。
+- 前端 `task-detail`：`handleClaim` 成功后 `setTimeout(() => router.back(), 600)` 自动返回大厅。
+- 前端 `task-hall`：`onLoad` 改为 `onShow(() => reload())`，每次显示（含领取返回）都重置到第一页刷新。
+
+#### 3. 关键口径
+
+- 大厅可见性 = 「任务仍公开」∩「当前用户未领取」，是**按用户隔离**的过滤，不改变任务全局状态。这与运营「定向分派」（`batch_assign` 把 `assign_mode` 改 `direct`，任务对所有人下架）是两条不同的路径。
+
+---
+
+### 2026-10-30 — 修复分派详情 `MissingGreenlet`（嵌套任务审计关系未预加载）
+
+#### 1. 原因
+
+`GET /market/mini/assignments/{id}` 序列化 `AssignmentOutSchema.task`（`TaskOutSchema`）时，`task.created_by` / `task.updated_by` 报 `MissingGreenlet`。根因：`_ASSIGNMENT_PRELOAD = ["task", *[f"task.{p}" for p in _TASK_PRELOAD]]`，而 `_TASK_PRELOAD` 未显式列出 `TaskModel` 自身的 `created_by`/`updated_by`（此前靠 `CRUD._loader_options` 对**顶层模型**的自动审计预加载兜底，`TaskCRUD` 用没问题，但 `AssignmentCRUD` 的自动预加载只覆盖 `AssignmentModel` 自己，覆盖不到嵌套的 `task`）。
+
+#### 2. 修改
+
+补全预加载链（`backend/app/modules/market/task/service.py`）：
+- `_TASK_PRELOAD` 增加 `created_by`、`updated_by`、`template.items.created_by`、`template.items.updated_by`。
+- `_TEMPLATE_PRELOAD` 同步增加 `items.created_by`、`items.updated_by`（同类隐患，一并修复）。
+
+#### 3. 关键口径
+
+- 嵌套关系序列化时，`_loader_options` 的「自动审计预加载」只作用于**当前 CRUD 的顶层模型**，不会自动下钻到 `task.created_by` 这类二级路径——凡是 `OutSchema` 里带 `created_by`/`updated_by` 的嵌套对象，必须在 preload 链里**显式**写全（如 `task.created_by`）。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -1603,3 +1678,7 @@ C 端市场任务 5 个页面（任务大厅/我的任务/任务详情/提交成
 19. **el-tree-select 的节点值取自 `node-key`，不是 `props.value`；`show-checkbox` 与 `filter-node-method` 都需显式声明**（2026-10-29）
    - 现象：① 配 `props: { label, children, value, disabled }` 时 TS 报 `'value' does not exist in type 'TreeOptionProps'`——`TreeOptionProps` 根本没有 `value` 字段，选中输出值 = `node[nodeKey]`；② `multiple` 下树节点**没有 checkbox**（父级/叶子都无法勾选）——`multiple` 只控制多选 tags，不会自动开启 el-tree 的 `show-checkbox`，官方多选示例也是显式写 `show-checkbox`；③ 节点 label 字段改名（如 `name`）后，默认 filterable 过滤按 `label` 匹配会失效。
    - 结论：el-tree-select 的「值」与「唯一标识」统一由 `node-key`（默认 `id`）承载，`props` 只配 `label/children/disabled`；凡「多张自增表拼树 + 值取 id」的场景，`node-key` 必须全局唯一（用「分类负数 id / 模板正数 id」这类符号区隔，与踩坑 15 同源），父级级联勾选时 v-model 只输出叶子值；多选必须显式 `show-checkbox`；label 字段改名时必须显式 `filter-node-method`（如 `(value, data) => data.name.includes(value)`）；`collapse-tags` 会把多选 tag 折叠成「+N」，需要完整展示时不要加。
+
+20. **`@wot-ui/router` 的 `router.push({ name, query })` 会静默丢弃 query → 详情页加载失败**（2026-10-30）
+   - 现象：小程序任务大厅/我的任务点卡片进详情页，详情页显示「加载失败」，后端日志没有任何详情请求（`/mini/tasks/{id}`、`/mini/assignments/{id}`）。逐层排查发现页面跳转成功、`onLoad` 也触发，但 `query` 为空——`@wot-ui/router` 的 `resolve` 在 `to.name` 分支误写 `const finalQuery = to.params || {}`（应为 `to.query`），把 query 当成 params 丢弃，跳转 URL 无参数。
+   - 结论：凡需跨页传参的跳转，用 `router.push({ path: '/完整路径', query: {...} })`（走 `resolvePath` 分支，query 正确序列化到 URL），**不要用 `name`**。`name` 分支只适合无参跳转。同根因的还有工单详情（`tickets → ticket-detail`），已一并修复。
