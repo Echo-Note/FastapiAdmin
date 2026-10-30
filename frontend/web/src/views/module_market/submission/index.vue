@@ -81,6 +81,10 @@ import { renderTableOperationCell, cleanEmptyArrayParams, type TableOperationAct
 defineOptions({ name: "MarketSubmission", inheritAttrs: false });
 
 const dictStore = useDictStore();
+const route = useRoute();
+
+/** 深链：运营工作台「待办队列」点进来时带 ?status=PENDING，直接只看待审核 */
+const initialStatus = typeof route.query.status === "string" ? route.query.status : undefined;
 
 const statusOptions = computed<OptionType[]>(() =>
   (dictStore.getDictArray("market_submission_status") ?? []).map((d) => ({ value: d.dict_value, label: d.dict_label }))
@@ -95,7 +99,7 @@ function dictTag(dictType: string, val?: unknown) {
   return h(StatusTag, { type: (item.list_class as StatusType) ?? "info", label: item.dict_label ?? strVal });
 }
 
-const searchForm = ref<{ assignment_id?: number; user_id?: number; status?: string }>({ assignment_id: undefined, user_id: undefined, status: undefined });
+const searchForm = ref<{ assignment_id?: number; user_id?: number; status?: string }>({ assignment_id: undefined, user_id: undefined, status: initialStatus });
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
@@ -124,7 +128,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
   useTable({
     core: {
       apiFn: SubmissionAPI.listSubmission,
-      apiParams: { page_no: 1, page_size: 10 },
+      apiParams: { page_no: 1, page_size: 10, ...(initialStatus ? { status: initialStatus } : {}) },
       columnsFactory: () => [
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "institution", label: "机构", minWidth: 150, formatter: (row: SubmissionTable) => row.institution?.name ?? row.subject_name ?? "—" },
@@ -234,6 +238,19 @@ onMounted(async () => {
   await dictStore.getDict(["market_submission_status", "market_subject_type"]);
   await loadOptions();
 });
+
+// 首次进入由 useTable 的 immediate 自动取数，initialStatus 已写进 apiParams；
+// 页面被 KeepAlive 缓存后，再用不同 ?status= 点进来不会重挂载，这里跟上 URL 变化
+watch(
+  () => route.query.status,
+  async (next) => {
+    const status = typeof next === "string" ? next : undefined;
+    if (!status || status === searchForm.value.status) return;
+    searchForm.value.status = status;
+    replaceSearchParams({ status });
+    await getData();
+  }
+);
 
 async function handleSearch(params: Record<string, unknown>) {
   replaceSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);

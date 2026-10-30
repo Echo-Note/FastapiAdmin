@@ -41,9 +41,42 @@ class DashboardOverviewSchema(BaseModel):
     template_count: int = Field(0, description="二级任务模板数")
 
 
+class SubmissionTrendPointSchema(BaseModel):
+    """成果提交量趋势点（一天一桶）"""
+
+    date: str = Field(description="本地日期(YYYY-MM-DD，Asia/Shanghai)")
+    pending: int = Field(0, description="当天提交且当前待审核")
+    approved: int = Field(0, description="当天提交且当前已通过")
+    rejected: int = Field(0, description="当天提交且当前已驳回")
+
+
+class PendingSubmissionRowSchema(BaseModel):
+    """待审核成果队列行（首页只展示判断所需的四个字段，不带采集表单）"""
+
+    id: int = Field(description="成果ID")
+    subject: str = Field(description="采集对象名称(机构名 → 对象名 → 未填写对象)")
+    task_name: str = Field(description="任务名称")
+    period: str = Field(description="所属月份(如 2026-03)")
+    created_at: str = Field(description="提交时间(ISO8601，带 +08:00)")
+
+
+class DashboardInsightsSchema(BaseModel):
+    """运营工作台明细洞察：趋势 + 待办队列"""
+
+    submission_trend: list[SubmissionTrendPointSchema] = Field(
+        default_factory=list, description="近 14 天成果提交量(由旧到新，固定 14 点)"
+    )
+    pending_submissions: list[PendingSubmissionRowSchema] = Field(
+        default_factory=list, description="最新待审核成果(最多 8 条)"
+    )
+
+
 __all__ = [
+    "DashboardInsightsSchema",
     "DashboardOverviewSchema",
+    "PendingSubmissionRowSchema",
     "SettlementStatSchema",
     "SubmissionStatSchema",
+    "SubmissionTrendPointSchema",
     "TaskStatSchema",
 ]

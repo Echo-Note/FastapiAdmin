@@ -1742,6 +1742,91 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-10-30 — 运营工作台概览页重排：从 12 张等权卡片改为「待处理 / 业务流转 / 资料库」三段式
+
+#### 1. 原因
+
+原页面把 `GET /market/dashboard/overview` 的 12 个计数平铺成 12 张同尺寸 `FaStatsCard`（4 + 3 + 5），存在四个信息设计问题：
+
+1. **没有层级**：待审核成果（要人干活）与二级模板总数（资料库存量）视觉权重完全相同；
+2. **没有流向**：任务 → 成果 → 结算是一条真实业务链，页面却把 7 个状态计数拆散成互不相邻的卡片，看不出「哪一环积压」；
+3. **颜色无意义**：每个卡片随机配一个彩色图标块（primary/success/warning/danger/info 轮流用），同一个「橙」既表示待审核也表示已结算任务、也表示机构数；
+4. **不可行动 + 失败伪装**：数字点不进去；`catch` 里只弹一条 `ElMessage`，然后照常渲染一堆 0——把「接口挂了」显示成「业务归零」。
+
+#### 2. 改法（只改前端，不动接口）
+
+`views/module_market/dashboard/index.vue` 整体重写，零新增接口、零新增依赖：
+
+- **① 待处理**：待审核成果 / 进行中任务 / 结算单三格，数字 + 一句「等运营做什么」+ 跳转（`/market/task/submission`、`/market/task/task`、`/market/payout/settlement`）。跳转按 `useAuth().hasAuth` 守卫，无权限时降级为纯数字（不展示点了会 403 的入口）。
+- **② 业务流转**：任务 → 成果 → 结算三列，阶段之间有流向箭头（真实顺序，不是装饰）；任务/成果两列用 **100% 堆叠条**画状态分布（进行中/已完成/已结算/其他，待审核/已通过/已驳回/其他），占比按阶段总数算，「其他」= 总数 − 各状态之和（草稿/已发布/归档等未单列状态）。结算列为终点：应发金额 + 单数 + 口径说明「全部结算单应发合计，不区分状态」——这句正是旧版 description「结算应发合计（元）」说不清的地方。
+- **③ 资料库**：项目/医药公司/机构/一级分类/二级模板降为一条可点目录（13px 标签 + 20px 数字），不再和业务指标争权重。
+- **页头**：面包屑已标明页名，故不再重复 `<h2>工作台概览`；页面级只保留右对齐的「全库数据（不含已删除），更新于 HH:mm」+ 刷新。
+
+#### 3. 顺手修掉的三个缺陷
+
+- **失败态**：首屏失败改为错误块 + 重试（不再渲染 0）；已有数据时刷新失败则**保留旧数据** + `ElMessage` 提示，页面不被清空。
+- **骨架**：`ElSkeleton` 三块高度对齐真实版式（98 / 226 / 74），避免加载完成的跳动。
+- **缓存陈旧**：页面 `keep_alive=true`，切回标签不重挂载。新增 `onActivated` 判断：距上次加载超过 5 分钟才静默重拉，配合「更新于 HH:mm」让数字的新鲜度可核对。
+
+#### 4. 视觉口径（对齐 `design-system/default/MASTER.md`）
+
+- 颜色只承载**状态语义**：进行中/待审核 = `warning`、已完成 = `primary`、已结算/已通过 = `success`、已驳回 = `danger`、其余 = 中性灰；去掉了全部彩色图标块。
+- 单处重笔 = 堆叠条 + 阶段箭头；其余保持无阴影、无渐变、无装饰图标（卡片描边 `--fa-card-border`，圆角 `calc(var(--custom-radius) + 4px)`）。
+- 数字统一 `font-variant-numeric: tabular-nums`；**不使用 `FaCountTo` 数字滚动**——首页数字直接可读比动画更重要。
+- 色块不是唯一信息载体：图例给出「状态名 + 数值 + 占比」，堆叠条带 `role="img"` + `aria-label`。
+- 响应式：1180 / 900 / 760 三档，业务流转列在窄屏纵向堆叠（箭头与竖分割线同时隐藏）。
+
+#### 5. 验证
+
+- `npx vue-tsc --noEmit --skipLibCheck` → 0 错误；`eslint` / `stylelint` / `prettier --check` 该文件 → 全部通过；`npx vitest run` → 41 passed。
+- Playwright 实测（用 `page.route` 注入 mock 数据绕过空库）：1440 / 1200 宽、真实种子数据、暗色、接口失败态、760 窄屏均符合预期。
+- 本地库当前无成果/结算数据（见「重建本地开发库清理市场演示数据」），因此实机页面大多是 0——这是数据现状，不是排版问题；堆叠条在 0 数据下显示「暂无数据」而非空条。
+
+---
+
+### 2026-10-30 — 运营工作台首页增补「14 天提交趋势」+「待审核队列」
+
+#### 1. 原因
+
+上一轮重排只解决了「现在有多少」，回答不了两个运营真实问题：「这两天提交量在变好还是变差」「具体是哪几条在等我」。需要后端补明细数据。
+
+#### 2. 后端：新增 `GET /market/dashboard/insights`
+
+- `schema.py`：`SubmissionTrendPointSchema`（date + 待审/通过/驳回）、`PendingSubmissionRowSchema`（id/subject/task_name/period/created_at）、`DashboardInsightsSchema`。
+- `service.py`：新增 `insights()`。
+  - 趋势窗口 = 北京时间今天往前 13 天 00:00 转 UTC；只取窗口内 `(created_time, status)` 两列，用纯函数 `build_trend()` 按本地日历日分桶、缺失日补 0、草稿不入桶。
+  - 队列一条 join：`submission → assignment → task` 内连接，`institution` 外连接（软删除过滤写在 ON 里，机构被删时退回 `subject_name`），`status=PENDING` 倒序取 8 条。
+  - `created_at` 返回带 `+08:00` 的 ISO 串，前端不用去解析 `YYYY-MM-DD HH:mm:ss` 这种跨浏览器不可靠格式。
+- `controller.py`：`/insights`，权限码与 `/overview` 相同。
+- **不改 `overview`**：它是纯计数契约且有结构断言；也不复用 `/market/submissions` 列表接口拿队列——那会把 `form_data`（JSONB）整列带回。
+
+#### 3. 前端
+
+- `api/module_market/dashboard.ts`：`getInsights()` + 三个类型。
+- `views/module_market/dashboard/index.vue`：
+  - 待处理卡内新增队列块（8 行四列，整行 `RouterLink` 到 `?status=PENDING`）；无 `submission:query` 权限不渲染；窄屏用 `grid-template-areas` 换成「对象名 + 时间 / 任务名」两行。
+  - 业务流转卡内新增趋势块：**自绘 CSS 堆叠柱**（14 列，绿/橙/红自底向上），柱高按峰值归一，头部「峰值 N 条 · 合计 M 条」+ 只标颜色的图例；空态保留 25/50/75% 网格线与基线 + 居中说明。
+  - 取数改为 `refreshAll()` 并行；`insights` 失败非致命，两块各自内联重试，不清空已渲染的计数。
+- `views/module_market/submission/index.vue`：读 `route.query.status` 作为 `searchForm` 初值 + `useTable` 的 `apiParams.status`（首次加载即带筛选，不多发请求），另加 `watch(route.query.status)` 覆盖 KeepAlive 缓存下换参数再点进来的情况。
+
+#### 4. 为什么不直接用 `FaBarChart`
+
+它的 `useChartComponent.checkEmpty` 在数据全 0 时执行 `chart.clear()` 并插入居中空态 div（丢掉坐标轴与网格），与本页「空态保留基线 + 网格」的约定冲突；默认渐变/网格样式也与 hairline 语言不符。自绘 40 行 CSS 即可，颜色直接吃 `--el-color-*`。
+
+#### 5. 验证
+
+- 后端：`ruff check` 通过；`pytest tests/test_market_dashboard.py` **10 passed**（新增：insights 结构/空库全 0/401、`build_trend` 跨日边界与补 0、队列 join 四个字段与今日桶、非 PENDING 不入队列）；全量 `pytest` **266 passed**。
+- 前端：`vue-tsc` / `eslint` / `stylelint` / `prettier` 均通过，`vitest` 41 passed。
+- Playwright 实测（mock 数据）：1440 / 1200 / 760、暗色、趋势全 0 空态、insights 500 失败态、空队列；并验证深链——点队列首行后 URL 为 `#/market/task/submission?status=PENDING` 且搜索栏状态显示「待审核」。
+- 修一轮：网格线原用 `rgba(0,0,0,.08)` 在白底几乎不可见，改 `--default-border` 并按 25/50/75% 定位 + 基线；窄屏队列原 flex 写法把时间挤到第三行，改 `grid-template-areas`。
+
+#### 6. 后续可做
+
+- 不包含：结算金额趋势、时间范围切换、队列混排任务/结算单、点行直接打开该条审核弹窗（需审核页支持按 id 深链）。
+- `submission/index.vue` 的 `<style scoped>` 里有 3 处 stylelint `order/properties-order` 遗留告警（`form-data-pre` 块，属存量），本次未动；下次跑全量 `pnpm lint` 会被 `--fix` 自动整理。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
