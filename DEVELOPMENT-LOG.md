@@ -1601,6 +1601,147 @@ C 端「我的任务」出现 5 条 `test-*`/`demo-*` 任务（`user` 账号）�
 
 ---
 
+### 2026-10-30 — 新增分模块 subagent 定义（backend-agent / frontend-agent）
+
+#### 1. 原因
+
+用户要求按前后端拆分建立两个可复用的分模块 Agent，用于后续并行分析/编码。经确认采用**持久化 subagent 定义文件**（`.codebuddy/agents/`），而非运行时团队成员（team member）。
+
+#### 2. 修改内容
+
+- 新增 `.codebuddy/agents/backend-agent.md`：后端开发专家，负责 `backend/`（modules/api/core/tests/sql/scripts），内置 PG18/双轨制迁移/五件套/异步预加载防 MissingGreenlet/编号计数器等硬口径。
+- 新增 `.codebuddy/agents/frontend-agent.md`：前端开发专家，负责 `frontend/`（web + app），内置 useDictStore/树形 key 唯一/`@wot-ui/router` 用 path 等硬口径。
+- 两文件均为标准 subagent 格式（YAML frontmatter：`name`/`description`/`tools`/`model` + Markdown 系统提示），`tools: Read, Grep, Glob, Bash, Edit, Write`，`model: inherit`。
+
+#### 3. 规范（同步到 SKILL.md 第 10 节）
+
+- 遇到不确定的框架/库用法，先调用 `context7` skill 查询最新官方文档，不凭记忆猜测过时示例（两个 agent 均适用）。
+- 前端页面/组件设计先调用 `ui-ux-pro-max` 与 `frontend-design` skill，遵循其设计规范，避免模板化默认样式（仅 frontend-agent）。
+
+#### 4. 注意
+
+- 手动添加到 `.codebuddy/agents/` 后，下次启动会话自动加载；立即生效用 `/agents` 命令确认/重载。
+
+---
+
+### 2026-10-30 — C 端任务大厅/我的任务细化到最小单元任务 + 按项目分组
+
+#### 1. 需求
+
+任务大厅、我的任务、任务详情三个 C 端页面「细化到最小单元任务」：补全最小单元任务的完整归属链路（项目 → 一级分类 → 二级模板 → 三级任务）+ 执行标准/执行要求透出，并按「项目」分组组织列表。前后端分模块多 Agent 并行（backend-agent + 3×frontend-agent）。
+
+#### 2. 后端改动
+
+- `TaskOutSchema` 新增顶层 `exec_standard` / `executor_requirement`（item.config 优先回退 template.config），service 统一 `_fill_task_exec_fields` 回填所有产出 `TaskOutSchema` 的位置。
+- 新增 C 端分组接口：`GET /market/mini/tasks/grouped`（任务大厅，复用 `_hall_visibility_search` 可见性）与 `GET /market/mini/assignments/grouped`（我的任务，按当前用户 + 可选 status）。
+- 新增分组 schema：`MiniTaskGroupSchema`（`tasks: list[TaskOutSchema]`，任务大厅）与 `MiniAssignmentGroupSchema`（`assignments: list[AssignmentOutSchema]`，我的任务）。
+
+#### 3. 关键口径（易错点）
+
+- **分组接口元素形状必须区分**：任务大厅分组返回「任务」（TaskOutSchema），我的任务分组必须返回「分派单」（AssignmentOutSchema，含 id/status/task），否则前端拿不到分派单 id/status，状态 Tab、进度轨道、成果角标与卡片跳转全部失真。首版误把 `[a.task for a in assignments]` 丢给 `_group_orm_tasks`，丢失分派单字段，已拆出 `_group_orm_assignments` 修复。
+- 分组接口不分页（一次性返回全部），前端相应去掉触底加载/「没有更多了」。
+- 前端 `@wot-ui/router` 跳转仍用 path + query（见踩坑 20）。
+
+#### 4. 前端改动
+
+- `api/module_market/index.ts`：`TaskItem` 补 `project`/`exec_standard`/`executor_requirement`；新增 `MiniTaskGroup`/`MiniAssignmentGroup` 类型与 `getTaskHallGrouped`/`getMyAssignmentsGrouped`。
+- `task-hall`/`my-task`：改为按项目分组渲染，卡片补「一级分类 · 二级模板」路径 + 执行要求。
+- `task-detail`：Hero 卡补项目/分类/模板路径 + 执行要求。
+- 三页面的「执行要求」文案暂用中文字面量（未加 i18n key），待补 `market.executorRequirement`。
+
+#### 5. 验证
+
+- 后端 `ruff check` + `pytest -q`（259 passed）全绿；前端 `vue-tsc --noEmit` + read_lints 全绿。
+
+---
+
+### 2026-10-30 — 修复「提交成果无采集字段/列表显示大类」：模板级脏任务拦截 + 数据细化重建
+
+#### 1. 原因
+
+C 端提交成果页只有「周期」无任何采集字段；我的任务/任务大厅显示的是二级模板名（大类）而非三级任务。根因：demo 项目的 6 条任务（TK-0001~0006）被**按二级模板直接创建**（`item_id` 为空），而这些模板（商务管理服务类等）均含 5~7 个三级任务且按口径**不承载 `form_schema`**（表单由三级任务自包含）→ 模板级任务无任何采集分节可渲染。
+
+缺陷点：`TaskService.create/update` 的 `template_id` 分支与 `ProjectService` 模板关联入口（`add_template`/`_sync_task_unit_links`）都**没有校验「叶子模板」**，有三级任务的模板也能按模板级建任务/关联。
+
+#### 2. 修改内容
+
+**后端强校验（`task/service.py` + `project/service.py`）**
+
+- `TaskService._get_leaf_template()`：查询并校验模板为叶子（`preload=["items"]` 后断言 `items` 为空，否则报「模板[X]含 N 个三级任务，请按三级任务创建任务」）；`create`/`update` 的 `template_id` 分支统一走该校验。
+- `ProjectService._ensure_template_exists()`：从「仅校验存在」升级为「存在 + 叶子」校验，覆盖 `add_template`/`_sync_task_unit_links`；`publish` 的模板 link 分支加同款防御（拦截历史脏关联）。
+
+**数据修复（一次性 SQL，单事务）**
+
+- 6 条模板级脏任务 → 按「其模板下全部三级任务」细化重建：33 条任务实例（`name = 项目-模板-三级任务`，状态/周期/分配方式继承，`task_no` 从 TK-0007 续编）+ 20 条分派（原用户 × 该模板全部新任务，状态/时间继承）。
+- 引用链按序清理：institution_image → submission（1 条测试成果被删）→ assignment → task。
+- 编号计数器 `TK` 用 GREATEST 对齐到 39。
+
+#### 3. 关键口径
+
+- **凡有三级任务的模板，必须按三级任务创建任务**；模板级任务仅对「无三级任务的叶子模板」（如会议服务）合法。后端已强校验，运营端选错会收到明确报错。
+- 待办（可选）：运营端 web 任务创建表单可把「有三级任务的模板」节点禁用，从选择源头避免（当前靠后端报错提示兜底）。
+
+#### 4. 验证
+
+- `ruff check` + `pytest -q`（259 passed）全绿。
+- 复核：33 条任务 `item_id` 全非空、每条三级任务 `form_schema` 有 3 个分节、计数器 TK=39。
+
+---
+
+### 2026-10-30 — 提交成果表单体验优化（周期只读/省市区联动/执行人自动填/日期控件/校验）
+
+#### 1. 需求
+
+提交成果页表单体验问题：周期可改、区域自由填写、执行人需手填、执行日期无日期控件、表单无校验。区域口径先误定为「七大区」，用户纠正为「全国行政区划省市区三级联动」。
+
+#### 2. 改动
+
+**后端（form_schema 语义扩展）**
+
+- `FormSchemaField.type` 新增 `region`（全国省市区三级联动）；新增 `autofill: Literal["current_user"]`（自动填当前登录用户并只读）。
+- 种子 + 数据迁移：`app/scripts/form_schema_semantics.py`（规则，幂等）+ `apply_seed_form_schema_semantics.py`（改两张种子 JSON）+ `migrate_form_schema_semantics.py`（就地更新库内 JSONB，不 TRUNCATE）。规则：`region` → `type=region`（移除旧七大区 options）、`executor` → `autofill=current_user`，按字段名匹配非 label。
+
+**前端（submission-form + 类型）**
+
+- 周期只读（弱化样式）；`date` → `wd-datetime-picker`（YYYY-MM-DD）；`region` → `wd-cascader`（省市区三级联动，`text-key="label"`，confirm 取完整路径 `/` 拼接）；`autofill=current_user` → 自动填 `userInfo.name` 只读；校验按字段类型措辞（请选择/请填写）并定位首个缺失项。
+
+#### 3. 关键口径
+
+- 区域 = 全国省市区三级联动（`type=region`），数据源 `element-china-area-data` 的 `pcaTextArr`（31 省级，前端内置，仅 import 该导出）。
+- 执行人 = `autofill=current_user`（后端权威定义），前端按字段名 `executor` 自动填当前用户姓名（`userInfo.name ?? username`）。
+- 迁移脚本与种子改造共用同一套规则，避免种子与库内数据漂移；幂等可重复执行。
+- 直辖市省市区联动中间层为「市辖区」（如 `北京市/市辖区/东城区`），数据源固有，暂按完整三级展示。
+
+#### 4. 验证
+
+- `ruff check` + `pytest -q`（259 passed）全绿；前端 `vue-tsc --noEmit` + read_lints 全绿。
+- 数据复核：37 条三级任务 region 已改为 `type=region`（无 options），executor 已加 `autofill=current_user`。
+
+---
+
+### 2026-10-30 — 修复 C 端文件上传 403（无权限操作）
+
+#### 1. 原因
+
+C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，该接口声明运营端 RBAC 权限 `module_common:file:upload`；C 端小程序用户（OAuth 自动注册，默认角色）无此权限 → `403 无权限操作`。市场域 C 端接口统一只要求登录（`get_current_user`），上传却复用了运营端受权限保护的接口，属设计缺陷。
+
+#### 2. 修复
+
+- 市场域 C 端路由 `mini_controller.py` 新增 `POST /market/mini/upload`：复用 `FileService.upload_service`，`dependencies=[Security(get_current_user)]` 仅校验登录，不要求 RBAC 权限码。
+- 前端 `MarketAPI.uploadFile` 改调 `/market/mini/upload?upload_type=file`。
+- 运营端 `/common/file/upload` 保持不变（仍受 `module_common:file:upload` 权限保护）。
+
+#### 3. 关键口径
+
+- C 端接口一律「登录即可」（`get_current_user`），不挂运营端菜单权限码；需要上传/下载能力时在 C 端路由内提供专用入口，复用通用 FileService 而非直接暴露运营端受保护接口。
+- 上传（写入）不敏感可放开到登录级，下载（读取）仍受权限保护。
+
+#### 4. 验证
+
+- `ruff check` + `pytest -q`（259 passed）全绿；前端 read_lints 零 error。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。

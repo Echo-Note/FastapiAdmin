@@ -176,3 +176,9 @@ grep -oE '.{0,60}readyState.{0,60}' <chunk> | grep -i websocket       # 核守�
 例：旧包 `if (ws?.readyState === WebSocket.OPEN) return;`（`CLOSED` 命中 0 次）；修复后 `if (ws && ws.readyState !== WebSocket.CLOSED) return;`。
 
 **收到「源码没改好」的线上反馈时，第一步先核 dist 产物特征字符串**，再回源码；docker 部署还要重新打镜像/重传 `docker` 目录才算生效。
+
+## 10. 查文档与 UI 设计规范
+
+- **框架/库用法不确定时**：先调用 `context7` skill 查询最新官方文档，不凭记忆猜测过时示例（后端框架、前端组件库、第三方 SDK 均适用）。
+- **前端页面/组件设计时**：先调用 `ui-ux-pro-max` 与 `frontend-design` skill，遵循其设计规范，避免模板化默认样式。
+- 分模块 Agent 已按此规范内置：`.codebuddy/agents/backend-agent.md`（后端）、`.codebuddy/agents/frontend-agent.md`（前端）。
