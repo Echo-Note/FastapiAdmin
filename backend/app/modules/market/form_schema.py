@@ -31,6 +31,9 @@ class FormSchemaColumn(BaseModel):
     真实采集表（如「价格核查」）中，分节内既有多行明细列（产品名称/规格/挂网价…），
     也有表后的单字段（异常说明）。多行明细以 ``type=table`` 字段表达，其列由本模型定义；
     子列类型不允许再嵌套 ``table``，防止无限递归。
+
+    ``product_role`` 标记该列与产品库的对应关系：C 端在 ``name`` 列输入产品名称后
+    检索产品库，命中后按 ``spec`` / ``manufacturer`` 角色回填同行的另外两列。
     """
 
     name: str = Field(min_length=1, max_length=64, description="子列唯一标识(如 product_name)")
@@ -41,6 +44,10 @@ class FormSchemaColumn(BaseModel):
     required: bool = Field(default=False, description="该列是否必填")
     placeholder: str | None = Field(default=None, max_length=255, description="输入占位提示")
     options: list[FormSchemaOption] | None = Field(default=None, description="选项列表(仅 select/radio/checkbox 需要)")
+    product_role: Literal["name", "spec", "manufacturer"] | None = Field(
+        default=None,
+        description="产品库角色(name=检索并自动填充的产品名称列/spec=产品规格/manufacturer=生产企业)，None 表示与产品库无关",
+    )
 
 
 class FormSchemaField(BaseModel):
