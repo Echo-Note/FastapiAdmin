@@ -41,6 +41,16 @@ export interface FormSchemaField {
   autofill?: 'current_user' | null
 }
 
+/** 产品库检索候选（对齐后端 ProductSearchItemSchema） */
+export interface ProductCandidate {
+  id: number
+  name: string
+  spec: string
+  manufacturer: string
+  /** 完整展示名：名称 / 规格 / 生产企业 */
+  display_name: string
+}
+
 /** 采集表单分节：英文 code + 中文 name + 其下字段（对齐后端 FormSchemaSection） */
 export interface FormSchemaSection {
   code: string
@@ -284,6 +294,18 @@ export const MarketAPI = {
    * @param filePath 本地临时文件路径（uni.chooseImage / uni.chooseFile 选择结果）
    * @returns uni.uploadFile 成功回调结果（statusCode + data 响应体字符串）
    */
+  /**
+   * 产品库检索（提交成果时按产品名称联想）。
+   *
+   * 可见范围由后端决定：已通过的产品所有人可见，自己提交的待审产品仅本人可见。
+   *
+   * @param keyword 产品名称关键词
+   * @param limit 返回条数上限（默认 20）
+   */
+  searchProducts(keyword: string, limit = 20): Promise<ProductCandidate[]> {
+    return http.Get(`${MARKET_BASE}/mini/products/search`, { params: { keyword, limit } })
+  },
+
   uploadFile(filePath: string): Promise<UniApp.UploadFileSuccessCallbackResult> {
     return http.Post(`${MARKET_BASE}/mini/upload?upload_type=file`, { filePath, name: 'file' }, { requestType: 'upload' })
   },
