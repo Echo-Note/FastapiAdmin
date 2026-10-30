@@ -32,6 +32,7 @@ from .schema import (
     TaskCategoryTreeSchema,
     TaskCategoryUpdateSchema,
     TaskCreateSchema,
+    TaskFacetSchema,
     TaskItemCreateSchema,
     TaskItemOutSchema,
     TaskItemQueryParam,
@@ -241,6 +242,16 @@ async def get_task_list_controller(
 ) -> JSONResponse:
     result = await TaskService(auth, db).page(page_no=page.page_no, page_size=page.page_size, search=search, order_by=page.order_by)
     return SuccessResponse(data=result, msg="查询任务成功")
+
+
+@TaskRouter.get("/facets", summary="任务目录侧边栏统计(只含有任务的分类/模板)", response_model=ResponseSchema[list[TaskFacetSchema]])
+async def get_task_facets_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:task:query"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """返回确实有任务实例的（分类, 模板）组合及任务数，供侧边栏目录隐藏空节点。"""
+    result = await TaskService(auth, db).facets()
+    return SuccessResponse(data=result, msg="获取任务目录统计成功")
 
 
 @TaskRouter.get("/detail/{id}", summary="查询任务详情", response_model=ResponseSchema[TaskOutSchema])

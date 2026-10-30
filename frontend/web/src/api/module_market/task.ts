@@ -12,6 +12,14 @@ const TaskAPI = {
     });
   },
 
+  /** 任务目录侧边栏统计：只返回确实有任务的（分类, 模板）组合 */
+  getTaskFacets() {
+    return request<ApiResponse<TaskFacet[]>>({
+      url: `${API_PATH}/facets`,
+      method: "get",
+    });
+  },
+
   detailTask(id: number) {
     return request<ApiResponse<TaskTable>>({
       url: `${API_PATH}/detail/${id}`,
@@ -71,6 +79,13 @@ const TaskAPI = {
 };
 
 export default TaskAPI;
+
+/** 任务目录侧边栏统计项（对齐后端 TaskFacetSchema） */
+export interface TaskFacet {
+  category_id: number;
+  template_id: number;
+  task_count: number;
+}
 
 export interface TaskPageQuery extends PageQuery, UserByQueryParams {
   task_no?: string;

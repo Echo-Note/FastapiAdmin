@@ -189,8 +189,8 @@ function buildRowActions(row: ProductTable): TableOperationAction[] {
     { key: "detail", label: "详情", artType: "view", perm: "module_market:product:query", run: () => opCtx.onDetail(row.id!) },
     { key: "edit", label: "编辑", artType: "edit", perm: "module_market:product:update", run: () => opCtx.onEdit(row.id!) },
   ];
-  // 已通过的不再给「通过」、已驳回的不再给「驳回」，避免无意义的状态回写
-  if (row.audit_status !== "approved") {
+  // 只有 C 端自动入库的待审记录才需要审核；运营录入的产品直接生效，不出现审核动作
+  if (row.audit_status === "pending") {
     actions.push({
       key: "approve",
       label: "通过",
@@ -198,8 +198,6 @@ function buildRowActions(row: ProductTable): TableOperationAction[] {
       perm: "module_market:product:audit",
       run: () => opCtx.onAudit(row.id!, true),
     });
-  }
-  if (row.audit_status !== "rejected") {
     actions.push({
       key: "reject",
       label: "驳回",

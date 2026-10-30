@@ -44,6 +44,7 @@ from .schema import (
     TaskCategoryTreeSchema,
     TaskCategoryUpdateSchema,
     TaskCreateSchema,
+    TaskFacetSchema,
     TaskItemCreateSchema,
     TaskItemOutSchema,
     TaskItemQueryParam,
@@ -461,6 +462,26 @@ class TaskService:
                 msg=f"模板[{template.name}]含 {len(template.items)} 个三级任务，请按三级任务创建任务"
             )
         return template
+
+    async def facets(self) -> list[TaskFacetSchema]:
+        """任务目录侧边栏的「已用目录」统计。
+
+        只返回**确实有任务实例**的（分类, 模板）组合及其任务数，供前端构建侧边栏时
+        隐藏「目录里有、但一个任务都没有」的模板——否则新建库/空库时侧边栏会显示
+        一整棵没有任何任务对应的目录树。
+        """
+        stmt = (
+            select(TaskTemplateModel.category_id, TaskModel.template_id, func.count(TaskModel.id))
+            .join(TaskTemplateModel, TaskTemplateModel.id == TaskModel.template_id)
+            .where(TaskModel.is_deleted.is_(False))
+            .group_by(TaskTemplateModel.category_id, TaskModel.template_id)
+            .order_by(TaskTemplateModel.category_id, TaskModel.template_id)
+        )
+        rows = (await self.db.execute(stmt)).all()
+        return [
+            TaskFacetSchema(category_id=category_id, template_id=template_id, task_count=count)
+            for category_id, template_id, count in rows
+        ]
 
     async def create(self, data: TaskCreateSchema) -> TaskOutSchema:
         """创建任务（草稿状态，编号自动生成，名称 = 项目-二级模板[-三级任务]）。"""

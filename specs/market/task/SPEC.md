@@ -58,6 +58,12 @@ parent: market-domain
 - 提交后的成果状态是 `DRAFT`（`create` 不传 `status`，走模型默认），没有「提交即 `PENDING`」这一步；`review` 接受 `DRAFT` 与 `PENDING` 两种入参。
 - 「单月单对象只提交一次」目前**没有数据库唯一约束兜底**（`market_submission` 上没有 `UniqueConstraint`），只有业务层校验；并发重提不受阻。
 
+## 运营端任务列表与侧边栏目录
+
+- **任务列表默认包含草稿**。项目发布只创建 `DRAFT` 任务实例，需要运营再逐条/批量「发布」；列表页曾经硬编码 `exclude_status=DRAFT`（初始参数与刷新条件各一处），导致「发布项目后任务页是空的」——现已去掉，靠状态筛选显式过滤。
+- **侧边栏目录只显示确实有任务的（分类, 模板）**。树节点来自 `TaskCategoryService.tree()`（完整主数据 6 分类 / 18 模板），与任务是否存在无关，空库时会显示一整棵没有任务对应的目录；`GET /market/tasks/facets` 返回 `[{category_id, template_id, task_count}]`，前端据此裁剪节点并显示任务数，任务增删后刷新（页面 `keep_alive`，用 `onActivated` 覆盖从项目页发布后切回的场景）。
+- 「任务目录」菜单页（`/market/task-catalog`）仍是三级目录的主数据维护页，**故意**展示完整目录——它是配置来源，不跟随任务清空。
+
 ## 采集表单与真实采集表对齐
 
 - `form_schema` 的字段来源是运营手上的真实 Excel 采集表（`docs/materials/任务/...`），不是开发臆造的结构；机构管理 5 类共 26 个三级任务（`ITEM-0001`..`ITEM-0026`）的字段定义收敛在 `backend/app/modules/market/task/collection_schema.py` 的 `ITEM_FORM_SCHEMAS`。

@@ -258,7 +258,7 @@
 
 <script setup lang="ts">
 import { h } from "vue";
-import TaskAPI, { type TaskForm, type TaskTable } from "@/api/module_market/task";
+import TaskAPI, { type TaskFacet, type TaskForm, type TaskTable } from "@/api/module_market/task";
 import AssignmentAPI, { type AssignmentTable } from "@/api/module_market/assignment";
 import ProjectAPI from "@/api/module_market/project";
 import TaskCategoryAPI, { type TaskCategoryTreeItem } from "@/api/module_market/task-category";
@@ -339,6 +339,7 @@ interface UnitTreeNode {
 }
 
 const categoryTree = ref<TaskCategoryTreeItem[]>([]);
+const facetRows = ref<TaskFacet[]>([]);
 const sidebarTreeData = ref<UnitTreeNode[]>([]);
 const formTreeData = ref<UnitTreeNode[]>([]);
 const defaultExpandedKeys = ref<number[]>([]);
@@ -367,16 +368,35 @@ function buildUnitTree(categories: TaskCategoryTreeItem[], leafOnly: boolean): U
   });
 }
 
-/** 把「一级分类 → 二级模板」转换为侧边栏两级树：分类负 id 仅作父级，模板正 id 为叶子 */
-function buildSidebarTree(categories: TaskCategoryTreeItem[]): UnitTreeNode[] {
-  return categories.map((cat) => ({
-    id: -(cat.id ?? 0),
-    name: cat.name ?? "",
-    children: (cat.children ?? []).map((tpl) => ({
-      id: tpl.id!,
-      name: tpl.name ?? tpl.code ?? "",
-    })),
-  }));
+/**
+ * 把「一级分类 → 二级模板」转换为侧边栏两级树：分类负 id 仅作父级，模板正 id 为叶子。
+ * 只保留**确实有任务**的模板与分类（facets 来自 /market/tasks/facets），
+ * 否则空库/刚重建的库会显示一整棵没有任何任务对应的目录树。
+ */
+function buildSidebarTree(categories: TaskCategoryTreeItem[], facets: TaskFacet[]): UnitTreeNode[] {
+  const templateCount = new Map<number, number>();
+  const categoryCount = new Map<number, number>();
+  for (const f of facets ?? []) {
+    templateCount.set(f.template_id, (templateCount.get(f.template_id) ?? 0) + f.task_count);
+    categoryCount.set(f.category_id, (categoryCount.get(f.category_id) ?? 0) + f.task_count);
+  }
+
+  const tree: UnitTreeNode[] = [];
+  for (const cat of categories) {
+    const templates = (cat.children ?? [])
+      .filter((tpl) => templateCount.has(tpl.id!))
+      .map((tpl) => ({
+        id: tpl.id!,
+        name: `${tpl.name ?? tpl.code ?? ""}（${templateCount.get(tpl.id!) ?? 0}）`,
+      }));
+    if (templates.length === 0) continue;
+    tree.push({
+      id: -(cat.id ?? 0),
+      name: `${cat.name ?? ""}（${categoryCount.get(cat.id ?? 0) ?? 0}）`,
+      children: templates,
+    });
+  }
+  return tree;
 }
 
 /** 由侧边栏节点 id 解析过滤条件：分类（负 id）→ category_id，模板（正 id）→ template_id */
@@ -390,9 +410,9 @@ function filterUnitNode(value: string, data: { name?: string }): boolean {
   return (data.name ?? "").includes(value);
 }
 
-/** 合并搜索表单 + 目录过滤条件，回到第一页并刷新（固定排除草稿，只展示已发布任务） */
+/** 合并搜索表单 + 目录过滤条件，回到第一页并刷新（不排除草稿：草稿也需要被发布） */
 async function refreshWithFilters() {
-  replaceSearchParams(cleanEmptyArrayParams({ ...searchForm.value, ...unitFilter.value, exclude_status: "DRAFT" }) as Record<string, unknown>);
+  replaceSearchParams(cleanEmptyArrayParams({ ...searchForm.value, ...unitFilter.value }) as Record<string, unknown>);
   await getData();
 }
 
@@ -441,7 +461,8 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
   useTable({
     core: {
       apiFn: TaskAPI.listTask,
-      apiParams: { page_no: 1, page_size: 10, exclude_status: "DRAFT" },
+      // 不排除 DRAFT：项目发布只创建草稿任务，需在列表里逐条/批量发布；隐藏草稿会让「发布项目后任务页是空的」
+      apiParams: { page_no: 1, page_size: 10 },
       columnsFactory: () => [
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
@@ -529,23 +550,44 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit: crudSu
   updateApi: TaskAPI.updateTask,
   titles: { create: "新增任务", update: "修改任务", detail: "任务详情" },
   detailFormData: detailFormData as unknown as Ref<Partial<TaskForm>>,
-  onCreateSuccess: refreshCreate,
+  onCreateSuccess: async () => {
+    await refreshCreate();
+    await refreshSidebarTree();
+  },
   onUpdateSuccess: refreshUpdate,
 });
 
 async function loadOptions() {
-  const [projectRes, treeRes, userRes] = await Promise.all([
+  const [projectRes, treeRes, userRes, facetRes] = await Promise.all([
     ProjectAPI.listProject({ page_no: 1, page_size: 100 }),
     TaskCategoryAPI.treeCategory(),
     UserAPI.listUser({ page_no: 1, page_size: 100 }),
+    TaskAPI.getTaskFacets(),
   ]);
   projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? p.code ?? "" }));
   userOptions.value = userRes.data.data.items.map((u) => ({ value: u.id!, label: u.name ?? u.username ?? "" }));
   categoryTree.value = treeRes.data.data ?? [];
-  sidebarTreeData.value = buildSidebarTree(categoryTree.value);
   formTreeData.value = buildUnitTree(categoryTree.value, true);
   defaultExpandedKeys.value = categoryTree.value.map((cat) => -(cat.id ?? 0));
+  facetRows.value = facetRes.data.data ?? [];
+  sidebarTreeData.value = buildSidebarTree(categoryTree.value, facetRows.value);
 }
+
+/** 只刷新侧边栏的「已用目录」（任务增删/发布后调用） */
+async function refreshSidebarTree() {
+  try {
+    const res = await TaskAPI.getTaskFacets();
+    facetRows.value = res.data.data ?? [];
+    sidebarTreeData.value = buildSidebarTree(categoryTree.value, facetRows.value);
+  } catch {
+    // 侧边栏统计失败不影响主列表
+  }
+}
+
+// 页面 keep_alive：从「项目」页发布项目后切回来时，侧边栏目录需要反映新生成的任务
+onActivated(() => {
+  if (categoryTree.value.length > 0) void refreshSidebarTree();
+});
 
 onMounted(async () => {
   await dictStore.getDict(["market_task_status", "market_assign_mode", "market_assignment_status"]);
@@ -597,6 +639,7 @@ async function deleteRow(id: number, taskNo: string) {
     await TaskAPI.deleteTask([id]);
     faTableRef.value?.elTableRef?.clearSelection();
     await refreshRemove();
+    await refreshSidebarTree();
   } catch {
     // 用户取消
   }
@@ -610,6 +653,7 @@ async function handleBatchDelete() {
     await TaskAPI.deleteTask(selectedIds.value);
     faTableRef.value?.elTableRef?.clearSelection();
     await refreshRemove();
+    await refreshSidebarTree();
   } catch {
     // 用户取消
   } finally {

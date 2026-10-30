@@ -1862,6 +1862,25 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — 发布项目后任务页为空 / 侧边栏目录出现完整树 / 运营录入产品不需要审核
+
+#### 1. 现象与根因
+
+- **发布项目后「任务」页没有任务**：项目发布只创建 `DRAFT` 任务实例（设计如此，需运营再发布），而任务页两处硬编码了 `exclude_status: "DRAFT"`——`useTable` 的初始 `apiParams` 和 `refreshWithFilters()`（搜索/点目录都会走它）。任务确实在库里（诊断时 57 条全部是 DRAFT），只是被列表过滤掉了，形成「必须先发布才能看到、但看不到就没法发布」的死锁。修复：两处都去掉 `exclude_status`，草稿默认可见，靠状态筛选显式过滤。
+- **任务页左侧目录树总是完整一棵**：树来自 `/market/categories/tree`（主数据 6 分类 / 18 模板），与任务存在与否无关，空库时也显示全部。修复：新增 `GET /market/tasks/facets`（`group by category_id, template_id` 返回任务数），前端只渲染有任务的分类/模板并在节点上带任务数，任务增删后刷新，`onActivated` 覆盖「从项目页发布后切回」的场景。
+- **运营录入的产品被当成待审对象**：产品落库本来就是 `approved`（免审），但行操作里「驳回」对非 `rejected` 的行都显示，看起来像需要审批。修复：只有 `audit_status === "pending"`（C 端自动入库）才显示「通过/驳回」。
+
+#### 2. 验证
+
+- API：不排除草稿 → 57 条；`exclude_status=DRAFT` → 0 条（正是用户看到的现象）；`/market/tasks/facets` → 5 条（分类 1 下的模板 1..5，含任务数）。
+- Web：`vue-tsc --noEmit` 通过，改动文件 `eslint` 通过。
+
+#### 3. 附带发现（重要）
+
+`backend/tests/conftest.py` 读取 `docker/.env`，因此 `uv run pytest` **用的是同一个开发库**，会把 `test-*` 项目/任务写进日常开发数据里。要让测试与开发数据隔离，需给测试单独建库（或让 conftest 支持 `TEST_DATABASE_NAME`）。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。

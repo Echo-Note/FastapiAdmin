@@ -271,6 +271,14 @@ class TaskQueryParam(BaseQueryParam, UserByQueryParam):
     status: str | None = Field(default=None, description="任务状态", json_schema_extra={"q": "eq"})
 
 
+class TaskFacetSchema(BaseModel):
+    """任务目录侧边栏的「已用目录」统计（只含有任务的分类/模板）。"""
+
+    category_id: int = Field(description="一级分类ID")
+    template_id: int = Field(description="二级模板ID")
+    task_count: int = Field(description="该模板下的任务数")
+
+
 class TaskStatusUpdateSchema(BaseModel):
     """任务状态流转"""
 

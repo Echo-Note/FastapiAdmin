@@ -45,6 +45,8 @@ parent: market-domain
 
 驳回必须填写审核意见（`ProductAuditSchema` 的模型校验，422），避免提交人不知道为什么被拒。
 
+**审核动作只对 `pending` 记录开放**：运营录入的产品落库即 `approved`（`reviewer_id` 记为录入人），运营端列表里不显示「通过/驳回」；只有 C 端自动入库的待审记录才出现这两个动作，避免把「运营录入」也误当成需要审批的对象。
+
 ## 自动入库
 
 - 挂接点：`SubmissionService.create`（新提交）与 `update`（驳回重提）在成果落库后调用 `ProductService.ingest_from_form_data(form_data, form_schema)`。
