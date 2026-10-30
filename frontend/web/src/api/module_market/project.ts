@@ -42,7 +42,24 @@ const ProjectAPI = {
     });
   },
 
-  /** 项目关联二级任务模板（幂等） */
+  /** 项目关联三级任务（幂等） */
+  addProjectItem(id: number, body: { item_id: number }) {
+    return request<ApiResponse<ProjectTable>>({
+      url: `${API_PATH}/items/${id}`,
+      method: "post",
+      data: body,
+    });
+  },
+
+  /** 移除项目关联的三级任务 */
+  removeProjectItem(id: number, item_id: number) {
+    return request<ApiResponse<ProjectTable>>({
+      url: `${API_PATH}/items/${id}/${item_id}`,
+      method: "delete",
+    });
+  },
+
+  /** 项目关联叶子模板（无三级任务的模板，幂等） */
   addProjectTemplate(id: number, body: { template_id: number }) {
     return request<ApiResponse<ProjectTable>>({
       url: `${API_PATH}/templates/${id}`,
@@ -51,7 +68,7 @@ const ProjectAPI = {
     });
   },
 
-  /** 移除项目关联的二级任务模板 */
+  /** 移除项目关联的叶子模板 */
   removeProjectTemplate(id: number, template_id: number) {
     return request<ApiResponse<ProjectTable>>({
       url: `${API_PATH}/templates/${id}/${template_id}`,
@@ -68,7 +85,7 @@ const ProjectAPI = {
     });
   },
 
-  /** 发布项目：按关联的二级模板批量生成任务实例 */
+  /** 发布项目：按关联的三级任务批量生成任务实例 */
   publishProject(id: number) {
     return request<ApiResponse<ProjectTable>>({
       url: `${API_PATH}/publish/${id}`,
@@ -96,7 +113,9 @@ export interface ProjectTable extends BaseType {
   period?: string;
   status?: string;
   publisher_id?: number | null;
-  /** 关联的二级任务模板 ID 列表 */
+  /** 关联的三级任务 ID 列表 */
+  item_ids?: number[];
+  /** 关联的叶子模板 ID 列表（无任务时即模板） */
   template_ids?: number[];
 }
 
@@ -106,5 +125,6 @@ export interface ProjectForm extends BaseFormType {
   company_id?: number | string;
   /** 项目截止日期（YYYY-MM-DD） */
   period?: string;
+  item_ids?: number[];
   template_ids?: number[];
 }

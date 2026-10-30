@@ -52,7 +52,7 @@
     >
       <template v-if="dialogVisible.type === 'detail'">
         <FaDescriptions :column="4" :data="detailFormData" :items="detailItems" max-height="70vh">
-          <template #templateNames="{ row }">{{ resolveTemplateNames(row) }}</template>
+          <template #taskUnitNames="{ row }">{{ resolveUnitNames(row) }}</template>
         </FaDescriptions>
       </template>
       <template v-else>
@@ -81,10 +81,10 @@
               style="width: 100%"
             />
           </template>
-          <template #template_ids>
+          <template #task_units>
             <ElTreeSelect
-              v-model="formData.template_ids"
-              :data="templateTreeData"
+              v-model="selectedUnitIds"
+              :data="taskUnitTreeData"
               multiple
               show-checkbox
               filterable
@@ -93,7 +93,7 @@
               :props="{ label: 'name', children: 'children', disabled: 'disabled' }"
               node-key="id"
               :render-after-expand="false"
-              placeholder="请选择二级任务模板（勾选分类可全选其下模板）"
+              placeholder="请选择任务"
               style="width: 100%"
             />
           </template>
@@ -137,28 +137,41 @@ const searchForm = ref<{ code?: string; name?: string; company_id?: number; peri
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
-/** 关联模板树节点：分类用负数 id 与模板正数 id 区分，避免「分类 id」与「模板 id」各自自增撞车；id 同时作为 el-tree-select 的 node-key 与选中值 */
-interface TemplateTreeNode {
+/** 任务单元树节点：分类用负 id、中间模板与叶子模板用不同偏移，避免「分类 id / 模板 id / 三级任务 id」各自自增撞车；id 同时作为 node-key 与选中值 */
+interface TaskUnitTreeNode {
   id: number;
   name: string;
   disabled?: boolean;
-  children?: TemplateTreeNode[];
+  children?: TaskUnitTreeNode[];
 }
 
-const companyOptions = ref<OptionType[]>([]);
-const templateTreeData = ref<TemplateTreeNode[]>([]);
-const templateMap = ref<Record<number, string>>({});
+/** 叶子模板（无三级任务）偏移：选中值 - LEAF_TEMPLATE_OFFSET = 真实模板 id */
+const LEAF_TEMPLATE_OFFSET = 100_000;
+/** 有三级任务的中间模板偏移：仅作父级，不进入选中值 */
+const TEMPLATE_OFFSET = 300_000;
 
-/** 把「一级分类 → 二级模板」目录树转换为 el-tree-select 数据（模板为叶子，分类负值仅作父级） */
-function buildTemplateTree(categories: TaskCategoryTreeItem[]): TemplateTreeNode[] {
+const companyOptions = ref<OptionType[]>([]);
+const taskUnitTreeData = ref<TaskUnitTreeNode[]>([]);
+const itemMap = ref<Record<number, string>>({});
+const leafTemplateMap = ref<Record<number, string>>({});
+
+/** 把「一级分类 → 二级模板 → 三级任务」目录树转换为 el-tree-select 数据：三级任务为叶子；无三级任务的叶子模板本身即叶子（可选中） */
+function buildTaskUnitTree(categories: TaskCategoryTreeItem[]): TaskUnitTreeNode[] {
   return categories.map((cat) => ({
     id: -(cat.id ?? 0),
     name: cat.name ?? "",
     disabled: !cat.children?.length,
-    children: (cat.children ?? []).map((tpl) => ({
-      id: tpl.id!,
-      name: tpl.name ?? tpl.code ?? "",
-    })),
+    children: (cat.children ?? []).map((tpl) => {
+      const items = tpl.items ?? [];
+      if (items.length === 0) {
+        return { id: LEAF_TEMPLATE_OFFSET + tpl.id!, name: tpl.name ?? tpl.code ?? "" };
+      }
+      return {
+        id: TEMPLATE_OFFSET + tpl.id!,
+        name: tpl.name ?? tpl.code ?? "",
+        children: items.map((item) => ({ id: item.id!, name: item.name ?? item.code ?? "" })),
+      };
+    }),
   }));
 }
 
@@ -223,7 +236,7 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "name", label: "项目名", minWidth: 150, showOverflowTooltip: true },
         { prop: "company", label: "委托方", minWidth: 150, formatter: (row: ProjectTable) => row.company?.name ?? "—" },
         { prop: "period", label: "截止日期", width: 110 },
-        { prop: "template_ids", label: "关联模板数", width: 100, align: "center", formatter: (row: ProjectTable) => row.template_ids?.length ?? 0 },
+        { prop: "item_ids", label: "关联任务数", width: 100, align: "center", formatter: (row: ProjectTable) => (row.item_ids?.length ?? 0) + (row.template_ids?.length ?? 0) },
         { prop: "status", label: "状态", width: 92, status: projectStatusMap.value },
         { prop: "operation", label: "操作", width: 260, fixed: "right", align: "center", formatter: (row: ProjectTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ]),
@@ -237,17 +250,29 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "委托方", prop: "company.name" },
   { label: "截止日期", prop: "period" },
   { label: "状态", prop: "status", tag: { map: projectStatusMap.value } },
-  { label: "关联模板", prop: "template_ids", slot: "templateNames", span: 4 },
+  { label: "关联任务", prop: "item_ids", slot: "taskUnitNames", span: 4 },
   { label: "创建人", prop: "created_by.name" },
   { label: "创建时间", prop: "created_time" },
 ];
 
-const formData = ref<ProjectForm>({ id: undefined, name: undefined, company_id: undefined, period: undefined, template_ids: undefined });
+const formData = ref<ProjectForm>({ id: undefined, name: undefined, company_id: undefined, period: undefined, item_ids: undefined, template_ids: undefined });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: ProjectForm = { id: undefined, name: undefined, company_id: undefined, period: undefined, template_ids: undefined };
+const initialFormData: ProjectForm = { id: undefined, name: undefined, company_id: undefined, period: undefined, item_ids: undefined, template_ids: undefined };
+
+/** 树选择器选中值：把三级任务 id 与「叶子模板 id + 偏移」合并为单一数组，读写时与 formData.item_ids / template_ids 互转 */
+const selectedUnitIds = computed<number[]>({
+  get: () => [
+    ...(formData.value.item_ids ?? []),
+    ...(formData.value.template_ids ?? []).map((id) => id + LEAF_TEMPLATE_OFFSET),
+  ],
+  set: (vals: number[]) => {
+    formData.value.item_ids = vals.filter((id) => id < LEAF_TEMPLATE_OFFSET);
+    formData.value.template_ids = vals.filter((id) => id >= LEAF_TEMPLATE_OFFSET).map((id) => id - LEAF_TEMPLATE_OFFSET);
+  },
+});
 
 const rules = reactive({
   name: [{ required: true, message: "请输入项目名", trigger: "blur" }],
@@ -259,7 +284,7 @@ const formItems = computed<FormItem[]>(() => [
   { label: "项目名", key: "name", type: "input", span: 24, props: { placeholder: "项目名称", maxlength: 128 } },
   { label: "委托方", key: "company_id", type: "select", span: 24, props: { placeholder: "请选择或输入医药公司", options: companyOptions.value, filterable: true, allowCreate: true, defaultFirstOption: true } },
   { label: "截止日期", key: "period", span: 24 },
-  { label: "关联模板", key: "template_ids", span: 24 },
+  { label: "关联任务", key: "task_units", span: 24 },
 ]);
 
 const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit: crudSubmit } = useCrudForm<ProjectForm>({
@@ -300,10 +325,14 @@ async function handleSubmit() {
   await crudSubmit();
 }
 
-function resolveTemplateNames(row: Record<string, unknown> | null): string {
-  const ids = (row?.template_ids as number[] | undefined) ?? [];
-  if (ids.length === 0) return "—";
-  return ids.map((id) => templateMap.value[id] ?? `#${id}`).join("、");
+function resolveUnitNames(row: Record<string, unknown> | null): string {
+  const itemIds = (row?.item_ids as number[] | undefined) ?? [];
+  const templateIds = (row?.template_ids as number[] | undefined) ?? [];
+  const names = [
+    ...itemIds.map((id) => itemMap.value[id] ?? `#${id}`),
+    ...templateIds.map((id) => leafTemplateMap.value[id] ?? `#${id}`),
+  ];
+  return names.length === 0 ? "—" : names.join("、");
 }
 
 async function loadOptions() {
@@ -313,10 +342,21 @@ async function loadOptions() {
   ]);
   companyOptions.value = companyRes.data.data.items.map((c) => ({ value: c.id!, label: c.name ?? "" }));
   const categories = treeRes.data.data ?? [];
-  templateTreeData.value = buildTemplateTree(categories);
-  templateMap.value = Object.fromEntries(
-    categories.flatMap((cat) => (cat.children ?? []).map((tpl) => [tpl.id!, tpl.name ?? tpl.code ?? ""]))
-  );
+  taskUnitTreeData.value = buildTaskUnitTree(categories);
+  const itemEntries: [number, string][] = [];
+  const leafTemplateEntries: [number, string][] = [];
+  for (const cat of categories) {
+    for (const tpl of cat.children ?? []) {
+      const items = tpl.items ?? [];
+      if (items.length === 0) {
+        leafTemplateEntries.push([tpl.id!, tpl.name ?? tpl.code ?? ""]);
+      } else {
+        for (const item of items) itemEntries.push([item.id!, item.name ?? item.code ?? ""]);
+      }
+    }
+  }
+  itemMap.value = Object.fromEntries(itemEntries);
+  leafTemplateMap.value = Object.fromEntries(leafTemplateEntries);
 }
 
 onMounted(async () => {
@@ -366,7 +406,7 @@ async function handleBatchDelete() {
 
 async function publishRow(id: number, name: string) {
   try {
-    await ElMessageBox.confirm(`确定发布项目「${name}」吗？发布后将按关联的二级模板批量生成任务实例。`, "发布项目", { type: "warning" });
+    await ElMessageBox.confirm(`确定发布项目「${name}」吗？发布后将按关联的任务批量生成任务实例。`, "发布项目", { type: "warning" });
     await ProjectAPI.publishProject(id);
     await refreshData();
   } catch {

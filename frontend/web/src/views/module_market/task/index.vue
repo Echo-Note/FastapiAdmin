@@ -11,64 +11,86 @@
       description="创建任务后先「发布」，再按需「分派」或公开大厅接单；成果在「成果审核」页处理，任务进度通过「状态流转」单向推进（发布→进行中→已完成→已结算→归档）。"
     />
 
-    <FaSearchBar
-      v-show="showSearchBar"
-      ref="searchBarRef"
-      v-model="searchForm"
-      :items="searchItems"
-      :is-expand="false"
-      :show-expand="true"
-      :show-reset="true"
-      :show-search="true"
-      @search="handleSearch"
-      @reset="onResetSearch"
-    />
+    <div class="market-task-layout">
+      <!-- 左侧任务目录树：一级分类 → 二级模板 → 任务，点击节点过滤右侧任务表 -->
+      <ElCard class="market-task-sidebar" :body-style="{ padding: '12px' }">
+        <div class="market-task-sidebar__title">任务目录</div>
+        <div class="market-task-sidebar__all" :class="{ 'is-active': isAllSelected }" @click="handleSelectAll">
+          全部任务
+        </div>
+        <ElTree
+          :data="sidebarTreeData"
+          node-key="id"
+          :props="{ label: 'name', children: 'children' }"
+          :expand-on-click-node="false"
+          :highlight-current="true"
+          :current-node-key="currentNodeKey"
+          :default-expanded-keys="defaultExpandedKeys"
+          @node-click="handleSidebarNodeClick"
+        />
+      </ElCard>
 
-    <ElCard class="fa-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
-      <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
-        <template #left>
-          <FaTableHeaderLeft
-            :remove-ids="selectedIds"
-            :perm-create="['module_market:task:create']"
-            :perm-delete="['module_market:task:delete']"
-            :delete-loading="batchDeleting"
-            @add="handleAdd"
-            @delete="handleBatchDelete"
+      <div class="market-task-main">
+        <FaSearchBar
+          v-show="showSearchBar"
+          ref="searchBarRef"
+          v-model="searchForm"
+          :items="searchItems"
+          :is-expand="false"
+          :show-expand="true"
+          :show-reset="true"
+          :show-search="true"
+          @search="handleSearch"
+          @reset="onResetSearch"
+        />
+
+        <ElCard class="fa-table-card" :style="{ 'margin-top': showSearchBar ? '12px' : '0' }">
+          <FaTableHeader v-model:columns="columnChecks" v-model:showSearchBar="showSearchBar" :loading="loading" @refresh="refreshData">
+            <template #left>
+              <FaTableHeaderLeft
+                :remove-ids="selectedIds"
+                :perm-create="['module_market:task:create']"
+                :perm-delete="['module_market:task:delete']"
+                :delete-loading="batchDeleting"
+                @add="handleAdd"
+                @delete="handleBatchDelete"
+              />
+              <ElButton
+                v-if="selectedIds.length > 0"
+                v-hasPerm="'module_market:assignment:create'"
+                type="success"
+                plain
+                :icon="UserFilled"
+                @click="openBatchAssign"
+              >
+                批量分配 ({{ selectedIds.length }})
+              </ElButton>
+              <ElButton
+                v-if="selectedIds.length > 0"
+                v-hasPerm="'module_market:task:publish'"
+                type="primary"
+                plain
+                :icon="Promotion"
+                @click="openBatchPublish"
+              >
+                批量发布 ({{ selectedIds.length }})
+              </ElButton>
+            </template>
+          </FaTableHeader>
+
+          <FaTable
+            ref="faTableRef"
+            :loading="loading"
+            :data="data"
+            :columns="columns"
+            :pagination="pagination"
+            @selection-change="onTableSelectionChange"
+            @pagination:size-change="handleSizeChange"
+            @pagination:current-change="handleCurrentChange"
           />
-          <ElButton
-            v-if="selectedIds.length > 0"
-            v-hasPerm="'module_market:assignment:create'"
-            type="success"
-            plain
-            :icon="UserFilled"
-            @click="openBatchAssign"
-          >
-            批量分配 ({{ selectedIds.length }})
-          </ElButton>
-          <ElButton
-            v-if="selectedIds.length > 0"
-            v-hasPerm="'module_market:task:publish'"
-            type="primary"
-            plain
-            :icon="Promotion"
-            @click="openBatchPublish"
-          >
-            批量发布 ({{ selectedIds.length }})
-          </ElButton>
-        </template>
-      </FaTableHeader>
-
-      <FaTable
-        ref="faTableRef"
-        :loading="loading"
-        :data="data"
-        :columns="columns"
-        :pagination="pagination"
-        @selection-change="onTableSelectionChange"
-        @pagination:size-change="handleSizeChange"
-        @pagination:current-change="handleCurrentChange"
-      />
-    </ElCard>
+        </ElCard>
+      </div>
+    </div>
 
     <FaDialog
       v-model="dialogVisible.visible"
@@ -82,6 +104,7 @@
     >
       <template v-if="dialogVisible.type === 'detail'">
         <FaDescriptions :column="4" :data="detailFormData" :items="detailItems" max-height="70vh">
+          <template #taskUnitName="{ row }">{{ resolveUnitName(row) }}</template>
           <template #projectName="{ row }">{{ resolveProjectName(row) }}</template>
           <template #assignMode="{ row }"><component :is="dictTag('market_assign_mode', row?.assign_mode)" /></template>
           <template #statusTag="{ row }"><component :is="dictTag('market_task_status', row?.status)" /></template>
@@ -101,7 +124,22 @@
           label-position="right"
           :span="24"
           :gutter="16"
-        />
+        >
+          <template #task_unit>
+            <ElTreeSelect
+              v-model="selectedUnitId"
+              :data="formTreeData"
+              filterable
+              clearable
+              :filter-node-method="filterUnitNode"
+              :props="{ label: 'name', children: 'children', disabled: 'disabled' }"
+              node-key="id"
+              :render-after-expand="false"
+              placeholder="请选择任务"
+              style="width: 100%"
+            />
+          </template>
+        </FaForm>
       </template>
     </FaDialog>
 
@@ -129,6 +167,7 @@
     <FaDrawer v-model="assignDrawerVisible" :title="`任务详情 · ${drawerTask?.task_no ?? ''}`" size="720px" destroy-on-close>
       <div class="task-drawer">
         <FaDescriptions :column="2" :data="drawerTask ?? {}" :items="detailItems" class="task-drawer__info">
+          <template #taskUnitName="{ row }">{{ resolveUnitName(row) }}</template>
           <template #projectName="{ row }">{{ resolveProjectName(row) }}</template>
           <template #assignMode="{ row }"><component :is="dictTag('market_assign_mode', row?.assign_mode)" /></template>
           <template #statusTag="{ row }"><component :is="dictTag('market_task_status', row?.status)" /></template>
@@ -222,7 +261,7 @@ import { h } from "vue";
 import TaskAPI, { type TaskForm, type TaskTable } from "@/api/module_market/task";
 import AssignmentAPI, { type AssignmentTable } from "@/api/module_market/assignment";
 import ProjectAPI from "@/api/module_market/project";
-import TaskTemplateAPI from "@/api/module_market/task-template";
+import TaskCategoryAPI, { type TaskCategoryTreeItem } from "@/api/module_market/task-category";
 import UserAPI from "@/api/module_system/user";
 import { useDictStore } from "@stores";
 import StatusTag from "@/components/display/fa-status-tag/index.vue";
@@ -264,11 +303,10 @@ function dictTag(dictType: string, val?: unknown) {
   return h(StatusTag, { type: (item.list_class as StatusType) ?? "info", label: item.dict_label ?? strVal });
 }
 
-const searchForm = ref<{ task_no?: string; name?: string; project_id?: number; template_id?: number; period?: string; assign_mode?: string; status?: string }>({
+const searchForm = ref<{ task_no?: string; name?: string; project_id?: number; period?: string; assign_mode?: string; status?: string }>({
   task_no: undefined,
   name: undefined,
   project_id: undefined,
-  template_id: undefined,
   period: undefined,
   assign_mode: undefined,
   status: undefined,
@@ -277,17 +315,100 @@ const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
 const projectOptions = ref<OptionType[]>([]);
-const templateOptions = ref<OptionType[]>([]);
 
 const searchItems = computed<SearchFormItem[]>(() => [
   { label: "任务编号", key: "task_no", type: "input", placeholder: "请输入任务编号", clearable: true, span: 6 },
   { label: "显示名", key: "name", type: "input", placeholder: "请输入任务显示名", clearable: true, span: 6 },
   { label: "项目", key: "project_id", type: "select", props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true, clearable: true }, span: 6 },
-  { label: "模板", key: "template_id", type: "select", props: { placeholder: "请选择模板", options: templateOptions.value, filterable: true, clearable: true }, span: 6 },
   { label: "周期", key: "period", type: "input", placeholder: "如 2026-10", clearable: true, span: 6 },
   { label: "分配方式", key: "assign_mode", type: "select", props: { placeholder: "请选择分配方式", options: assignModeOptions.value, clearable: true }, span: 6 },
   { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: statusOptions.value, clearable: true }, span: 6 },
 ]);
+
+// ── 左侧任务目录树（一级分类 → 二级模板，两级）──
+/** 叶子模板（无三级任务）偏移：选中值 - LEAF_TEMPLATE_OFFSET = 真实模板 id */
+const LEAF_TEMPLATE_OFFSET = 100_000;
+/** 有三级任务的中间模板偏移：仅作父级 */
+const TEMPLATE_OFFSET = 300_000;
+
+interface UnitTreeNode {
+  id: number;
+  name: string;
+  disabled?: boolean;
+  children?: UnitTreeNode[];
+}
+
+const categoryTree = ref<TaskCategoryTreeItem[]>([]);
+const sidebarTreeData = ref<UnitTreeNode[]>([]);
+const formTreeData = ref<UnitTreeNode[]>([]);
+const defaultExpandedKeys = ref<number[]>([]);
+
+/** 当前目录过滤条件（空对象 = 全部任务） */
+const unitFilter = ref<{ category_id?: number; template_id?: number }>({});
+const currentNodeKey = ref<number | undefined>(undefined);
+const isAllSelected = computed(() => currentNodeKey.value == null);
+
+/** 把「一级分类 → 二级模板 → 任务」转换为树；leafOnly 时非叶子节点禁用（表单只选任务） */
+function buildUnitTree(categories: TaskCategoryTreeItem[], leafOnly: boolean): UnitTreeNode[] {
+  return categories.map((cat) => {
+    const children = (cat.children ?? []).map((tpl) => {
+      const items = tpl.items ?? [];
+      if (items.length === 0) {
+        return { id: LEAF_TEMPLATE_OFFSET + tpl.id!, name: tpl.name ?? tpl.code ?? "" };
+      }
+      return {
+        id: TEMPLATE_OFFSET + tpl.id!,
+        name: tpl.name ?? tpl.code ?? "",
+        disabled: leafOnly,
+        children: items.map((item) => ({ id: item.id!, name: item.name ?? item.code ?? "" })),
+      };
+    });
+    return { id: -(cat.id ?? 0), name: cat.name ?? "", disabled: leafOnly, children };
+  });
+}
+
+/** 把「一级分类 → 二级模板」转换为侧边栏两级树：分类负 id 仅作父级，模板正 id 为叶子 */
+function buildSidebarTree(categories: TaskCategoryTreeItem[]): UnitTreeNode[] {
+  return categories.map((cat) => ({
+    id: -(cat.id ?? 0),
+    name: cat.name ?? "",
+    children: (cat.children ?? []).map((tpl) => ({
+      id: tpl.id!,
+      name: tpl.name ?? tpl.code ?? "",
+    })),
+  }));
+}
+
+/** 由侧边栏节点 id 解析过滤条件：分类（负 id）→ category_id，模板（正 id）→ template_id */
+function resolveSidebarFilter(id: number): { category_id?: number; template_id?: number } {
+  if (id < 0) return { category_id: -id };
+  return { template_id: id };
+}
+
+/** 树选择器按名称过滤（el-tree-select 的 filterable 需显式 filter-node-method） */
+function filterUnitNode(value: string, data: { name?: string }): boolean {
+  return (data.name ?? "").includes(value);
+}
+
+/** 合并搜索表单 + 目录过滤条件，回到第一页并刷新（固定排除草稿，只展示已发布任务） */
+async function refreshWithFilters() {
+  replaceSearchParams(cleanEmptyArrayParams({ ...searchForm.value, ...unitFilter.value, exclude_status: "DRAFT" }) as Record<string, unknown>);
+  await getData();
+}
+
+/** 点击目录树节点：分类/模板都过滤显示该节点下包含的任务 */
+function handleSidebarNodeClick(data: UnitTreeNode) {
+  currentNodeKey.value = data.id;
+  unitFilter.value = resolveSidebarFilter(data.id);
+  void refreshWithFilters();
+}
+
+/** 点击「全部任务」清除目录过滤 */
+function handleSelectAll() {
+  currentNodeKey.value = undefined;
+  unitFilter.value = {};
+  void refreshWithFilters();
+}
 
 const faTableRef = ref<{ elTableRef?: { clearSelection: () => void } } | null>(null);
 const { selectedRows, selectedIds, batchDeleting, onTableSelectionChange } = useTableSelection<TaskTable>();
@@ -320,13 +441,15 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
   useTable({
     core: {
       apiFn: TaskAPI.listTask,
-      apiParams: { page_no: 1, page_size: 10 },
+      apiParams: { page_no: 1, page_size: 10, exclude_status: "DRAFT" },
       columnsFactory: () => [
         { type: "selection", width: 48, fixed: "left" },
         { type: "globalIndex", width: 56, label: "序号" },
         { prop: "task_no", label: "任务编号", minWidth: 120, showOverflowTooltip: true },
         { prop: "name", label: "显示名", minWidth: 180, showOverflowTooltip: true },
+        { prop: "project", label: "项目", minWidth: 140, formatter: (row: TaskTable) => row.project?.name ?? "—" },
         { prop: "template", label: "任务模板", minWidth: 140, formatter: (row: TaskTable) => row.template?.name ?? "—" },
+        { prop: "item", label: "任务", minWidth: 150, formatter: (row: TaskTable) => row.item?.name ?? "—" },
         { prop: "period", label: "周期", width: 90 },
         { prop: "assign_mode", label: "分配方式", width: 100, formatter: (row: TaskTable) => dictTag("market_assign_mode", row.assign_mode) },
         { prop: "status", label: "状态", width: 92, formatter: (row: TaskTable) => dictTag("market_task_status", row.status) },
@@ -342,6 +465,7 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "任务编号", prop: "task_no" },
   { label: "显示名", prop: "name" },
   { label: "任务模板", prop: "template.name" },
+  { label: "任务", prop: "item_id", slot: "taskUnitName" },
   { label: "项目", prop: "project_id", slot: "projectName" },
   { label: "周期", prop: "period" },
   { label: "分配方式", prop: "assign_mode", slot: "assignMode" },
@@ -352,30 +476,48 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "创建时间", prop: "created_time" },
 ];
 
-const formData = ref<TaskForm>({ id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "open" });
+const formData = ref<TaskForm>({ id: undefined, project_id: undefined, item_id: undefined, template_id: undefined, period: undefined, assign_mode: "open" });
 const { dialogVisible } = useCrudDialog();
 const dataFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const formRenderKey = ref(0);
 
-const initialFormData: TaskForm = { id: undefined, project_id: undefined, template_id: undefined, name: undefined, period: undefined, assign_mode: "open" };
+const initialFormData: TaskForm = { id: undefined, project_id: undefined, item_id: undefined, template_id: undefined, period: undefined, assign_mode: "open" };
+
+/** 表单树选择器选中值：三级任务 id 直接作为值，叶子模板用「id + 偏移」，读写时与 item_id / template_id 互转 */
+const selectedUnitId = computed<number | undefined>({
+  get: () => {
+    if (formData.value.item_id != null) return formData.value.item_id;
+    if (formData.value.template_id != null) return formData.value.template_id + LEAF_TEMPLATE_OFFSET;
+    return undefined;
+  },
+  set: (val: number | undefined) => {
+    if (val == null) {
+      formData.value.item_id = undefined;
+      formData.value.template_id = undefined;
+    } else if (val >= LEAF_TEMPLATE_OFFSET) {
+      formData.value.template_id = val - LEAF_TEMPLATE_OFFSET;
+      formData.value.item_id = undefined;
+    } else {
+      formData.value.item_id = val;
+      formData.value.template_id = undefined;
+    }
+  },
+});
 
 const rules = reactive({
   project_id: [{ required: true, message: "请选择项目", trigger: "change" }],
-  template_id: [{ required: true, message: "请选择任务模板", trigger: "change" }],
-  name: [{ required: true, message: "请输入任务显示名", trigger: "blur" }],
   period: [{ required: true, message: "请输入周期", trigger: "blur" }],
   assign_mode: [{ required: true, message: "请选择分配方式", trigger: "change" }],
 });
 
 const formItems = computed<FormItem[]>(() => [
   { label: "项目", key: "project_id", type: "select", span: 24, props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true } },
-  { label: "任务模板", key: "template_id", type: "select", span: 24, props: { placeholder: "请选择二级任务模板", options: templateOptions.value, filterable: true } },
-  { label: "显示名", key: "name", type: "input", span: 24, props: { placeholder: "如 一心坦-等级医院管理", maxlength: 256 } },
+  { label: "任务", key: "task_unit", span: 24 },
   { label: "周期", key: "period", type: "input", span: 24, props: { placeholder: "继承项目周期，如 2026-10", maxlength: 16 } },
   { label: "分配方式", key: "assign_mode", type: "select", span: 24, props: { placeholder: "请选择分配方式", options: assignModeOptions.value } },
 ]);
 
-const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = useCrudForm<TaskForm>({
+const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit: crudSubmit } = useCrudForm<TaskForm>({
   formData,
   initialFormData,
   dialogVisible,
@@ -392,14 +534,17 @@ const { submitLoading, handleCloseDialog, handleOpenDialog, handleSubmit } = use
 });
 
 async function loadOptions() {
-  const [projectRes, templateRes, userRes] = await Promise.all([
+  const [projectRes, treeRes, userRes] = await Promise.all([
     ProjectAPI.listProject({ page_no: 1, page_size: 100 }),
-    TaskTemplateAPI.listTemplate({ page_no: 1, page_size: 100 }),
+    TaskCategoryAPI.treeCategory(),
     UserAPI.listUser({ page_no: 1, page_size: 100 }),
   ]);
   projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? p.code ?? "" }));
-  templateOptions.value = templateRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? t.code ?? "" }));
   userOptions.value = userRes.data.data.items.map((u) => ({ value: u.id!, label: u.name ?? u.username ?? "" }));
+  categoryTree.value = treeRes.data.data ?? [];
+  sidebarTreeData.value = buildSidebarTree(categoryTree.value);
+  formTreeData.value = buildUnitTree(categoryTree.value, true);
+  defaultExpandedKeys.value = categoryTree.value.map((cat) => -(cat.id ?? 0));
 }
 
 onMounted(async () => {
@@ -411,19 +556,38 @@ async function handleAdd() {
   await handleOpenDialog("create");
 }
 
+/** 提交表单：先校验任务已选，再走通用 CRUD 提交流程 */
+async function handleSubmit() {
+  if (selectedUnitId.value == null) {
+    ElMessage.warning("请选择任务");
+    return;
+  }
+  await crudSubmit();
+}
+
 function resolveProjectName(row: Record<string, unknown> | null): string {
   const id = row?.project_id as number | undefined;
   if (id == null) return "—";
   return projectOptions.value.find((o) => o.value === id)?.label ?? `#${id}`;
 }
 
+/** 任务名：优先三级任务名，叶子模板任务回退为模板名 */
+function resolveUnitName(row: Record<string, unknown> | null): string {
+  const item = row?.item as { name?: string } | null | undefined;
+  if (item?.name) return item.name;
+  const tpl = row?.template as { name?: string } | null | undefined;
+  return tpl?.name ?? "—";
+}
+
 async function handleSearch(params: Record<string, unknown>) {
-  replaceSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);
+  replaceSearchParams(cleanEmptyArrayParams({ ...params, ...unitFilter.value, exclude_status: "DRAFT" }) as Record<string, unknown>);
   await getData();
 }
 
 async function onResetSearch() {
-  searchForm.value = { task_no: undefined, name: undefined, project_id: undefined, template_id: undefined, period: undefined, assign_mode: undefined, status: undefined };
+  searchForm.value = { task_no: undefined, name: undefined, project_id: undefined, period: undefined, assign_mode: undefined, status: undefined };
+  unitFilter.value = {};
+  currentNodeKey.value = undefined;
   await resetSearchParams();
 }
 
@@ -685,6 +849,48 @@ async function handleBatchPublishSubmit() {
 <style scoped>
 .market-flow-hint {
   margin-bottom: 12px;
+}
+.market-task-layout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-height: 0;
+  flex: 1;
+}
+.market-task-sidebar {
+  flex: 0 0 260px;
+  min-width: 220px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+.market-task-sidebar__title {
+  padding: 0 4px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  margin-bottom: 8px;
+}
+.market-task-sidebar__all {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.market-task-sidebar__all:hover {
+  background-color: var(--el-fill-color-light);
+}
+.market-task-sidebar__all.is-active {
+  color: var(--el-color-primary);
+  background-color: var(--el-color-primary-light-9);
+  font-weight: 600;
+}
+.market-task-main {
+  flex: 1;
+  min-width: 0;
 }
 .status-hint {
   margin-bottom: 12px;

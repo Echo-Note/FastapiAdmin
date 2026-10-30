@@ -76,6 +76,12 @@ export interface TaskPageQuery extends PageQuery, UserByQueryParams {
   task_no?: string;
   project_id?: number;
   template_id?: number;
+  /** 三级任务ID */
+  item_id?: number;
+  /** 一级分类ID */
+  category_id?: number;
+  /** 排除的任务状态（如 DRAFT，仅展示已发布任务） */
+  exclude_status?: string;
   period?: string;
   assign_mode?: string;
   status?: string;
@@ -87,6 +93,14 @@ export interface TaskTemplateBrief {
   code?: string;
   name?: string;
   config?: TaskConfig | null;
+}
+
+/** 三级任务（嵌套在任务响应中） */
+export interface TaskItemBrief {
+  id?: number;
+  code?: string;
+  name?: string;
+  template_id?: number;
 }
 
 /** 任务设计配置（与后端 app/modules/market/config.py 的 TaskConfig 对齐） */
@@ -104,8 +118,14 @@ export interface TaskConfig {
 export interface TaskTable extends BaseType {
   task_no?: string;
   project_id?: number;
+  /** 所属项目摘要 */
+  project?: { id?: number; name?: string; code?: string } | null;
   template_id?: number;
   template?: TaskTemplateBrief | null;
+  /** 三级任务ID（叶子模板任务为空） */
+  item_id?: number | null;
+  /** 三级任务 */
+  item?: TaskItemBrief | null;
   name?: string;
   period?: string;
   assign_mode?: string;
@@ -118,8 +138,10 @@ export interface TaskTable extends BaseType {
 
 export interface TaskForm extends BaseFormType {
   project_id?: number;
+  /** 三级任务ID（与 template_id 二选一） */
+  item_id?: number;
+  /** 叶子模板ID（无三级任务时） */
   template_id?: number;
-  name?: string;
   period?: string;
   assign_mode?: string;
   status?: string;
