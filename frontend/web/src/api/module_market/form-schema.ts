@@ -31,7 +31,12 @@ export interface FormSchemaColumn {
   placeholder?: string | null;
   /** 选项列表（仅 select/radio/checkbox 需要） */
   options?: FormSchemaOption[] | null;
+  /** 产品库角色：name 列检索产品库并回填同行的 spec / manufacturer 列 */
+  product_role?: ProductRole | null;
 }
+
+/** 产品库角色（对齐后端 FormSchemaColumn.product_role） */
+export type ProductRole = "name" | "spec" | "manufacturer";
 
 /** 采集字段类型，对齐后端 FormSchemaField.type（table 为分节内多行子表） */
 export type FormSchemaFieldType =

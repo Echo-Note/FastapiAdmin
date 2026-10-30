@@ -115,14 +115,28 @@
         </ElFormItem>
         <ElFormItem v-if="needsColumns" label="子表列">
           <div class="w-full space-y-2">
-            <div v-for="(col, i) in editing.columns" :key="i" class="flex items-center gap-2">
-              <ElInput v-model="col.label" placeholder="列显示名(如 产品名称)" class="w-36" maxlength="128" />
-              <ElInput v-model="col.name" placeholder="列标识(如 product_name)" class="w-40" maxlength="64" />
-              <ElSelect v-model="col.type" class="w-28">
-                <ElOption v-for="t in COLUMN_TYPE_OPTIONS" :key="t.value" :label="t.label" :value="t.value" />
-              </ElSelect>
-              <ElCheckbox v-model="col.required">必填</ElCheckbox>
-              <ElButton link type="danger" @click="removeColumn(i)">删除</ElButton>
+            <div v-for="(col, i) in editing.columns" :key="i" class="space-y-1 border-b border-dashed pb-2 last:border-b-0">
+              <div class="flex items-center gap-2">
+                <ElInput v-model="col.label" placeholder="列显示名(如 产品名称)" class="w-36" maxlength="128" />
+                <ElInput v-model="col.name" placeholder="列标识(如 product_name)" class="w-40" maxlength="64" />
+                <ElSelect v-model="col.type" class="w-28">
+                  <ElOption v-for="t in COLUMN_TYPE_OPTIONS" :key="t.value" :label="t.label" :value="t.value" />
+                </ElSelect>
+                <ElSelect v-model="col.product_role" class="w-36" clearable placeholder="产品库角色">
+                  <ElOption v-for="r in PRODUCT_ROLE_OPTIONS" :key="r.value" :label="r.label" :value="r.value" />
+                </ElSelect>
+                <ElCheckbox v-model="col.required">必填</ElCheckbox>
+                <ElButton link type="danger" @click="removeColumn(i)">删除</ElButton>
+              </div>
+              <!-- select/radio/checkbox 列的可选项：C 端会用它们渲染选项选择器 -->
+              <div v-if="columnNeedsOptions(col)" class="ml-6 space-y-1">
+                <div v-for="(opt, j) in col.options ?? []" :key="j" class="flex items-center gap-2">
+                  <ElInput v-model="opt.label" placeholder="显示名" class="w-32" />
+                  <ElInput v-model="opt.value" placeholder="值" class="flex-1" />
+                  <ElButton link type="danger" @click="removeColumnOption(col, j)">删除</ElButton>
+                </div>
+                <ElButton link type="primary" @click="addColumnOption(col)">+ 添加选项</ElButton>
+              </div>
             </div>
             <ElButton link type="primary" @click="addColumn">+ 添加子列</ElButton>
           </div>
@@ -145,6 +159,7 @@ import type {
   FormSchemaField,
   FormSchemaFieldType,
   FormSchemaOption,
+  ProductRole,
 } from "@/api/module_market/form-schema";
 
 defineOptions({ name: "FormSchemaEditor" });
@@ -190,6 +205,13 @@ const COLUMN_TYPE_OPTIONS: { value: Exclude<FormSchemaFieldType, "table">; label
   { value: "checkbox", label: "多选" },
   { value: "image", label: "图片上传" },
   { value: "file", label: "文件附件" },
+];
+
+/** 子列产品库角色下拉选项（name 列会在 C 端触发产品库检索与自动填充） */
+const PRODUCT_ROLE_OPTIONS: { value: ProductRole; label: string }[] = [
+  { value: "name", label: "产品名称(检索)" },
+  { value: "spec", label: "产品规格(回填)" },
+  { value: "manufacturer", label: "生产企业(回填)" },
 ];
 
 /** 示例结构（点击「载入示例」一键填入） */
@@ -377,6 +399,20 @@ function removeColumn(i: number) {
   editing.columns.splice(i, 1);
 }
 
+/** 该子列是否需要维护选项列表 */
+function columnNeedsOptions(col: FormSchemaColumn) {
+  return ["select", "radio", "checkbox"].includes(col.type);
+}
+
+function addColumnOption(col: FormSchemaColumn) {
+  col.options = col.options ?? [];
+  col.options.push({ label: "", value: "" });
+}
+
+function removeColumnOption(col: FormSchemaColumn, i: number) {
+  col.options?.splice(i, 1);
+}
+
 function saveField() {
   const label = editing.label.trim();
   if (!label) return void ElMessage.warning("请输入显示名");
@@ -405,6 +441,14 @@ function saveField() {
         label: colLabel,
         type: col.type,
         ...(col.required ? { required: true } : {}),
+        ...(col.product_role ? { product_role: col.product_role } : {}),
+        ...(columnNeedsOptions(col)
+          ? {
+              options: (col.options ?? [])
+                .filter((o) => o.label.trim() || o.value.trim())
+                .map((o) => ({ label: o.label.trim(), value: o.value.trim() })),
+            }
+          : {}),
       });
     }
     if (columns.length === 0) return void ElMessage.warning("多行子表至少需要一个子列");
