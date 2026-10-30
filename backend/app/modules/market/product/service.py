@@ -8,7 +8,8 @@
 
 可见性规则是本模块的核心不变量：
 ``approved`` 对所有人可见；``pending`` 只对提交人自己可见（同人下月不必重录）；
-``rejected`` 对任何人都不可见。
+``rejected`` 对任何人都不可见。「提交人」取审计字段 ``created_id``（真实用户），
+不另设来源枚举——运营录入与 C 端提交都是具体的人。
 """
 
 from datetime import UTC, datetime
@@ -23,7 +24,7 @@ from app.core.exceptions import CustomException
 from app.core.logger import logger
 from app.utils.common_util import search_to_dict
 
-from ..enums import ProductAuditStatus, ProductSource
+from ..enums import ProductAuditStatus
 from ..task.collection_schema import PRODUCT_MANUFACTURER_KEY, PRODUCT_NAME_KEY, PRODUCT_SPEC_KEY
 from .crud import ProductCRUD
 from .model import ProductModel
@@ -146,7 +147,6 @@ class ProductService:
                 "name": data.name,
                 "spec": data.spec,
                 "manufacturer": data.manufacturer,
-                "source": ProductSource.ADMIN.value,
                 "audit_status": ProductAuditStatus.APPROVED.value,
                 "reviewer_id": self.auth.user.id,
                 "reviewed_at": datetime.now(UTC),
@@ -216,7 +216,7 @@ class ProductService:
                 ProductModel.audit_status == ProductAuditStatus.APPROVED.value,
                 and_(
                     ProductModel.audit_status == ProductAuditStatus.PENDING.value,
-                    ProductModel.submitter_id == self.auth.user.id,
+                    ProductModel.created_id == self.auth.user.id,
                 ),
             ),
         ]
@@ -251,7 +251,6 @@ class ProductService:
         :return: 新建的产品条数
         """
         columns = resolve_product_columns(form_schema)
-        submitter_id = self.auth.user.id
         created = 0
         for name, spec, manufacturer in iter_submitted_products(form_data, columns):
             if await ProductCRUD(self.auth, self.db).get(name=name, spec=spec, manufacturer=manufacturer):
@@ -264,9 +263,7 @@ class ProductService:
                             "name": name,
                             "spec": spec,
                             "manufacturer": manufacturer,
-                            "source": ProductSource.USER.value,
                             "audit_status": ProductAuditStatus.PENDING.value,
-                            "submitter_id": submitter_id,
                         }
                     )
                 created += 1

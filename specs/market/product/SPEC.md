@@ -30,16 +30,18 @@ parent: market-domain
 
 ## 来源与审核
 
-`source`：`admin`（运营录入）/ `user`（C 端提交自动入库）；`audit_status`：`pending` / `approved` / `rejected`。
+**「谁产生的这条记录」用审计字段表达**：`created_id` / `created_by`（`UserMixin` 自动填充，`UserBySchema` 自动透出）。不设 `source` 之类的来源枚举——运营录入与 C 端提交都是具体的人，硬编码两档字符串既丢失身份，又会在接入导入、外部主数据等新来源时立刻失效。
 
-| 场景 | source | audit_status | 谁能检索到 |
-|---|---|---|---|
-| 运营新增/修正 | `admin` | `approved`（录入即生效） | 所有人 |
-| C 端提交自动入库 | `user` | `pending` | 仅提交人自己 |
-| 运营通过 | 不变 | `approved` | 所有人 |
-| 运营驳回 | 不变 | `rejected` | 无人（记录保留可追溯） |
+审核状态机 `audit_status`：`pending` / `approved` / `rejected`（`ProductAuditStatus`）。
 
-可见性规则落在 `ProductService.search` 一条 SQL 里：`approved` **或**（`pending` 且 `submitter_id = 当前用户`）。`rejected` 永不出现在任何检索结果里。
+| 场景 | audit_status | 谁能检索到 |
+|---|---|---|
+| 运营新增/修正 | `approved`（录入即生效） | 所有人 |
+| C 端提交自动入库 | `pending` | 仅提交人（`created_id`）自己 |
+| 运营通过 | `approved` | 所有人 |
+| 运营驳回 | `rejected` | 无人（记录保留可追溯） |
+
+可见性规则落在 `ProductService.search` 一条 SQL 里：`approved` **或**（`pending` 且 `created_id = 当前用户`）。`rejected` 永不出现在任何检索结果里。
 
 驳回必须填写审核意见（`ProductAuditSchema` 的模型校验，422），避免提交人不知道为什么被拒。
 

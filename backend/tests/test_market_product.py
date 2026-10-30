@@ -33,7 +33,8 @@ class TestProductLibrary:
         assert resp.json()["success"] is True, resp.text
         created = resp.json()["data"]
         assert created["audit_status"] == "approved"
-        assert created["source"] == "admin"
+        # 来源不硬编码：谁产生的记录由审计字段表达（运营录入即当前登录用户）
+        assert created["created_id"] is not None
 
         search = test_client.get("/market/mini/products/search", headers=auth_headers, params={"keyword": "一心坦"})
         assert search.status_code == 200, search.text

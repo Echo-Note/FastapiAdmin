@@ -18,9 +18,7 @@ class ProductOutSchema(BaseSchema, UserBySchema):
     name: str = Field(description="产品名称")
     spec: str = Field(default="", description="产品规格")
     manufacturer: str = Field(default="", description="生产企业")
-    source: str = Field(description="来源(admin 运营录入/user C端提交)")
     audit_status: str = Field(description="审核状态(pending/approved/rejected)")
-    submitter_id: int | None = Field(default=None, description="C端提交人ID")
     reviewer_id: int | None = Field(default=None, description="审核人ID")
     review_comment: str | None = Field(default=None, description="审核意见")
     reviewed_at: datetime | None = Field(default=None, description="审核时间")
@@ -59,7 +57,6 @@ class ProductQueryParam(BaseQueryParam, UserByQueryParam):
     name: str | None = Field(default=None, description="产品名称", json_schema_extra={"q": "like"})
     manufacturer: str | None = Field(default=None, description="生产企业", json_schema_extra={"q": "like"})
     audit_status: str | None = Field(default=None, description="审核状态", json_schema_extra={"q": "eq"})
-    source: str | None = Field(default=None, description="来源", json_schema_extra={"q": "eq"})
 
 
 class ProductAuditSchema(BaseModel):

@@ -4,9 +4,10 @@
 判重键就是这三列：三者全等视为同一个产品，同名不同厂商或不同规格是各自独立的记录，
 C 端检索命中多条时由用户选择。
 
-来源与审核：运营录入（``source=admin``）直接生效；C 端提交成果时自动入库
-（``source=user``）先落 ``pending``，仅提交人自己可检索，运营审核通过（``approved``）
-后对所有人可见，驳回（``rejected``）则不再参与检索。
+来源与审核：**谁产生的记录由审计字段 ``created_id`` / ``created_by`` 表达**（不另设来源枚举，
+运营录入与 C 端提交都是真实用户）。运营录入直接生效（``approved``）；C 端提交成果时自动入库
+先落 ``pending``，仅提交人自己可检索，运营审核通过（``approved``）后对所有人可见，
+驳回（``rejected``）则不再参与检索。
 """
 
 from datetime import datetime
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.base_model import ModelMixin, UserMixin
 
-from ..enums import ProductAuditStatus, ProductSource
+from ..enums import ProductAuditStatus
 
 
 class ProductModel(ModelMixin, UserMixin):
@@ -33,22 +34,12 @@ class ProductModel(ModelMixin, UserMixin):
     manufacturer: Mapped[str] = mapped_column(
         String(255), nullable=False, default="", comment="生产企业(空串表示未填)"
     )
-    source: Mapped[str] = mapped_column(
-        String(16), nullable=False, default=ProductSource.ADMIN.value, index=True, comment="来源(admin 运营录入/user C端提交)"
-    )
     audit_status: Mapped[str] = mapped_column(
         String(16),
         nullable=False,
         default=ProductAuditStatus.APPROVED.value,
         index=True,
         comment="审核状态(pending 待审核/approved 已通过/rejected 已驳回)",
-    )
-    submitter_id: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("sys_user.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-        comment="C端提交人ID(运营录入为空)",
     )
     reviewer_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("sys_user.id", ondelete="SET NULL"), nullable=True, index=True, comment="审核人ID"

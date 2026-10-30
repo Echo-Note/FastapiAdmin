@@ -123,13 +123,6 @@ class AssignmentSource(StrEnum):
     CLAIMED = "claimed"  # 用户大厅接单生成
 
 
-class ProductSource(StrEnum):
-    """产品库记录来源：运营录入 / C 端提交自动入库。"""
-
-    ADMIN = "admin"  # 运营在后台录入或修正
-    USER = "user"  # C 端提交成果时自动入库
-
-
 class ProductAuditStatus(StrEnum):
     """产品库审核状态机：待审核 → 通过 / 驳回（驳回不删除，保留追溯）。"""
 

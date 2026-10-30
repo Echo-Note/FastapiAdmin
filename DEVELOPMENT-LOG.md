@@ -1842,7 +1842,7 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 - 新增 `backend/app/modules/market/task/collection_schema.py`：用「机构类型专属执行信息 + 工作区列定义」拼出机构管理 5 类 26 个三级任务（`ITEM-0001`..`ITEM-0026`）的 `FormSchema`，导出 `ITEM_FORM_SCHEMAS`。它是**种子与存量订正的唯一生成源**，运行时不读它（运行时真相仍是库里 `config.form_schema`）。
 - 新增 `backend/app/scripts/apply_collection_schema.py`：`--seed` 重写种子 JSON（26 条）、`--db` 就地订正库内记录（深拷贝后回写，JSONB 列 `mutable=False` 才认变更）、`--dry-run` 只打印；幂等。
 - `FormSchemaColumn` 增加 `product_role`（name/spec/manufacturer）；App 子表按列类型渲染，三套选择器与上传收敛为统一的 `ValueTarget`（`rowIndex=null` 即单值字段）；Web 表单设计器补子列选项与产品库角色编辑。
-- 新增产品库子模块 `market/product`：`market_product` 以 `(name, spec, manufacturer)` 判重；C 端 `GET /market/mini/products/search` 可见集 = `approved` ∪（`pending` 且本人提交）；成果提交/驳回重提后把库里没有的产品自动入库为 `pending`（判重键已存在则跳过，单条失败用 savepoint 隔离，不影响成果落库）；运营端 `/market/products/*` 提供 CRUD + 批量审核，菜单「市场管理 → 产品库」。
+- 新增产品库子模块 `market/product`：`market_product` 以 `(name, spec, manufacturer)` 判重；提交人不另设来源枚举，直接用审计字段 `created_id`/`created_by`（运营录入与 C 端提交都是具体用户）；C 端 `GET /market/mini/products/search` 可见集 = `approved` ∪（`pending` 且 `created_id` = 本人）；成果提交/驳回重提后把库里没有的产品自动入库为 `pending`（判重键已存在则跳过，单条失败用 savepoint 隔离，不影响成果落库）；运营端 `/market/products/*` 提供 CRUD + 批量审核，菜单「市场管理 → 产品库」。
 - 关键命名取舍：竞品调研的行用 `competitor_*` 前缀而非产品三要素 key，避免竞品被当成自家产品检索并自动写进产品库；退役语义的旧 key 不复用（库存盘点 `stock_qty`=库存数量 → 新「实盘数量」用 `actual_qty`）。
 - 范围之外（素材缺失或本轮未做）：市场档案信息调研 5 张、专项调研 7 模板×2（docx 问卷）、会议服务 3 模板（当前还没有三级任务）、市场宣传 2 模板；`ITEM-0027` 进销存数据收集 / `ITEM-0028` 流向数据收集 在素材里没有采集表，不臆造字段。
 
@@ -1852,6 +1852,7 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 - Web：`vue-tsc --noEmit` 通过，新增文件 `eslint`/`stylelint` 通过。
 - App：`vue-tsc --noEmit` 通过，改动文件 `eslint` 0 error（4 条 warning 为存量）。
 - **存量库必须手动订正一次**：`cd backend && PYTHONPATH=. uv run python -m app.scripts.apply_collection_schema --db --dry-run` 确认后去掉 `--dry-run` 再跑；并到「菜单管理」补「产品库」菜单（种子只在空表时导入）。
+- 若某个库在本轮中间态建过 `market_product`（带已被移除的 `source` / `submitter_id` 两列），需要 `DROP TABLE market_product;` 后重启（或手动 `ALTER TABLE market_product DROP COLUMN source, DROP COLUMN submitter_id`）——两次模型定义都被 autogen 视为增量，且 `initialize.py` 的破坏性 DROP 拦截规则只认 `op.drop_*`，认不出 `batch_op.drop_column`，会把这类迁移放过去（该拦截正则的已知盲点，见踩坑 15）。
 
 #### 4. 顺带记录（Hindsight 记忆纠偏时发现，本轮未修）
 

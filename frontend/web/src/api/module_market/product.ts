@@ -57,16 +57,13 @@ export interface ProductPageQuery extends PageQuery, UserByQueryParams {
   name?: string;
   manufacturer?: string;
   audit_status?: string;
-  source?: string;
 }
 
 export interface ProductTable extends BaseType {
   name?: string;
   spec?: string;
   manufacturer?: string;
-  source?: string;
   audit_status?: string;
-  submitter_id?: number | null;
   reviewer_id?: number | null;
   review_comment?: string | null;
   reviewed_at?: string | null;

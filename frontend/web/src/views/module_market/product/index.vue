@@ -149,20 +149,10 @@ const auditStatusOptions: OptionType[] = [
   { value: "approved", label: "已通过" },
   { value: "rejected", label: "已驳回" },
 ];
-const sourceMap: Record<string, { type: StatusType; text: string }> = {
-  admin: { type: "primary", text: "运营录入" },
-  user: { type: "info", text: "C端提交" },
-};
-const sourceOptions: OptionType[] = [
-  { value: "admin", label: "运营录入" },
-  { value: "user", label: "C端提交" },
-];
-
-const searchForm = ref<{ name?: string; manufacturer?: string; audit_status?: string; source?: string }>({
+const searchForm = ref<{ name?: string; manufacturer?: string; audit_status?: string }>({
   name: undefined,
   manufacturer: undefined,
   audit_status: undefined,
-  source: undefined,
 });
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
@@ -175,13 +165,6 @@ const searchItems = computed<SearchFormItem[]>(() => [
     key: "audit_status",
     type: "select",
     props: { placeholder: "请选择审核状态", options: auditStatusOptions, clearable: true },
-    span: 6,
-  },
-  {
-    label: "来源",
-    key: "source",
-    type: "select",
-    props: { placeholder: "请选择来源", options: sourceOptions, clearable: true },
     span: 6,
   },
 ]);
@@ -246,8 +229,8 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
         { prop: "name", label: "产品名称", minWidth: 160, showOverflowTooltip: true },
         { prop: "spec", label: "产品规格", minWidth: 140, showOverflowTooltip: true },
         { prop: "manufacturer", label: "生产企业", minWidth: 180, showOverflowTooltip: true },
-        { prop: "source", label: "来源", width: 100, status: sourceMap },
         { prop: "audit_status", label: "审核状态", width: 100, status: auditStatusMap },
+        { prop: "created_by.name", label: "提交人", width: 120, showOverflowTooltip: true },
         { prop: "review_comment", label: "审核意见", minWidth: 140, showOverflowTooltip: true },
         { prop: "created_time", label: "创建时间", width: 168, showOverflowTooltip: true },
         {
@@ -270,10 +253,10 @@ const detailItems: import("@/components/display/fa-descriptions/index.vue").Desc
   { label: "产品名称", prop: "name" },
   { label: "产品规格", prop: "spec" },
   { label: "生产企业", prop: "manufacturer" },
-  { label: "来源", prop: "source", tag: { map: sourceMap } },
   { label: "审核状态", prop: "audit_status", tag: { map: auditStatusMap } },
   { label: "审核意见", prop: "review_comment" },
   { label: "审核时间", prop: "reviewed_at" },
+  { label: "提交人", prop: "created_by.name" },
   { label: "创建时间", prop: "created_time" },
 ];
 
@@ -362,13 +345,13 @@ async function handleSubmitAudit() {
   }
 }
 
-async function handleSearch(params: { name?: string; manufacturer?: string; audit_status?: string; source?: string }) {
+async function handleSearch(params: { name?: string; manufacturer?: string; audit_status?: string }) {
   replaceSearchParams(cleanEmptyArrayParams({ ...params }) as Record<string, unknown>);
   await getData();
 }
 
 async function onResetSearch() {
-  searchForm.value = { name: undefined, manufacturer: undefined, audit_status: undefined, source: undefined };
+  searchForm.value = { name: undefined, manufacturer: undefined, audit_status: undefined };
   await resetSearchParams();
 }
 
