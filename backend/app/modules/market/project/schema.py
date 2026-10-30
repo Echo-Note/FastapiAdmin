@@ -68,7 +68,8 @@ class ProjectOutSchema(BaseSchema, UserBySchema):
     period: DateStr = Field(description="项目截止日期(如 2026-12-31)")
     status: str = Field(description="项目状态")
     publisher_id: int | None = Field(default=None, description="发布人ID")
-    template_ids: list[int] = Field(default_factory=list, description="关联的二级模板ID列表")
+    item_ids: list[int] = Field(default_factory=list, description="关联的任务ID列表")
+    template_ids: list[int] = Field(default_factory=list, description="关联的叶子模板ID列表(无任务时即模板)")
 
 
 class ProjectCreateSchema(BaseModel):
@@ -77,7 +78,8 @@ class ProjectCreateSchema(BaseModel):
     name: str = Field(min_length=1, max_length=128, description="项目名(如药品名)")
     company_id: int = Field(gt=0, description="委托方(医药公司)ID")
     period: DateStr = Field(description="项目截止日期(如 2026-12-31)")
-    template_ids: list[int] = Field(default_factory=list, description="关联的二级模板ID列表(可为空)")
+    item_ids: list[int] = Field(default_factory=list, description="关联的三级任务ID列表(可为空)")
+    template_ids: list[int] = Field(default_factory=list, description="关联的叶子模板ID列表(可为空)")
 
 
 class ProjectUpdateSchema(BaseModel):
@@ -86,7 +88,8 @@ class ProjectUpdateSchema(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128, description="项目名(如药品名)")
     company_id: int | None = Field(default=None, gt=0, description="委托方(医药公司)ID")
     period: DateStr | None = Field(default=None, description="项目截止日期(如 2026-12-31)")
-    template_ids: list[int] | None = Field(default=None, description="关联的二级模板ID列表(缺省不修改)")
+    item_ids: list[int] | None = Field(default=None, description="关联的三级任务ID列表(缺省不修改)")
+    template_ids: list[int] | None = Field(default=None, description="关联的叶子模板ID列表(缺省不修改)")
 
 
 class ProjectQueryParam(BaseQueryParam, UserByQueryParam):
@@ -105,11 +108,12 @@ class ProjectStatusUpdateSchema(BaseModel):
     status: Literal["IN_PROGRESS", "COMPLETED", "CLOSED"] = Field(description="目标状态")
 
 
-class ProjectTemplateCreateSchema(BaseModel):
-    """项目-二级模板关联记录（内部 CRUD 使用）"""
+class ProjectItemCreateSchema(BaseModel):
+    """项目-任务单元关联记录（内部 CRUD 使用，item_id / template_id 恰好一个非空）"""
 
     project_id: int = Field(gt=0, description="项目ID")
-    template_id: int = Field(gt=0, description="二级模板ID")
+    item_id: int | None = Field(default=None, gt=0, description="三级任务ID")
+    template_id: int | None = Field(default=None, gt=0, description="叶子模板ID")
 
 
 class ReportOutSchema(BaseSchema, UserBySchema):

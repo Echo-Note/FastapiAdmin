@@ -1,26 +1,26 @@
-"""项目管理（对外）与医药公司主数据、项目-二级模板关联、月度报告的数据模型。
+"""项目管理（对外）与医药公司主数据、项目-三级任务关联、月度报告的数据模型。
 
-本模块是后台「项目管理」模块的后端支撑，收编三类实体：
+本模块是后台「项目管理」模块的后端支撑，收编四类实体：
 - 医药公司主数据（委托方/甲方）：``CompanyModel``
 - 项目（对外的交付/结算单元）：``ProjectModel``
-- 项目-二级模板关联（多对多）：``ProjectTemplateModel``
+- 项目-三级任务关联（多对多，细化到任务）：``ProjectItemModel``
 - 月度报告（按项目×二级任务按月聚合）：``ReportModel``
 
-项目发布时按关联的二级模板批量生成任务实例（``market_task``），
-二级模板实体 ``TaskTemplateModel`` 定义于 ``..task.model``（任务管理模块），
+项目发布时按关联的三级任务批量生成任务实例（``market_task``，任务实例细化到
+三级任务粒度），三级任务实体 ``TaskItemModel`` 定义于 ``..task.model``，
 此处仅以字符串引用，避免模块间强耦合导入。
 """
 
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Date, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.base_model import JSONType, ModelMixin, UserMixin
 
 if TYPE_CHECKING:
-    from app.modules.market.task.model import TaskTemplateModel
+    from app.modules.market.task.model import TaskItemModel, TaskTemplateModel
 
 
 class CompanyModel(ModelMixin, UserMixin):
@@ -64,34 +64,44 @@ class ProjectModel(ModelMixin, UserMixin):
     )
 
     company: Mapped["CompanyModel"] = relationship()
-    template_links: Mapped[list["ProjectTemplateModel"]] = relationship(
+    item_links: Mapped[list["ProjectItemModel"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
 
     @property
+    def item_ids(self) -> list[int]:
+        """关联的三级任务ID列表（需预加载 ``item_links``，否则异步环境会触发懒加载）。"""
+        return [link.item_id for link in self.item_links if link.item_id is not None]
+
+    @property
     def template_ids(self) -> list[int]:
-        """关联的二级模板ID列表（需预加载 ``template_links``，否则异步环境会触发懒加载）。"""
-        return [link.template_id for link in self.template_links]
+        """关联的叶子模板ID列表（无任务的叶子模板，即模板本身）。"""
+        return [link.template_id for link in self.item_links if link.template_id is not None]
 
 
-class ProjectTemplateModel(ModelMixin, UserMixin):
-    """项目-二级模板关联（多对多关联表）"""
+class ProjectItemModel(ModelMixin, UserMixin):
+    """项目-任务单元关联（多对多关联表，任务单元 = 三级任务 或 叶子模板）。
 
-    __tablename__: str = "market_project_template"
-    __table_args__ = (
-        UniqueConstraint("project_id", "template_id", name="uq_market_project_template_project_template"),
-        {"comment": "项目-二级模板关联表"},
-    )
+    ``item_id`` 与 ``template_id`` 恰好一个非空：有三级任务的模板关联其三级任务（item_id），
+    无三级任务的叶子模板（如会议服务）直接关联模板（template_id）。
+    """
+
+    __tablename__: str = "market_project_item"
+    __table_args__: dict[str, str] = {"comment": "项目-任务单元关联表"}
 
     project_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_project.id", ondelete="CASCADE"), nullable=False, index=True, comment="项目ID"
     )
-    template_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("market_task_template.id", ondelete="CASCADE"), nullable=False, index=True, comment="二级模板ID"
+    item_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("market_task_item.id", ondelete="CASCADE"), nullable=True, index=True, comment="三级任务ID(有三级任务时)"
+    )
+    template_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("market_task_template.id", ondelete="CASCADE"), nullable=True, index=True, comment="叶子模板ID(无三级任务时)"
     )
 
-    project: Mapped["ProjectModel"] = relationship(back_populates="template_links")
-    template: Mapped["TaskTemplateModel"] = relationship()
+    project: Mapped["ProjectModel"] = relationship(back_populates="item_links")
+    item: Mapped["TaskItemModel | None"] = relationship()
+    template: Mapped["TaskTemplateModel | None"] = relationship()
 
 
 class ReportModel(ModelMixin, UserMixin):
@@ -119,4 +129,4 @@ class ReportModel(ModelMixin, UserMixin):
     template: Mapped["TaskTemplateModel"] = relationship()
 
 
-__all__ = ["CompanyModel", "ProjectModel", "ProjectTemplateModel", "ReportModel"]
+__all__ = ["CompanyModel", "ProjectModel", "ProjectItemModel", "ReportModel"]

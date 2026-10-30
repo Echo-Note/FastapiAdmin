@@ -164,26 +164,48 @@ async def change_project_status_controller(
     return SuccessResponse(data=result, msg="项目状态流转成功")
 
 
-@ProjectRouter.post("/templates/{id}", summary="项目关联二级模板", response_model=ResponseSchema[ProjectOutSchema])
+@ProjectRouter.post("/items/{id}", summary="项目关联三级任务", response_model=ResponseSchema[ProjectOutSchema])
+async def add_project_item_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:project:update"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="项目ID", ge=1)],
+    item_id: Annotated[int, Body(description="三级任务ID")],
+) -> JSONResponse:
+    result = await ProjectService(auth, db).add_item(id=id, item_id=item_id)
+    return SuccessResponse(data=result, msg="项目关联三级任务成功")
+
+
+@ProjectRouter.delete("/items/{id}/{item_id}", summary="项目移除三级任务", response_model=ResponseSchema[ProjectOutSchema])
+async def remove_project_item_controller(
+    auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:project:update"]))],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="项目ID", ge=1)],
+    item_id: Annotated[int, Path(description="三级任务ID", ge=1)],
+) -> JSONResponse:
+    result = await ProjectService(auth, db).remove_item(id=id, item_id=item_id)
+    return SuccessResponse(data=result, msg="项目移除三级任务成功")
+
+
+@ProjectRouter.post("/templates/{id}", summary="项目关联叶子模板", response_model=ResponseSchema[ProjectOutSchema])
 async def add_project_template_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:project:update"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="项目ID", ge=1)],
-    template_id: Annotated[int, Body(description="二级模板ID")],
+    template_id: Annotated[int, Body(description="叶子模板ID")],
 ) -> JSONResponse:
     result = await ProjectService(auth, db).add_template(id=id, template_id=template_id)
-    return SuccessResponse(data=result, msg="项目关联二级模板成功")
+    return SuccessResponse(data=result, msg="项目关联叶子模板成功")
 
 
-@ProjectRouter.delete("/templates/{id}/{template_id}", summary="项目移除二级模板", response_model=ResponseSchema[ProjectOutSchema])
+@ProjectRouter.delete("/templates/{id}/{template_id}", summary="项目移除叶子模板", response_model=ResponseSchema[ProjectOutSchema])
 async def remove_project_template_controller(
     auth: Annotated[AuthSchema, Security(AuthPermission(["module_market:project:update"]))],
     db: Annotated[AsyncSession, Depends(db_getter)],
     id: Annotated[int, Path(description="项目ID", ge=1)],
-    template_id: Annotated[int, Path(description="二级模板ID", ge=1)],
+    template_id: Annotated[int, Path(description="叶子模板ID", ge=1)],
 ) -> JSONResponse:
     result = await ProjectService(auth, db).remove_template(id=id, template_id=template_id)
-    return SuccessResponse(data=result, msg="项目移除二级模板成功")
+    return SuccessResponse(data=result, msg="项目移除叶子模板成功")
 
 
 # ── 月度报告 ──────────────────────────────────────────────────────────

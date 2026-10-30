@@ -1,4 +1,8 @@
-"""market 域集成测试：任务发布（定向分派须指定分派人员 + 发布即批量创建分派）。"""
+"""market 域集成测试：任务发布（定向分派须指定分派人员 + 发布即批量创建分派）。
+
+任务实例细化到三级任务粒度：创建任务/项目关联均传 ``item_id``（三级任务），
+``template_id`` 由后端按三级任务派生。
+"""
 
 from typing import Any
 
@@ -14,20 +18,20 @@ class TestTaskPublish:
         assert resp.status_code == 200, resp.text
         return resp.json()["data"]["id"]
 
-    def _get_template_id(self, client: TestClient, headers: dict[str, str]) -> int:
-        """取一个二级模板 id。"""
-        resp = client.get("/market/templates/list", headers=headers, params={"page_no": 1, "page_size": 1})
+    def _get_item_id(self, client: TestClient, headers: dict[str, str]) -> int:
+        """取一个任务 id。"""
+        resp = client.get("/market/items/list", headers=headers, params={"page_no": 1, "page_size": 1})
         assert resp.status_code == 200, resp.text
         items = resp.json()["data"]["items"]
-        assert items, "无二级模板种子数据"
+        assert items, "无三级任务种子数据"
         return items[0]["id"]
 
-    def _create_project(self, client: TestClient, headers: dict[str, str], company_id: int, template_id: int) -> int:
-        """创建项目（关联模板），返回项目 id。"""
+    def _create_project(self, client: TestClient, headers: dict[str, str], company_id: int, item_id: int) -> int:
+        """创建项目（关联三级任务），返回项目 id。"""
         resp = client.post(
             "/market/projects/create",
             headers=headers,
-            json={"name": "测试药品", "company_id": company_id, "period": "2026-12-31", "template_ids": [template_id]},
+            json={"name": "测试药品", "company_id": company_id, "period": "2026-12-31", "item_ids": [item_id]},
         )
         assert resp.status_code == 200, resp.text
         return resp.json()["data"]["id"]
@@ -49,15 +53,14 @@ class TestTaskPublish:
         user = next(u for u in items if u.get("username") == "user")
         return user["id"]
 
-    def _create_task(self, client: TestClient, headers: dict[str, str], project_id: int, template_id: int, assign_mode: str) -> int:
+    def _create_task(self, client: TestClient, headers: dict[str, str], project_id: int, item_id: int, assign_mode: str) -> int:
         """显式创建任务（指定分配方式），返回任务 id。"""
         resp = client.post(
             "/market/tasks/create",
             headers=headers,
             json={
                 "project_id": project_id,
-                "template_id": template_id,
-                "name": f"测试任务-{assign_mode}",
+                "item_id": item_id,
                 "period": "2026-12-31",
                 "assign_mode": assign_mode,
             },
@@ -68,9 +71,9 @@ class TestTaskPublish:
     def test_publish_direct_task_ok(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """定向分派任务可直接发布（发布与分派解耦，不再强制指定分派人员）。"""
         company_id = self._create_company(test_client, auth_headers, "测试医药公司甲")
-        template_id = self._get_template_id(test_client, auth_headers)
-        project_id = self._create_project(test_client, auth_headers, company_id, template_id)
-        task_id = self._create_task(test_client, auth_headers, project_id, template_id, "direct")
+        item_id = self._get_item_id(test_client, auth_headers)
+        project_id = self._create_project(test_client, auth_headers, company_id, item_id)
+        task_id = self._create_task(test_client, auth_headers, project_id, item_id, "direct")
 
         resp = test_client.post(f"/market/tasks/publish/{task_id}", headers=auth_headers)
         assert resp.status_code == 200, resp.text
@@ -79,16 +82,15 @@ class TestTaskPublish:
     def test_publish_open_without_assignee_ok(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """公开大厅任务无需分派人员即可发布。"""
         company_id = self._create_company(test_client, auth_headers, "测试医药公司丙")
-        template_id = self._get_template_id(test_client, auth_headers)
-        project_id = self._create_project(test_client, auth_headers, company_id, template_id)
+        item_id = self._get_item_id(test_client, auth_headers)
+        project_id = self._create_project(test_client, auth_headers, company_id, item_id)
 
         resp = test_client.post(
             "/market/tasks/create",
             headers=auth_headers,
             json={
                 "project_id": project_id,
-                "template_id": template_id,
-                "name": "测试药品-公开大厅",
+                "item_id": item_id,
                 "period": "2026-12-31",
                 "assign_mode": "open",
             },
@@ -101,19 +103,20 @@ class TestTaskPublish:
         assert resp.json()["data"]["status"] == "PUBLISHED"
 
     def test_publish_project_creates_open_task(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
-        """发布项目生成的任务默认分配方式为公开大厅。"""
+        """发布项目生成的任务默认分配方式为公开大厅，且任务细化到三级任务。"""
         company_id = self._create_company(test_client, auth_headers, "测试医药公司丁")
-        template_id = self._get_template_id(test_client, auth_headers)
-        project_id = self._create_project(test_client, auth_headers, company_id, template_id)
+        item_id = self._get_item_id(test_client, auth_headers)
+        project_id = self._create_project(test_client, auth_headers, company_id, item_id)
         task = self._publish_project_get_task(test_client, auth_headers, project_id)
         assert task["assign_mode"] == "open"
+        assert task["item_id"] == item_id
 
     def test_assign_open_task_switches_to_direct(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
         """对公开大厅任务定向分派用户后，任务分配方式应自动变为定向分派，并创建分派记录。"""
         company_id = self._create_company(test_client, auth_headers, "测试医药公司戊")
-        template_id = self._get_template_id(test_client, auth_headers)
-        project_id = self._create_project(test_client, auth_headers, company_id, template_id)
-        task_id = self._create_task(test_client, auth_headers, project_id, template_id, "open")
+        item_id = self._get_item_id(test_client, auth_headers)
+        project_id = self._create_project(test_client, auth_headers, company_id, item_id)
+        task_id = self._create_task(test_client, auth_headers, project_id, item_id, "open")
         user_id = self._get_user_id(test_client, auth_headers)
 
         # 对 open 任务定向分派用户

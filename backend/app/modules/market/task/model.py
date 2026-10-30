@@ -2,8 +2,8 @@
 
 任务三级层级：一级分类（TaskCategoryModel）→ 二级模板（TaskTemplateModel）→
 三级任务（TaskItemModel）。模板承载通用采集字段（TaskConfig JSON），任务承载
-专属采集字段（TaskItemConfig JSON），任务实例（TaskModel）引用模板执行，
-执行过程产生分派（AssignmentModel）与成果提交（SubmissionModel）。
+专属采集字段（TaskItemConfig JSON），任务实例（TaskModel）细化到三级任务粒度
+（``item_id``），执行过程产生分派（AssignmentModel）与成果提交（SubmissionModel）。
 
 状态机取值见 ``app.modules.market.enums``。
 """
@@ -18,6 +18,7 @@ from app.core.base_model import JSONType, ModelMixin, UserMixin
 
 if TYPE_CHECKING:
     from app.modules.market.institution.model import InstitutionModel
+    from app.modules.market.project.model import ProjectModel
 
 
 class TaskCategoryModel(ModelMixin, UserMixin):
@@ -72,13 +73,20 @@ class TaskItemModel(ModelMixin, UserMixin):
 
 
 class TaskModel(ModelMixin, UserMixin):
-    """任务实例（运营发布、C 端执行的最小执行单元）。"""
+    """任务实例（运营发布、C 端执行的最小执行单元，细化为三级任务粒度）。
+
+    任务实例引用三级任务（``item_id``），并冗余保留二级模板（``template_id``，
+    由 item 派生）供报告/结算按模板聚合；C 端显示名 ``name`` 自动生成
+    ``{项目}-{二级模板}-{三级任务}``（如 一心坦-等级医院管理-价格核查）。
+    """
 
     __tablename__: str = "market_task"
     __table_args__ = (
-        # template_id 外键索引显式命名：默认 ix_market_task_template_id 会与
-        # market_task_template.id（ModelMixin 主键 index=True）生成的同名索引冲突
+        # template_id / item_id 外键索引显式命名：默认 ix_market_task_template_id /
+        # ix_market_task_item_id 会与 market_task_template.id / market_task_item.id
+        # （ModelMixin 主键 index=True）生成的同名索引冲突
         Index("ix_market_task_template_fk", "template_id"),
+        Index("ix_market_task_item_fk", "item_id"),
         {"comment": "任务实例表"},
     )
 
@@ -89,7 +97,10 @@ class TaskModel(ModelMixin, UserMixin):
     template_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("market_task_template.id", ondelete="RESTRICT"), nullable=False, comment="所属二级模板ID"
     )
-    name: Mapped[str] = mapped_column(String(256), nullable=False, index=True, comment="C端显示名(如 一心坦-等级医院管理)")
+    item_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("market_task_item.id", ondelete="SET NULL"), nullable=True, comment="所属任务ID(叶子模板无任务时为空，即模板)"
+    )
+    name: Mapped[str] = mapped_column(String(256), nullable=False, index=True, comment="C端显示名(如 一心坦-等级医院管理-价格核查)")
     period: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="截止日期(继承项目截止日期)")
     assign_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="open", index=True, comment="分配方式(direct 定向分派/open 公开大厅)")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT", index=True, comment="任务状态")
@@ -99,6 +110,8 @@ class TaskModel(ModelMixin, UserMixin):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, comment="发布时间")
 
     template: Mapped["TaskTemplateModel"] = relationship(back_populates="tasks")
+    item: Mapped["TaskItemModel | None"] = relationship()
+    project: Mapped["ProjectModel"] = relationship()
     assignments: Mapped[list["AssignmentModel"]] = relationship(back_populates="task")
 
 

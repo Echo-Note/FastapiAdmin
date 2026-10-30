@@ -7,7 +7,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
 from app.core.validator import DateStr, DateTimeStr
@@ -164,15 +164,27 @@ class TaskTemplateQueryParam(BaseQueryParam, UserByQueryParam):
     enabled: bool | None = Field(default=None, description="是否启用", json_schema_extra={"q": "eq"})
 
 
+class TaskProjectBriefSchema(BaseSchema):
+    """任务所属项目摘要"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str = Field(description="项目名")
+    code: str | None = Field(default=None, description="项目编号")
+
+
 class TaskOutSchema(BaseSchema, UserBySchema):
-    """任务实例响应模型"""
+    """任务实例响应模型（细化到三级任务粒度）"""
 
     model_config = ConfigDict(from_attributes=True)
 
     task_no: str = Field(description="任务编号")
     project_id: int = Field(description="所属项目ID")
+    project: TaskProjectBriefSchema | None = Field(default=None, description="所属项目")
     template_id: int = Field(description="所属二级模板ID")
     template: TaskTemplateOutSchema | None = Field(default=None, description="所属二级模板(含分类)")
+    item_id: int | None = Field(default=None, description="所属任务ID(叶子模板为空)")
+    item: TaskItemOutSchema | None = Field(default=None, description="所属任务")
     name: str = Field(description="C端显示名")
     period: DateStr = Field(description="截止日期(继承项目截止日期)")
     assign_mode: str = Field(default="open", description="分配方式(direct 定向分派/open 公开大厅)")
@@ -180,26 +192,68 @@ class TaskOutSchema(BaseSchema, UserBySchema):
     publisher_id: int | None = Field(default=None, description="发布人ID")
     published_at: DateTimeStr | None = Field(default=None, description="发布时间")
     assignment_count: int = Field(default=0, description="已分派/接收人数(列表聚合字段)")
+    exec_standard: str | None = Field(default=None, description="执行标准(item.config 优先，回退 template.config)")
+    executor_requirement: str | None = Field(default=None, description="执行要求(item.config 优先，回退 template.config)")
+
+
+class MiniTaskGroupSchema(BaseModel):
+    """C 端按项目分组的最小单元任务组。"""
+
+    project_id: int = Field(description="项目ID")
+    project_name: str = Field(description="项目名")
+    period: DateStr | None = Field(default=None, description="项目截止日期")
+    tasks: list[TaskOutSchema] = Field(default_factory=list, description="该项目下最小单元任务")
+
+
+class MiniAssignmentGroupSchema(BaseModel):
+    """C 端按项目分组的分派单组（我的任务）。
+
+    与 ``MiniTaskGroupSchema`` 区别：元素为分派单（含 id/status/task），
+    而非纯任务，供「我的任务」状态筛选、进度轨道与成果角标使用。
+    """
+
+    project_id: int = Field(description="项目ID")
+    project_name: str = Field(description="项目名")
+    period: DateStr | None = Field(default=None, description="项目截止日期")
+    assignments: list["AssignmentOutSchema"] = Field(default_factory=list, description="该项目下分派单")
 
 
 class TaskCreateSchema(BaseModel):
-    """创建任务"""
+    """创建任务（名称由后端自动生成）。
+
+    ``item_id`` / ``template_id`` 恰好一个非空：有三级任务的模板传 item_id，
+    无三级任务的叶子模板（如会议服务）传 template_id。
+    """
 
     project_id: int = Field(gt=0, description="所属项目ID")
-    template_id: int = Field(gt=0, description="所属二级模板ID")
-    name: str = Field(min_length=1, max_length=256, description="C端显示名(如 一心坦-等级医院管理)")
+    item_id: int | None = Field(default=None, gt=0, description="所属任务ID")
+    template_id: int | None = Field(default=None, gt=0, description="所属叶子模板ID(无三级任务时)")
     period: DateStr = Field(description="截止日期(继承项目截止日期，如 2026-12-31)")
     assign_mode: Literal["direct", "open"] = Field(default="open", description="分配方式(direct 定向分派/open 公开大厅)")
+
+    @model_validator(mode="after")
+    def _check_unit(self) -> "TaskCreateSchema":
+        """校验 item_id 与 template_id 恰好一个非空。"""
+        if (self.item_id is None) == (self.template_id is None):
+            raise ValueError("item_id 与 template_id 必须恰好提供一个")
+        return self
 
 
 class TaskUpdateSchema(BaseModel):
     """更新任务"""
 
     project_id: int | None = Field(default=None, gt=0, description="所属项目ID")
-    template_id: int | None = Field(default=None, gt=0, description="所属二级模板ID")
-    name: str | None = Field(default=None, min_length=1, max_length=256, description="C端显示名")
+    item_id: int | None = Field(default=None, gt=0, description="所属任务ID")
+    template_id: int | None = Field(default=None, gt=0, description="所属叶子模板ID(无三级任务时)")
     period: DateStr | None = Field(default=None, description="截止日期")
     assign_mode: Literal["direct", "open"] | None = Field(default=None, description="分配方式")
+
+    @model_validator(mode="after")
+    def _check_unit(self) -> "TaskUpdateSchema":
+        """校验 item_id 与 template_id 不同时提供。"""
+        if self.item_id is not None and self.template_id is not None:
+            raise ValueError("item_id 与 template_id 不能同时提供")
+        return self
 
 
 class TaskQueryParam(BaseQueryParam, UserByQueryParam):
@@ -209,6 +263,9 @@ class TaskQueryParam(BaseQueryParam, UserByQueryParam):
     name: str | None = Field(default=None, description="C端显示名", json_schema_extra={"q": "like"})
     project_id: int | None = Field(default=None, description="所属项目ID", json_schema_extra={"q": "eq"})
     template_id: int | None = Field(default=None, description="所属二级模板ID", json_schema_extra={"q": "eq"})
+    item_id: int | None = Field(default=None, description="所属三级任务ID", json_schema_extra={"q": "eq"})
+    category_id: int | None = Field(default=None, description="一级分类ID", json_schema_extra={"q": "eq"})
+    exclude_status: str | None = Field(default=None, description="排除的任务状态(如 DRAFT)")
     period: str | None = Field(default=None, description="周期", json_schema_extra={"q": "eq"})
     assign_mode: str | None = Field(default=None, description="分配方式", json_schema_extra={"q": "eq"})
     status: str | None = Field(default=None, description="任务状态", json_schema_extra={"q": "eq"})

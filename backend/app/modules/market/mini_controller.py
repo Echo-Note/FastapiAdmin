@@ -5,17 +5,18 @@
 认证使用 ``get_current_user``（登录用户），不要求运营端 RBAC 权限码。
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Body, Depends, Path, Query, Security
+from fastapi import APIRouter, Body, Depends, File, Path, Query, Request, Security, UploadFile
 from fastapi.responses import JSONResponse
 from redis.asyncio.client import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.response import ResponseSchema, SuccessResponse
-from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam
+from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryParam, UploadResponseSchema
 from app.core.dependencies import db_getter, get_current_user, redis_getter
 from app.core.router_class import OperationLogRoute
+from app.modules.common.file.service import FileService
 
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
@@ -23,6 +24,8 @@ from .payout.service import PayoutService
 from .task.schema import (
     AssignmentOutSchema,
     AssignmentQueryParam,
+    MiniAssignmentGroupSchema,
+    MiniTaskGroupSchema,
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
@@ -46,6 +49,16 @@ async def mini_task_hall_controller(
     return SuccessResponse(data=result, msg="获取任务大厅成功")
 
 
+@MiniRouter.get("/tasks/grouped", summary="任务大厅分组(按项目)", response_model=ResponseSchema[list[MiniTaskGroupSchema]])
+async def mini_task_hall_grouped_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """任务大厅分组：复用大厅可见性语义，一次性返回全部可见任务并按项目分组。"""
+    result = await TaskService(auth, db).grouped_hall_tasks()
+    return SuccessResponse(data=result, msg="获取任务大厅分组成功")
+
+
 @MiniRouter.get("/tasks/{id}", summary="任务单详情", response_model=ResponseSchema[TaskOutSchema])
 async def mini_task_detail_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
@@ -66,6 +79,17 @@ async def mini_my_assignments_controller(
 ) -> JSONResponse:
     result = await AssignmentService(auth, db).my_assignments(page_no=page.page_no, page_size=page.page_size, search=search)
     return SuccessResponse(data=result, msg="获取我的任务成功")
+
+
+@MiniRouter.get("/assignments/grouped", summary="我的任务分组(按项目)", response_model=ResponseSchema[list[MiniAssignmentGroupSchema]])
+async def mini_my_assignments_grouped_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    search: Annotated[AssignmentQueryParam, Query()],
+) -> JSONResponse:
+    """我的任务分组：复用我的任务语义，按当前用户分派并按任务项目分组。"""
+    result = await AssignmentService(auth, db).grouped_my_assignments(search=search)
+    return SuccessResponse(data=result, msg="获取我的任务分组成功")
 
 
 @MiniRouter.get("/assignments/{id}", summary="分派单详情", response_model=ResponseSchema[AssignmentOutSchema])
@@ -165,3 +189,26 @@ async def mini_institution_list_controller(
         items=page_items,
     )
     return SuccessResponse(data=result, msg="获取机构列表成功")
+
+
+@MiniRouter.post(
+    "/upload",
+    summary="C端上传文件(提交成果图片/附件)",
+    response_model=ResponseSchema[UploadResponseSchema],
+    dependencies=[Security(get_current_user)],
+)
+async def mini_upload_controller(
+    request: Request,
+    file: Annotated[UploadFile, File(description="上传文件")],
+    upload_type: Annotated[
+        Literal["file", "avatar"] | None,
+        Query(description="上传类型: file=通用文件(成果图片/附件), avatar=头像"),
+    ] = "file",
+) -> JSONResponse:
+    """C端文件上传：提交成果的图片/附件，登录即可，不要求运营端 RBAC 权限码。"""
+    result = await FileService.upload_service(
+        base_url=str(request.base_url),
+        file=file,
+        upload_type=upload_type or "file",
+    )
+    return SuccessResponse(data=result, msg="上传文件成功")

@@ -1,11 +1,11 @@
 """项目管理（对外）、医药公司主数据、月度报告的业务逻辑。
 
 - ``CompanyService``：医药公司主数据 CRUD
-- ``ProjectService``：项目 CRUD + 关联二级模板 + 状态流转 + 发布（按模板批量生成任务）
+- ``ProjectService``：项目 CRUD + 关联任务单元（三级任务/叶子模板）+ 状态流转 + 发布（按任务单元批量生成任务）
 - ``ReportService``：月度报告 CRUD + 按项目×模板×月份聚合生成报告
 
-跨模块依赖（二级模板 ``TaskTemplateModel``、任务实例 ``TaskModel``、成果 ``SubmissionModel``）
-定义于任务管理模块（``..task``），由负责该模块的 Agent 落地，此处以延迟 import 引入，
+跨模块依赖（三级任务 ``TaskItemModel``、任务实例 ``TaskModel``、成果 ``SubmissionModel``）
+定义于任务管理模块（``..task``），此处以延迟 import 引入，
 避免本模块加载时因依赖尚未就绪而整体失败。
 """
 
@@ -18,7 +18,7 @@ from app.utils.common_util import search_to_dict
 
 from ..enums import ProjectStatus, SubmissionStatus
 from ..numbering import NumberPrefix, next_code
-from .crud import CompanyCRUD, ProjectCRUD, ProjectTemplateCRUD, ReportCRUD
+from .crud import CompanyCRUD, ProjectCRUD, ProjectItemCRUD, ReportCRUD
 from .schema import (
     CompanyCreateSchema,
     CompanyOutSchema,
@@ -36,12 +36,12 @@ from .schema import (
 )
 
 # company 为 UserBySchema（含 created_by/updated_by），需嵌套预加载审计关系；
-# template_links 为项目-二级模板关联，序列化 template_ids 时依赖它，需 selectinload 预加载
+# item_links 为项目-三级任务关联，序列化 item_ids 时依赖它，需 selectinload 预加载
 _PROJECT_PRELOAD = [
     "company",
     "company.created_by",
     "company.updated_by",
-    "template_links",
+    "item_links",
 ]
 
 # 报告需预加载其所属项目与二级模板（用于详情展示）
@@ -131,23 +131,26 @@ class ProjectService:
         )
 
     async def create(self, data: ProjectCreateSchema) -> ProjectOutSchema:
-        """创建项目（草稿状态，编号自动生成），并关联二级模板。"""
+        """创建项目（草稿状态，编号自动生成），并关联任务单元（三级任务/叶子模板）。"""
         await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
-        create_data = data.model_dump(exclude={"template_ids"})
+        create_data = data.model_dump(exclude={"item_ids", "template_ids"})
         create_data["code"] = await next_code(self.db, NumberPrefix.PROJECT)
         project = await ProjectCRUD(self.auth, self.db).create(data=create_data)
-        await self._sync_template_links(project.id, data.template_ids)
+        await self._sync_task_unit_links(project.id, data.item_ids, data.template_ids)
         return await self.detail(id=project.id)
 
     async def update(self, id: int, data: ProjectUpdateSchema) -> ProjectOutSchema:
         """更新项目（编号不可修改）。"""
-        await ProjectCRUD(self.auth, self.db).get_or_404(id=id)
+        project = await ProjectCRUD(self.auth, self.db).get_or_404(id=id, preload=_PROJECT_PRELOAD)
         if data.company_id is not None:
             await CompanyCRUD(self.auth, self.db).get_or_404(id=data.company_id, msg="医药公司不存在")
-        update_data = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"template_ids"})
+        update_data = data.model_dump(exclude_unset=True, exclude_none=True, exclude={"item_ids", "template_ids"})
         await ProjectCRUD(self.auth, self.db).update(id=id, data=update_data)
-        if data.template_ids is not None:
-            await self._sync_template_links(id, data.template_ids)
+        if data.item_ids is not None or data.template_ids is not None:
+            # 缺省不修改：仅传入一侧时，另一侧保持现状
+            item_ids = data.item_ids if data.item_ids is not None else project.item_ids
+            template_ids = data.template_ids if data.template_ids is not None else project.template_ids
+            await self._sync_task_unit_links(id, item_ids, template_ids)
         return await self.detail(id=id)
 
     async def delete(self, ids: list[int]) -> None:
@@ -156,21 +159,38 @@ class ProjectService:
             raise CustomException(msg="删除失败，删除对象不能为空")
         await ProjectCRUD(self.auth, self.db).delete(ids=ids)
 
+    async def add_item(self, id: int, item_id: int) -> ProjectOutSchema:
+        """把三级任务关联到项目（增量，幂等）。"""
+        await ProjectCRUD(self.auth, self.db).get_or_404(id=id, preload=_PROJECT_PRELOAD)
+        await self._ensure_item_exists(item_id)
+        existing = await ProjectItemCRUD(self.auth, self.db).get_list(search={"project_id": id, "item_id": item_id})
+        if not existing:
+            await ProjectItemCRUD(self.auth, self.db).create(data={"project_id": id, "item_id": item_id})
+        return await self.detail(id=id)
+
+    async def remove_item(self, id: int, item_id: int) -> ProjectOutSchema:
+        """从项目移除三级任务关联。"""
+        await ProjectCRUD(self.auth, self.db).get_or_404(id=id)
+        existing = await ProjectItemCRUD(self.auth, self.db).get_list(search={"project_id": id, "item_id": item_id})
+        if existing:
+            await ProjectItemCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
+        return await self.detail(id=id)
+
     async def add_template(self, id: int, template_id: int) -> ProjectOutSchema:
-        """把二级模板关联到项目（增量，幂等）。"""
+        """把叶子模板关联到项目（增量，幂等）。"""
         await ProjectCRUD(self.auth, self.db).get_or_404(id=id, preload=_PROJECT_PRELOAD)
         await self._ensure_template_exists(template_id)
-        existing = await ProjectTemplateCRUD(self.auth, self.db).get_list(search={"project_id": id, "template_id": template_id})
+        existing = await ProjectItemCRUD(self.auth, self.db).get_list(search={"project_id": id, "template_id": template_id})
         if not existing:
-            await ProjectTemplateCRUD(self.auth, self.db).create(data={"project_id": id, "template_id": template_id})
+            await ProjectItemCRUD(self.auth, self.db).create(data={"project_id": id, "template_id": template_id})
         return await self.detail(id=id)
 
     async def remove_template(self, id: int, template_id: int) -> ProjectOutSchema:
-        """从项目移除二级模板关联。"""
+        """从项目移除叶子模板关联。"""
         await ProjectCRUD(self.auth, self.db).get_or_404(id=id)
-        existing = await ProjectTemplateCRUD(self.auth, self.db).get_list(search={"project_id": id, "template_id": template_id})
+        existing = await ProjectItemCRUD(self.auth, self.db).get_list(search={"project_id": id, "template_id": template_id})
         if existing:
-            await ProjectTemplateCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
+            await ProjectItemCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
         return await self.detail(id=id)
 
     async def change_status(self, id: int, data: ProjectStatusUpdateSchema) -> ProjectOutSchema:
@@ -190,55 +210,102 @@ class ProjectService:
         return await self.detail(id=id)
 
     async def publish(self, id: int) -> ProjectOutSchema:
-        """发布项目：状态置为进行中，并按关联的二级模板批量创建任务实例。
+        """发布项目：状态置为进行中，并按关联的任务单元批量创建任务实例。
 
-        任务实例字段按新设计（``market_task``）：``task_no`` 用 ``TK-XXX`` 编号自动生成，
-        ``name=f"{project.name}-{template.name}"``，``period=project.period``，
-        ``assign_mode="open"``，``status="DRAFT"``；已存在同 project+template 的任务则跳过（幂等）。
+        三级任务生成 ``name=f"{project}-{template}-{item}"``；叶子模板（无三级任务）生成
+        ``name=f"{project}-{template}"`` 且 ``item_id`` 为空。已存在同 project+item（或
+        project+叶子模板）的任务则跳过（幂等）。
         """
         from ..task.crud import TaskCRUD
 
-        project = await ProjectCRUD(self.auth, self.db).get_or_404(id=id, preload=[*_PROJECT_PRELOAD, "template_links.template"])
+        project = await ProjectCRUD(self.auth, self.db).get_or_404(
+            id=id, preload=[*_PROJECT_PRELOAD, "item_links.item", "item_links.item.template", "item_links.template"]
+        )
         if project.status != ProjectStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的项目可发布")
 
-        for link in project.template_links:
-            template = link.template
-            existing = await TaskCRUD(self.auth, self.db).get(project_id=id, template_id=template.id)
-            if existing:
-                continue  # 同项目同模板已生成任务，幂等跳过
-            task_no = await next_code(self.db, NumberPrefix.TASK)
-            await TaskCRUD(self.auth, self.db).create(
-                data={
-                    "task_no": task_no,
-                    "project_id": id,
-                    "template_id": template.id,
-                    "name": f"{project.name}-{template.name}",
-                    "period": project.period,
-                    "assign_mode": "open",
-                    "status": "DRAFT",
-                }
-            )
+        for link in project.item_links:
+            if link.item is not None:
+                item = link.item
+                existing = await TaskCRUD(self.auth, self.db).get(project_id=id, item_id=item.id)
+                if existing:
+                    continue  # 同项目同三级任务已生成任务，幂等跳过
+                task_no = await next_code(self.db, NumberPrefix.TASK)
+                await TaskCRUD(self.auth, self.db).create(
+                    data={
+                        "task_no": task_no,
+                        "project_id": id,
+                        "template_id": item.template_id,
+                        "item_id": item.id,
+                        "name": f"{project.name}-{item.template.name}-{item.name}",
+                        "period": project.period,
+                        "assign_mode": "open",
+                        "status": "DRAFT",
+                    }
+                )
+            elif link.template is not None:
+                # 防御历史脏关联：非叶子模板（含三级任务）不生成模板级任务，其表单结构由三级任务自包含
+                await self._ensure_template_exists(link.template.id)
+                template = link.template
+                existing = await TaskCRUD(self.auth, self.db).get(
+                    project_id=id, template_id=template.id, item_id=("None", None)
+                )
+                if existing:
+                    continue  # 同项目同叶子模板已生成任务，幂等跳过
+                task_no = await next_code(self.db, NumberPrefix.TASK)
+                await TaskCRUD(self.auth, self.db).create(
+                    data={
+                        "task_no": task_no,
+                        "project_id": id,
+                        "template_id": template.id,
+                        "item_id": None,
+                        "name": f"{project.name}-{template.name}",
+                        "period": project.period,
+                        "assign_mode": "open",
+                        "status": "DRAFT",
+                    }
+                )
 
         await ProjectCRUD(self.auth, self.db).update(id=id, data={"status": ProjectStatus.IN_PROGRESS.value})
         return await self.detail(id=id)
 
-    async def _sync_template_links(self, project_id: int, template_ids: list[int]) -> None:
-        """同步项目-二级模板关联关系（全量替换为传入的模板列表）。"""
-        unique_ids = list(dict.fromkeys(template_ids))  # 去重并保持顺序
-        for tid in unique_ids:
+    async def _sync_task_unit_links(self, project_id: int, item_ids: list[int], template_ids: list[int]) -> None:
+        """同步项目-任务单元关联关系（全量替换为传入的三级任务 + 叶子模板列表）。"""
+        unique_items = list(dict.fromkeys(item_ids))  # 去重并保持顺序
+        unique_templates = list(dict.fromkeys(template_ids))
+        for iid in unique_items:
+            await self._ensure_item_exists(iid)
+        for tid in unique_templates:
             await self._ensure_template_exists(tid)
-        existing = await ProjectTemplateCRUD(self.auth, self.db).get_list(search={"project_id": project_id})
+        existing = await ProjectItemCRUD(self.auth, self.db).get_list(search={"project_id": project_id})
         if existing:
-            await ProjectTemplateCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
-        for tid in unique_ids:
-            await ProjectTemplateCRUD(self.auth, self.db).create(data={"project_id": project_id, "template_id": tid})
+            await ProjectItemCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
+        for iid in unique_items:
+            await ProjectItemCRUD(self.auth, self.db).create(data={"project_id": project_id, "item_id": iid})
+        for tid in unique_templates:
+            await ProjectItemCRUD(self.auth, self.db).create(data={"project_id": project_id, "template_id": tid})
+
+    async def _ensure_item_exists(self, item_id: int) -> None:
+        """校验三级任务存在（依赖任务管理模块的 TaskItemModel）。"""
+        from ..task.crud import TaskItemCRUD
+
+        await TaskItemCRUD(self.auth, self.db).get_or_404(id=item_id, msg=f"三级任务[{item_id}]不存在")
 
     async def _ensure_template_exists(self, template_id: int) -> None:
-        """校验二级模板存在（依赖任务管理模块的 TaskTemplateModel）。"""
+        """校验叶子模板存在且确为「叶子」（无三级任务，依赖任务管理模块的 TaskTemplateModel）。
+
+        有三级任务的模板不承载 ``form_schema``（表单由三级任务自包含），按模板级
+        关联/建任务会导致 C 端无采集字段可填，故关联入口强校验拦截。
+        """
         from ..task.crud import TaskTemplateCRUD
 
-        await TaskTemplateCRUD(self.auth, self.db).get_or_404(id=template_id, msg=f"二级模板[{template_id}]不存在")
+        template = await TaskTemplateCRUD(self.auth, self.db).get_or_404(
+            id=template_id, msg=f"叶子模板[{template_id}]不存在", preload=["items"]
+        )
+        if template.items:
+            raise CustomException(
+                msg=f"模板[{template.name}]含 {len(template.items)} 个三级任务，请关联其三级任务而非模板"
+            )
 
 
 class ReportService:

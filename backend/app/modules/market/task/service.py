@@ -4,6 +4,7 @@
 状态流转遵循 ``app.modules.market.enums`` 定义的状态机，单向流转由各 Service 显式约束。
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,12 +24,14 @@ from ..institution.service import InstitutionService, extract_institution_info, 
 from ..numbering import NumberPrefix, next_code
 from ..project.crud import ProjectCRUD
 from .crud import AssignmentCRUD, SubmissionCRUD, TaskCategoryCRUD, TaskCRUD, TaskItemCRUD, TaskTemplateCRUD
-from .model import AssignmentModel, TaskItemModel, TaskTemplateModel
+from .model import AssignmentModel, TaskItemModel, TaskModel, TaskTemplateModel
 from .schema import (
     AssignmentCreateSchema,
     AssignmentOutSchema,
     AssignmentQueryParam,
     AssignmentUpdateSchema,
+    MiniAssignmentGroupSchema,
+    MiniTaskGroupSchema,
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
@@ -66,7 +69,8 @@ _TEMPLATE_PRELOAD = [
     "items.updated_by",
 ]
 
-# 任务输出含 template（含 category + items），需预加载自身审计关系、两层关系及其审计关系
+# 任务输出含 template（含 category + items）与 item（三级任务），需预加载自身审计关系、
+# 各层关系及其审计关系
 _TASK_PRELOAD = [
     "created_by",
     "updated_by",
@@ -79,6 +83,10 @@ _TASK_PRELOAD = [
     "template.items",
     "template.items.created_by",
     "template.items.updated_by",
+    "item",
+    "item.created_by",
+    "item.updated_by",
+    "project",
 ]
 
 # 分派输出含 task（复用任务预加载链，加 task. 前缀）
@@ -298,10 +306,70 @@ class TaskService:
         self.auth = auth
         self.db = db
 
+    @staticmethod
+    def _fill_task_exec_fields(out: TaskOutSchema) -> None:
+        """回填最小单元任务的执行标准/执行要求。
+
+        取值优先级：三级任务 ``item.config`` 覆盖模板 ``template.config``；
+        三级任务未配置时回退模板配置。
+        """
+        item = out.item
+        template = out.template
+        item_standard = item.config.exec_standard if item and item.config else None
+        item_requirement = item.config.executor_requirement if item and item.config else None
+        template_standard = template.config.exec_standard if template and template.config else None
+        template_requirement = template.config.executor_requirement if template and template.config else None
+        out.exec_standard = item_standard if item_standard is not None else template_standard
+        out.executor_requirement = item_requirement if item_requirement is not None else template_requirement
+
+    @staticmethod
+    def _task_out(task: TaskModel) -> TaskOutSchema:
+        """序列化任务实例为出参并回填执行字段。"""
+        out = TaskOutSchema.model_validate(task)
+        TaskService._fill_task_exec_fields(out)
+        return out
+
+    @staticmethod
+    def _task_orm_sort_key(task: TaskModel) -> tuple[int, ...]:
+        """分组内最小单元任务排序键：分类 sort/id → 模板 id → 三级任务 sort/id。"""
+        category = task.template.category if task.template else None
+        item = task.item
+        return (
+            task.project_id,
+            category.sort if category else 0,
+            category.id if category else 0,
+            task.template.id if task.template else 0,
+            item.sort if item else 0,
+            item.id if item else 0,
+        )
+
+    @staticmethod
+    def _group_orm_tasks(tasks: Sequence[TaskModel]) -> list[MiniTaskGroupSchema]:
+        """按项目分组最小单元任务。
+
+        项目按 ``project_id`` 升序出现，组内任务按分类/模板/三级任务排序。
+        """
+        ordered = sorted(tasks, key=TaskService._task_orm_sort_key)
+        groups: dict[int, MiniTaskGroupSchema] = {}
+        for task in ordered:
+            project = task.project
+            group = groups.get(task.project_id)
+            if group is None:
+                group = MiniTaskGroupSchema(
+                    project_id=task.project_id,
+                    project_name=project.name if project else "",
+                    period=project.period if project else None,
+                )
+                groups[task.project_id] = group
+            group.tasks.append(TaskService._task_out(task))
+        return list(groups.values())
+
     async def detail(self, id: int) -> TaskOutSchema:
         """查询任务详情。"""
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id, preload=_TASK_PRELOAD)
-        return TaskOutSchema.model_validate(task)
+        out = TaskOutSchema.model_validate(task)
+        self._fill_task_exec_fields(out)
+        return out
 
     async def page(
         self,
@@ -310,16 +378,39 @@ class TaskService:
         search: TaskQueryParam | None = None,
         order_by: list[dict[str, str]] | None = None,
     ) -> PageResultSchema[TaskOutSchema]:
-        """分页查询任务，并聚合各任务的已分派/接收人数。"""
+        """分页查询任务，并聚合各任务的已分派/接收人数。
+
+        任务实例无 ``category_id`` 字段，一级分类过滤需转为「该分类下模板 id 的 in 查询」。
+        """
         offset = (page_no - 1) * page_size
+        search_dict = search_to_dict(search) or {}
+
+        # category_id → template_id in
+        if search is not None and search.category_id is not None:
+            search_dict.pop("category_id", None)
+            templates = await TaskTemplateCRUD(self.auth, self.db).get_list(search={"category_id": search.category_id})
+            template_ids = [t.id for t in templates]
+            if not template_ids:
+                return PageResultSchema[TaskOutSchema](page_no=page_no, page_size=page_size, total=0, has_next=False, items=[])
+            search_dict["template_id"] = ("in", template_ids)
+
+        # exclude_status → status notin（未显式指定 status 时排除草稿；字符串须包成 list 供 SQLAlchemy notin 使用）
+        if search is not None and search.exclude_status:
+            exclude_val = search.exclude_status
+            search_dict.pop("exclude_status", None)
+            if "status" not in search_dict:
+                search_dict["status"] = ("notin", [exclude_val])
+
         result = await TaskCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
             order_by=order_by or [{"id": "desc"}],
-            search=search_to_dict(search),
+            search=search_dict,
             out_schema=TaskOutSchema,
             preload=_TASK_PRELOAD,
         )
+        for item in result.items:
+            self._fill_task_exec_fields(item)
         await self._attach_assignment_counts(result)
         return result
 
@@ -340,24 +431,74 @@ class TaskService:
             if item.id is not None:
                 item.assignment_count = count_map.get(item.id, 0)
 
+    async def _get_leaf_template(self, template_id: int) -> TaskTemplateModel:
+        """查询并校验叶子模板：仅「无三级任务」的模板允许直接建任务。
+
+        有三级任务的模板不承载 ``form_schema``（表单结构完全由三级任务自包含），
+        若按模板级创建任务，C 端将无任何采集字段可填，故在此强校验拦截。
+        """
+        template = await TaskTemplateCRUD(self.auth, self.db).get_or_404(
+            id=template_id, msg="叶子模板不存在", preload=["items"]
+        )
+        if template.items:
+            raise CustomException(
+                msg=f"模板[{template.name}]含 {len(template.items)} 个三级任务，请按三级任务创建任务"
+            )
+        return template
+
     async def create(self, data: TaskCreateSchema) -> TaskOutSchema:
-        """创建任务（草稿状态，编号自动生成）。"""
-        await ProjectCRUD(self.auth, self.db).get_or_404(id=data.project_id, msg="项目不存在")
-        await TaskTemplateCRUD(self.auth, self.db).get_or_404(id=data.template_id, msg="任务模板不存在")
+        """创建任务（草稿状态，编号自动生成，名称 = 项目-二级模板[-三级任务]）。"""
+        project = await ProjectCRUD(self.auth, self.db).get_or_404(id=data.project_id, msg="项目不存在")
         task_no = await next_code(self.db, NumberPrefix.TASK)
-        task = await TaskCRUD(self.auth, self.db).create(data={**data.model_dump(), "task_no": task_no})
+        if data.item_id is not None:
+            item = await TaskItemCRUD(self.auth, self.db).get_or_404(id=data.item_id, msg="三级任务不存在", preload=["template"])
+            create_data = {
+                "task_no": task_no,
+                "project_id": data.project_id,
+                "template_id": item.template_id,
+                "item_id": item.id,
+                "name": f"{project.name}-{item.template.name}-{item.name}",
+                "period": data.period,
+                "assign_mode": data.assign_mode,
+            }
+        else:
+            template = await self._get_leaf_template(data.template_id)
+            create_data = {
+                "task_no": task_no,
+                "project_id": data.project_id,
+                "template_id": template.id,
+                "item_id": None,
+                "name": f"{project.name}-{template.name}",
+                "period": data.period,
+                "assign_mode": data.assign_mode,
+            }
+        task = await TaskCRUD(self.auth, self.db).create(data=create_data)
         return await self.detail(id=task.id)
 
     async def update(self, id: int, data: TaskUpdateSchema) -> TaskOutSchema:
-        """更新任务（仅草稿状态可改，编号不可修改）。"""
+        """更新任务（仅草稿状态可改，编号不可修改；项目/任务单元变更时同步模板与名称）。"""
         task = await TaskCRUD(self.auth, self.db).get_or_404(id=id)
         if task.status != TaskStatus.DRAFT.value:
             raise CustomException(msg="仅草稿状态的任务可修改")
-        if data.project_id is not None:
-            await ProjectCRUD(self.auth, self.db).get_or_404(id=data.project_id, msg="项目不存在")
-        if data.template_id is not None:
-            await TaskTemplateCRUD(self.auth, self.db).get_or_404(id=data.template_id, msg="任务模板不存在")
-        await TaskCRUD(self.auth, self.db).update(id=id, data=data)
+
+        update_data = data.model_dump(exclude_unset=True, exclude_none=True)
+
+        # 项目或任务单元（三级任务/叶子模板）变更时，同步派生的二级模板与显示名
+        if data.item_id is not None or data.template_id is not None or data.project_id is not None:
+            project_id = data.project_id if data.project_id is not None else task.project_id
+            project = await ProjectCRUD(self.auth, self.db).get_or_404(id=project_id, msg="项目不存在")
+            if data.item_id is not None:
+                item = await TaskItemCRUD(self.auth, self.db).get_or_404(id=data.item_id, msg="三级任务不存在", preload=["template"])
+                update_data["template_id"] = item.template_id
+                update_data["item_id"] = item.id
+                update_data["name"] = f"{project.name}-{item.template.name}-{item.name}"
+            elif data.template_id is not None:
+                template = await self._get_leaf_template(data.template_id)
+                update_data["template_id"] = template.id
+                update_data["item_id"] = None
+                update_data["name"] = f"{project.name}-{template.name}"
+
+        await TaskCRUD(self.auth, self.db).update(id=id, data=update_data)
         return await self.detail(id=id)
 
     async def delete(self, ids: list[int]) -> None:
@@ -428,17 +569,8 @@ class TaskService:
         """
         del redis  # 预留参数，当前未使用
         offset = (page_no - 1) * page_size
-        # 当前用户已领取的任务 id 列表，大厅需排除这些任务
-        claimed = await AssignmentCRUD(self.auth, self.db).get_list(
-            search={"user_id": self.auth.user.id, "source": AssignmentSource.CLAIMED.value}
-        )
-        claimed_ids = [a.task_id for a in claimed]
-        search = {
-            "status": TaskStatus.PUBLISHED.value,
-            "assign_mode": AssignMode.OPEN.value,
-            "id": ("notin", claimed_ids),
-        }
-        return await TaskCRUD(self.auth, self.db).page(
+        search = await self._hall_visibility_search()
+        result = await TaskCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
             order_by=[{"published_at": "desc"}, {"id": "desc"}],
@@ -446,6 +578,27 @@ class TaskService:
             out_schema=TaskOutSchema,
             preload=_TASK_PRELOAD,
         )
+        for item in result.items:
+            self._fill_task_exec_fields(item)
+        return result
+
+    async def _hall_visibility_search(self) -> dict[str, Any]:
+        """任务大厅可见性过滤条件：PUBLISHED + open + 排除当前用户已领取任务。"""
+        claimed = await AssignmentCRUD(self.auth, self.db).get_list(
+            search={"user_id": self.auth.user.id, "source": AssignmentSource.CLAIMED.value}
+        )
+        claimed_ids = [a.task_id for a in claimed]
+        return {
+            "status": TaskStatus.PUBLISHED.value,
+            "assign_mode": AssignMode.OPEN.value,
+            "id": ("notin", claimed_ids),
+        }
+
+    async def grouped_hall_tasks(self) -> list[MiniTaskGroupSchema]:
+        """任务大厅分组：复用大厅可见性，一次性查出全部可见任务并按项目分组。"""
+        search = await self._hall_visibility_search()
+        tasks = await TaskCRUD(self.auth, self.db).get_list(search=search, preload=_TASK_PRELOAD)
+        return self._group_orm_tasks(tasks)
 
 
 class AssignmentService:
@@ -458,7 +611,10 @@ class AssignmentService:
     async def detail(self, id: int) -> AssignmentOutSchema:
         """查询分派详情（预加载任务链，避免异步懒加载）。"""
         assignment = await AssignmentCRUD(self.auth, self.db).get_or_404(id=id, preload=_ASSIGNMENT_PRELOAD)
-        return AssignmentOutSchema.model_validate(assignment)
+        out = AssignmentOutSchema.model_validate(assignment)
+        if out.task is not None:
+            TaskService._fill_task_exec_fields(out.task)
+        return out
 
     async def page(
         self,
@@ -469,7 +625,7 @@ class AssignmentService:
     ) -> PageResultSchema[AssignmentOutSchema]:
         """分页查询分派（预加载任务链）。"""
         offset = (page_no - 1) * page_size
-        return await AssignmentCRUD(self.auth, self.db).page(
+        result = await AssignmentCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
             order_by=order_by or [{"id": "desc"}],
@@ -477,6 +633,10 @@ class AssignmentService:
             out_schema=AssignmentOutSchema,
             preload=_ASSIGNMENT_PRELOAD,
         )
+        for item in result.items:
+            if item.task is not None:
+                TaskService._fill_task_exec_fields(item.task)
+        return result
 
     async def create(self, data: AssignmentCreateSchema) -> list[AssignmentOutSchema]:
         """批量创建分派（运营定向分派，一个任务指派给多个用户，跳过已分派）。"""
@@ -534,7 +694,7 @@ class AssignmentService:
         offset = (page_no - 1) * page_size
         cond = search_to_dict(search) or {}
         cond["user_id"] = self.auth.user.id
-        return await AssignmentCRUD(self.auth, self.db).page(
+        result = await AssignmentCRUD(self.auth, self.db).page(
             offset=offset,
             limit=page_size,
             order_by=[{"id": "desc"}],
@@ -542,6 +702,54 @@ class AssignmentService:
             out_schema=AssignmentOutSchema,
             preload=_ASSIGNMENT_PRELOAD,
         )
+        for item in result.items:
+            if item.task is not None:
+                TaskService._fill_task_exec_fields(item.task)
+        return result
+
+    async def grouped_my_assignments(self, search: AssignmentQueryParam | None = None) -> list[MiniAssignmentGroupSchema]:
+        """我的任务分组：复用我的任务语义，一次性查出全部分派并按任务项目分组。"""
+        cond = search_to_dict(search) or {}
+        cond["user_id"] = self.auth.user.id
+        assignments = await AssignmentCRUD(self.auth, self.db).get_list(
+            search=cond,
+            order_by=[{"id": "desc"}],
+            preload=_ASSIGNMENT_PRELOAD,
+        )
+        return self._group_orm_assignments(assignments)
+
+    @staticmethod
+    def _group_orm_assignments(assignments: Sequence[AssignmentModel]) -> list[MiniAssignmentGroupSchema]:
+        """按分派单所属任务的项目分组，组内按任务分类/模板/三级任务排序。
+
+        保留分派单自身 id/status（而非仅任务），供「我的任务」状态筛选、进度轨道、
+        成果角标与卡片跳转使用。
+        """
+        def sort_key(a: AssignmentModel) -> tuple[int, ...]:
+            task = a.task
+            if task is None:
+                return (0, 0, 0, 0, 0, 0, a.id or 0)
+            return (*TaskService._task_orm_sort_key(task), a.id or 0)
+
+        ordered = sorted(assignments, key=sort_key)
+        groups: dict[int, MiniAssignmentGroupSchema] = {}
+        for a in ordered:
+            task = a.task
+            project = task.project if task else None
+            project_id = task.project_id if task else 0
+            group = groups.get(project_id)
+            if group is None:
+                group = MiniAssignmentGroupSchema(
+                    project_id=project_id,
+                    project_name=project.name if project else "",
+                    period=project.period if project else None,
+                )
+                groups[project_id] = group
+            out = AssignmentOutSchema.model_validate(a)
+            if out.task is not None:
+                TaskService._fill_task_exec_fields(out.task)
+            group.assignments.append(out)
+        return list(groups.values())
 
     async def accept(self, id: int) -> AssignmentOutSchema:
         """接收任务：PENDING → ACCEPTED，写入接收时间。"""

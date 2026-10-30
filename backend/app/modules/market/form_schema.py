@@ -7,6 +7,7 @@
 
 字段形态对齐真实采集表：单值字段（text/textarea/number/date/select/radio/checkbox/image/file）
 + ``type=table`` 多行子表（``columns`` 子列，如「价格核查」的产品明细列），可同分节混排。
++ ``type=region`` 全国省市区三级联动选择（如「区域」字段），前端内置行政区划数据渲染级联选择。
 
 后端 Pydantic 模型是 ``form_schema`` 结构的唯一定义源，前端 TS 类型只对齐、不做定义源。
 ``FormSchemaField`` 同时被 ``task`` 与 ``template`` 模块复用，故抽出到独立模块避免循环导入。
@@ -49,15 +50,20 @@ class FormSchemaField(BaseModel):
     - 单值字段：text/textarea/number/date/select/radio/checkbox/image/file，
       图片用 image（如打卡照片、机构内/外部照片），文件附件用 file（如合同、入库单、宣传资料）。
     - ``type=table``：多行子表，``columns`` 携带子列定义，行数据为 ``list[dict[子列名, 值]]``。
+    - ``autofill=current_user``：字段由后端按当前登录用户自动填充并只读（如「执行人」），
+      前端不渲染输入框，提交时由后端注入当前用户身份，不参与用户填写。
     二级模板（TaskConfig）与三级任务（TaskItemConfig）共用本定义，字段名与字段定义分离，
     统一在分节 ``fields`` 中以 ``dict[字段名, FormSchemaField]`` 表达。
     """
 
     label: str = Field(min_length=1, max_length=128, description="字段显示名(如 医院名称)")
-    type: Literal["text", "textarea", "number", "date", "select", "radio", "checkbox", "image", "file", "table"] = Field(
-        default="text", description="字段类型(table 为多行子表)"
+    type: Literal["text", "textarea", "number", "date", "select", "radio", "checkbox", "image", "file", "table", "region"] = Field(
+        default="text", description="字段类型(table 为多行子表；region 为省市区三级联动选择)"
     )
     required: bool = Field(default=False, description="是否必填")
+    autofill: Literal["current_user"] | None = Field(
+        default=None, description="自动填充来源(current_user=自动填当前登录用户并只读)"
+    )
     placeholder: str | None = Field(default=None, max_length=255, description="输入占位提示")
     options: list[FormSchemaOption] | None = Field(default=None, description="选项列表(仅 select/radio/checkbox 需要)")
     columns: list[FormSchemaColumn] | None = Field(default=None, description="子表列定义(仅 type=table 需要)")

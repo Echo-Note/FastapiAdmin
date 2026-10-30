@@ -127,7 +127,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -154,7 +154,8 @@
             "executor": {
               "label": "采集人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "采集日期",
@@ -343,7 +344,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "venue": {
@@ -369,7 +370,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "宣传日期",
@@ -405,7 +407,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "venue": {
@@ -431,7 +433,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "科普日期",
@@ -472,7 +475,7 @@
             },
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "attendees": {
@@ -483,7 +486,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "会议日期",
@@ -553,7 +557,7 @@
             },
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "attendees": {
@@ -564,7 +568,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "活动日期",
@@ -634,7 +639,7 @@
             },
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "attendees": {
@@ -645,7 +650,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "活动日期",

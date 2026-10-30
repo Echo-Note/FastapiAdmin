@@ -11,7 +11,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "hospital_name": {
@@ -32,7 +32,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -119,7 +120,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "hospital_name": {
@@ -140,7 +141,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -212,7 +214,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "hospital_name": {
@@ -233,7 +235,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -305,7 +308,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "hospital_name": {
@@ -326,7 +329,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -403,7 +407,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "hospital_name": {
@@ -424,7 +428,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -496,7 +501,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -507,7 +512,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -579,7 +585,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -590,7 +596,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -657,7 +664,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -668,7 +675,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -735,7 +743,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -746,7 +754,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -813,7 +822,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -824,7 +833,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -891,7 +901,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -902,7 +912,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -974,7 +985,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -985,7 +996,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1052,7 +1064,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1063,7 +1075,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1130,7 +1143,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1141,7 +1154,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1208,7 +1222,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1219,7 +1233,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1286,7 +1301,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1297,7 +1312,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1369,7 +1385,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1380,7 +1396,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1447,7 +1464,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1458,7 +1475,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1525,7 +1543,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1536,7 +1554,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1603,7 +1622,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1614,7 +1633,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1681,7 +1701,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1692,7 +1712,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1759,7 +1780,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1770,7 +1791,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1842,7 +1864,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1853,7 +1875,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1920,7 +1943,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -1931,7 +1954,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -1998,7 +2022,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -2009,7 +2033,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -2076,7 +2101,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -2087,7 +2112,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -2154,7 +2180,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -2165,7 +2191,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -2242,7 +2269,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -2253,7 +2280,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "执行日期",
@@ -2336,7 +2364,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2420,7 +2449,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2504,7 +2534,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2577,7 +2608,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2650,7 +2682,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2719,7 +2752,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2788,7 +2822,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2857,7 +2892,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2926,7 +2962,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -2995,7 +3032,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -3064,7 +3102,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -3133,7 +3172,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -3202,7 +3242,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -3271,7 +3312,8 @@
             "executor": {
               "label": "调研人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "调研日期",
@@ -3329,7 +3371,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "venue": {
@@ -3355,7 +3397,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "宣传日期",
@@ -3396,7 +3439,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "venue": {
@@ -3422,7 +3465,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "宣传日期",
@@ -3463,7 +3507,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "venue": {
@@ -3489,7 +3533,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "科普日期",
@@ -3530,7 +3575,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "venue": {
@@ -3556,7 +3601,8 @@
             "executor": {
               "label": "执行人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "科普日期",
@@ -3597,7 +3643,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -3624,7 +3670,8 @@
             "executor": {
               "label": "采集人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "采集日期",
@@ -3686,7 +3733,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -3713,7 +3760,8 @@
             "executor": {
               "label": "采集人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "采集日期",
@@ -3775,7 +3823,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -3802,7 +3850,8 @@
             "executor": {
               "label": "采集人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "采集日期",
@@ -3864,7 +3913,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -3891,7 +3940,8 @@
             "executor": {
               "label": "采集人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "采集日期",
@@ -3953,7 +4003,7 @@
           "fields": {
             "region": {
               "label": "区域",
-              "type": "text",
+              "type": "region",
               "required": true
             },
             "org_name": {
@@ -3980,7 +4030,8 @@
             "executor": {
               "label": "采集人",
               "type": "text",
-              "required": true
+              "required": true,
+              "autofill": "current_user"
             },
             "exec_date": {
               "label": "采集日期",
