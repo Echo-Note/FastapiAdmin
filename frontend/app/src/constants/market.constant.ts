@@ -14,6 +14,8 @@ export type MarketStatusType = 'primary' | 'success' | 'warning' | 'danger' | 'i
 export interface MarketStatusMeta {
   label: string
   type: MarketStatusType
+  /** 状态徽章左侧图标（wot-ui 图标名，可选） */
+  icon?: string
 }
 
 /** 任务状态机 */
@@ -29,12 +31,40 @@ export const TASK_STATUS_MAP: Record<string, MarketStatusMeta> = {
 
 /** 分派/接收状态机 */
 export const ASSIGNMENT_STATUS_MAP: Record<string, MarketStatusMeta> = {
-  PENDING: { label: '待接收', type: 'info' },
-  ACCEPTED: { label: '已接收', type: 'primary' },
-  SUBMITTING: { label: '进行中', type: 'warning' },
-  SUBMITTED: { label: '已提交', type: 'warning' },
-  REVIEWED: { label: '已审核', type: 'success' },
-  SETTLED: { label: '已结算', type: 'success' },
+  PENDING: { label: '待接收', type: 'info', icon: 'clock-circle' },
+  ACCEPTED: { label: '已接收', type: 'primary', icon: 'check-circle' },
+  SUBMITTING: { label: '进行中', type: 'warning', icon: 'edit' },
+  SUBMITTED: { label: '已提交', type: 'warning', icon: 'send' },
+  REVIEWED: { label: '已审核', type: 'success', icon: 'doublecheck' },
+  SETTLED: { label: '已结算', type: 'success', icon: 'trophy' },
+}
+
+/** 任务执行四大阶段（卡片底部进度轨道） */
+export const ASSIGNMENT_STAGES = [
+  { label: '接收' },
+  { label: '提交' },
+  { label: '审核' },
+  { label: '结算' },
+] as const
+
+/** 分派状态 → 阶段序号（0~3），用于进度轨道高亮到当前所处阶段 */
+export const ASSIGNMENT_STATUS_STAGE: Record<string, number> = {
+  PENDING: 0,
+  ACCEPTED: 0,
+  SUBMITTING: 1,
+  SUBMITTED: 1,
+  REVIEWED: 2,
+  SETTLED: 3,
+}
+
+/** 成果进度角标：已提交成果按状态分组的展示顺序（草稿不计入进度） */
+export const SUBMISSION_STAT_ORDER = ['APPROVED', 'PENDING', 'REJECTED'] as const
+
+/** 成果进度角标短文案 + 语义色（区别于成果状态机全称文案） */
+export const SUBMISSION_STAT_META: Record<string, { label: string, type: MarketStatusType }> = {
+  APPROVED: { label: '通过', type: 'success' },
+  PENDING: { label: '待审', type: 'warning' },
+  REJECTED: { label: '驳回', type: 'danger' },
 }
 
 /** 成果状态机 */

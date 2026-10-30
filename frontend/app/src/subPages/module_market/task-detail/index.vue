@@ -40,7 +40,7 @@ const unitText = computed(() => task.value?.template?.config?.unit ?? '')
 /** 是否为「我的任务」入口（有分派实例） */
 const fromMine = computed(() => assignmentId.value != null)
 
-/** 可提交：已接收 / 进行中 / 已提交（驳回可重提）/ 已审核 */
+/** 可提交：已接收 / 进行中（填表中）/ 已提交（驳回可重提）/ 已审核 */
 const canSubmit = computed(() => {
   const s = assignmentStatus.value
   return s === 'ACCEPTED' || s === 'SUBMITTING' || s === 'SUBMITTED' || s === 'REVIEWED'
@@ -95,6 +95,8 @@ async function handleAccept() {
     await MarketAPI.acceptAssignment(assignmentId.value)
     assignmentStatus.value = 'ACCEPTED'
     toast.success(t('market.receiveSuccess'))
+    // 接收成功自动返回上级列表（返回后 onShow 会刷新列表）
+    setTimeout(() => router.back(), 600)
   }
   catch {
     toast.error(t('common.operationFailed'))
@@ -124,6 +126,8 @@ async function handleClaim() {
     assignmentId.value = assigned.id
     assignmentStatus.value = assigned.status
     toast.success(t('market.claimSuccess'))
+    // 领取成功自动返回任务大厅（任务已转为定向分派从大厅下架，返回后 onShow 会刷新列表）
+    setTimeout(() => router.back(), 600)
   }
   catch {
     toast.error(t('common.operationFailed'))
@@ -135,8 +139,10 @@ async function handleClaim() {
 
 /** 去提交成果 */
 function goSubmit() {
+  // 用 path 而非 name 跳转：@wot-ui/router 的 resolve 在 name 分支误把 to.params 当 query，
+  // 导致 query 丢失；传 path 走 resolvePath 分支才能正确带上 query。
   router.push({
-    name: 'market-submission-form',
+    path: '/subPages/module_market/submission-form/index',
     query: { assignment_id: String(assignmentId.value) },
   })
 }

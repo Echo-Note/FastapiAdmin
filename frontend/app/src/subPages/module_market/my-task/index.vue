@@ -1,10 +1,17 @@
 <script setup lang="ts">
-import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { useMarketListPage } from '@/composables/useMarketListPage'
-import { ASSIGNMENT_STATUS_MAP, statusMeta } from '@/constants'
+import {
+  ASSIGNMENT_STAGES,
+  ASSIGNMENT_STATUS_MAP,
+  ASSIGNMENT_STATUS_STAGE,
+  statusMeta,
+  SUBMISSION_STAT_META,
+  SUBMISSION_STAT_ORDER,
+} from '@/constants'
 
 definePage({ name: 'market-my-task', style: { navigationBarTitleText: '我的任务', enablePullDownRefresh: true } })
 
@@ -39,7 +46,7 @@ const TAB_OPTIONS = [
 const activeTab = ref(0)
 const activeStatus = ref<string | undefined>()
 
-const { list, total, loading, loadData, refreshData, loadNext, toFirst } = useMarketListPage<MyAssignmentItem>({
+const { list, total, loading, reload, refreshData, loadNext, toFirst } = useMarketListPage<MyAssignmentItem>({
   fetcher: p => MarketAPI.getMyAssignments({
     ...p,
     status: activeStatus.value,
@@ -63,15 +70,75 @@ function barColor(status?: string) {
   return STATUS_BAR_COLOR[statusInfo(status).type] ?? 'var(--wot-grey-6)'
 }
 
+/** 成果进度聚合：assignment_id → { APPROVED/PENDING/REJECTED/DRAFT: 数量 } */
+const submissionStatMap = ref<Record<number, Record<string, number>>>({})
+
+/**
+ * 拉取当前用户全部成果（后端单页上限 100，循环翻页），按分派单聚合各状态数量。
+ * 失败静默处理：角标缺失不影响任务主列表展示。
+ */
+async function loadSubmissionStats() {
+  const PAGE_SIZE = 100
+  const map: Record<number, Record<string, number>> = {}
+  try {
+    let page = 1
+    for (;;) {
+      const res = await MarketAPI.getMySubmissions({ page_no: page, page_size: PAGE_SIZE })
+      const items = res?.items ?? []
+      for (const s of items) {
+        if (s.assignment_id == null)
+          continue
+        const bucket = (map[s.assignment_id] ??= {})
+        const key = s.status ?? 'DRAFT'
+        bucket[key] = (bucket[key] ?? 0) + 1
+      }
+      const total = res?.total ?? 0
+      if (items.length < PAGE_SIZE || page * PAGE_SIZE >= total)
+        break
+      page += 1
+    }
+  }
+  catch {
+    // 聚合失败不阻塞列表
+  }
+  submissionStatMap.value = map
+}
+
+/** 某任务已提交成果的进度角标项（仅统计通过/待审/驳回，草稿不计入） */
+function statItems(assignmentId?: number) {
+  const bucket = assignmentId != null ? submissionStatMap.value[assignmentId] : undefined
+  if (!bucket)
+    return []
+  return SUBMISSION_STAT_ORDER
+    .map(key => ({
+      key,
+      label: SUBMISSION_STAT_META[key].label,
+      type: SUBMISSION_STAT_META[key].type,
+      count: bucket[key] ?? 0,
+    }))
+    .filter(s => s.count > 0)
+}
+
+/** 分派状态 → 阶段序号（进度轨道高亮到当前阶段） */
+function stageIndex(status?: string) {
+  return ASSIGNMENT_STATUS_STAGE[status ?? ''] ?? 0
+}
+
 function handleTabChange(e: { index: number }) {
   activeStatus.value = TAB_OPTIONS[e.index]?.value
   toFirst()
 }
 
-/** 卡片点击统一跳任务详情页（详情页内完成接收 / 去提交） */
+/** 卡片点击：已接收 / 进行中 → 提交成果页；其余（待接收/已提交/已审核/已结算）→ 详情页 */
 function goDetail(item: MyAssignmentItem) {
+  // 用 path 而非 name 跳转：@wot-ui/router 的 resolve 在 name 分支误把 to.params 当 query，
+  // 导致 query 丢失；传 path 走 resolvePath 分支才能正确带上 query。
+  const canFill = item.status === 'ACCEPTED' || item.status === 'SUBMITTING'
+  const path = canFill
+    ? '/subPages/module_market/submission-form/index'
+    : '/subPages/module_market/task-detail/index'
   router.push({
-    name: 'market-task-detail',
+    path,
     query: { assignment_id: String(item.id) },
   })
 }
@@ -82,13 +149,17 @@ onReachBottom(() => {
 })
 onPullDownRefresh(async () => {
   try {
-    await refreshData()
+    await Promise.all([refreshData(), loadSubmissionStats()])
   }
   finally {
     uni.stopPullDownRefresh()
   }
 })
-onLoad(() => loadData())
+// 每次显示都刷新：从详情接收返回后状态已变，需重新拉取列表与成果统计
+onShow(() => {
+  reload()
+  loadSubmissionStats()
+})
 </script>
 
 <template>
@@ -108,18 +179,42 @@ onLoad(() => loadData())
           hover-class="my-card--active"
           @click="goDetail(item)"
         >
-          <view class="my-card__bar" :style="{ background: barColor(item.status) }" />
-          <view class="my-card__body">
-            <view class="flex items-center justify-between gap-2">
-              <view class="my-card__title">
-                {{ item.task?.name ?? '-' }}
-              </view>
-              <wd-tag :type="statusInfo(item.status).type" plain :title="statusInfo(item.status).label" />
+          <view class="flex items-center justify-between gap-2">
+            <view class="my-card__title">
+              {{ item.task?.name ?? '-' }}
             </view>
-            <view class="mt-2 flex flex-wrap items-center gap-2">
-              <view class="my-card__meta">
-                {{ t('market.period') }} {{ item.task?.period ?? '-' }}
+            <wd-tag :type="statusInfo(item.status).type" plain round :icon="statusInfo(item.status).icon">
+              {{ statusInfo(item.status).label }}
+            </wd-tag>
+          </view>
+          <view class="mt-2 flex flex-wrap items-center justify-between gap-2">
+            <view class="my-card__meta">
+              {{ t('market.period') }} {{ item.task?.period ?? '-' }}
+            </view>
+            <view v-if="statItems(item.id).length" class="sub-stat">
+              <text
+                v-for="s in statItems(item.id)"
+                :key="s.key"
+                class="sub-stat__item"
+              >
+                <text class="sub-stat__dot" :style="{ background: STATUS_BAR_COLOR[s.type] }" />
+                <text class="sub-stat__num">{{ s.count }}</text>
+                <text class="sub-stat__label">{{ s.label }}</text>
+              </text>
+            </view>
+          </view>
+          <view class="stage-track mt-3" :style="{ '--track-color': barColor(item.status) }">
+            <view
+              v-for="(stage, i) in ASSIGNMENT_STAGES"
+              :key="stage.label"
+              class="stage-col"
+            >
+              <view class="stage-col__row">
+                <view class="stage-col__line stage-col__line--l" :class="{ on: i > 0 && i <= stageIndex(item.status) }" />
+                <view class="stage-col__dot" :class="{ on: i <= stageIndex(item.status) }" />
+                <view class="stage-col__line stage-col__line--r" :class="{ on: i < stageIndex(item.status) }" />
               </view>
+              <text class="stage-col__label" :class="{ on: i <= stageIndex(item.status) }">{{ stage.label }}</text>
             </view>
           </view>
         </view>
@@ -135,10 +230,7 @@ onLoad(() => loadData())
 
 <style lang="scss" scoped>
 .my-card {
-  display: flex;
-  align-items: stretch;
-  gap: 20rpx;
-  padding: 28rpx 24rpx 28rpx 20rpx;
+  padding: 24rpx;
   margin-bottom: 20rpx;
   background: var(--wot-bg-filled-oppo, #fff);
   border-radius: 24rpx;
@@ -150,18 +242,9 @@ onLoad(() => loadData())
   transform: scale(0.98);
 }
 
-.my-card__bar {
-  width: 8rpx;
-  flex-shrink: 0;
-  border-radius: 8rpx;
-}
-
-.my-card__body {
+.my-card__title {
   flex: 1;
   min-width: 0;
-}
-
-.my-card__title {
   overflow: hidden;
   font-size: 32rpx;
   font-weight: 600;
@@ -178,5 +261,83 @@ onLoad(() => loadData())
   color: var(--wot-text-secondary);
   background: var(--wot-filled-content, #f2f3f5);
   border-radius: 8rpx;
+}
+
+/* 成果进度角标：通过 / 待审 / 驳回 分组计数 */
+.sub-stat {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+.sub-stat__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+.sub-stat__dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sub-stat__num {
+  font-weight: 600;
+  color: var(--wot-text-main);
+}
+.sub-stat__label {
+  color: var(--wot-text-secondary);
+}
+
+/* 四阶段进度轨道：接收 → 提交 → 审核 → 结算 */
+.stage-track {
+  display: flex;
+}
+.stage-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.stage-col:first-child .stage-col__line--l,
+.stage-col:last-child .stage-col__line--r {
+  opacity: 0;
+}
+.stage-col__row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.stage-col__line {
+  flex: 1;
+  height: 4rpx;
+  border-radius: 2rpx;
+  background: var(--wot-grey-4, #e5e6eb);
+}
+.stage-col__line.on {
+  background: var(--track-color, var(--wot-primary-6));
+}
+.stage-col__dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: var(--wot-grey-4, #e5e6eb);
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+.stage-col__dot.on {
+  background: var(--track-color, var(--wot-primary-6));
+}
+.stage-col__label {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  line-height: 1;
+  color: var(--wot-text-auxiliary);
+}
+.stage-col__label.on {
+  color: var(--track-color, var(--wot-primary-6));
 }
 </style>
