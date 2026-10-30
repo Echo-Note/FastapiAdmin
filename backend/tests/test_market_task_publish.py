@@ -138,3 +138,35 @@ class TestTaskPublish:
         assert len(items) == 1
         assert items[0]["user_id"] == user_id
         assert items[0]["source"] == "assigned"
+
+        # 定向分派即上线：任务应被置为已发布，并写入发布人与时间
+        detail = test_client.get(f"/market/tasks/detail/{task_id}", headers=auth_headers).json()["data"]
+        assert detail["status"] == "PUBLISHED"
+        assert detail["publisher_id"]
+        assert detail["published_at"]
+
+    def test_direct_assign_publishes_draft_task(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """定向分派草稿任务后任务变为已发布；被指派人能在「我的任务」里看到并接收。"""
+        company_id = self._create_company(test_client, auth_headers, "测试医药公司己")
+        item_id = self._get_item_id(test_client, auth_headers)
+        project_id = self._create_project(test_client, auth_headers, company_id, item_id)
+        task_id = self._create_task(test_client, auth_headers, project_id, item_id, "open")
+        assert test_client.get(f"/market/tasks/detail/{task_id}", headers=auth_headers).json()["data"]["status"] == "DRAFT"
+        user_id = self._get_user_id(test_client, auth_headers)
+
+        resp = test_client.post(
+            "/market/assignments/create",
+            headers=auth_headers,
+            json={"task_id": task_id, "user_ids": [user_id]},
+        )
+        assert resp.status_code == 200, resp.text
+        assignment_id = resp.json()["data"][0]["id"] if isinstance(resp.json()["data"], list) else resp.json()["data"]["id"]
+
+        detail = test_client.get(f"/market/tasks/detail/{task_id}", headers=auth_headers).json()["data"]
+        assert detail["status"] == "PUBLISHED"
+        assert detail["assign_mode"] == "direct"
+
+        # 被指派人（C 端 user）能看到这条分派
+        user_headers = {"Authorization": f"Bearer {test_client.post('/system/auth/login', data={'username': 'user', 'password': '123456'}).json()['data']['access_token']}"}
+        mine = test_client.get("/market/mini/assignments", headers=user_headers, params={"page_no": 1, "page_size": 50}).json()["data"]["items"]
+        assert assignment_id in [a["id"] for a in mine]

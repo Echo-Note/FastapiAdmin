@@ -749,12 +749,27 @@ class AssignmentService:
     async def batch_assign(self, task_id: int, user_ids: list[int], source: str) -> list[AssignmentOutSchema]:
         """批量创建分派记录：用户去重、跳过已分派，返回本次新建的分派列表。
 
-        运营定向分派（``source=assigned``）时，自动将任务的分配方式改为 ``direct``，
-        避免「已指定执行人但任务仍为公开大厅」的矛盾状态（大厅接单 ``claim`` 不走此方法）。
+        运营定向分派（``source=assigned``）时：
+
+        - 任务的分配方式改为 ``direct``，避免「已指定执行人但任务仍为公开大厅」的矛盾状态；
+        - 草稿任务一并置为 ``PUBLISHED``（写发布人与时间）——「指定了执行人」本身就是上线信号，
+          否则被指派人能看到的却是一个未发布的任务，任务状态与实际执行脱节。
+
+        大厅接单（``claim``）不走本方法。不需要定向分派的任务仍由运营显式「发布」进大厅。
         """
         created: list[AssignmentOutSchema] = []
         if source == AssignmentSource.ASSIGNED.value:
-            await TaskCRUD(self.auth, self.db).update(id=task_id, data={"assign_mode": AssignMode.DIRECT.value})
+            update_data: dict[str, Any] = {"assign_mode": AssignMode.DIRECT.value}
+            task = await TaskCRUD(self.auth, self.db).get_or_404(id=task_id, msg="任务不存在")
+            if task.status == TaskStatus.DRAFT.value:
+                update_data.update(
+                    {
+                        "status": TaskStatus.PUBLISHED.value,
+                        "publisher_id": self.auth.user.id,
+                        "published_at": datetime.now(UTC),
+                    }
+                )
+            await TaskCRUD(self.auth, self.db).update(id=task_id, data=update_data)
         for user_id in dict.fromkeys(user_ids):
             existing = await AssignmentCRUD(self.auth, self.db).get_list(
                 search={"task_id": task_id, "user_id": user_id}

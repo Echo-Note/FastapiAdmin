@@ -38,7 +38,7 @@ parent: market-domain
 
 ## 发布与分派解耦
 
-发布（`publish` / `batch_publish`）**只做状态流转** DRAFT → PUBLISHED 并写发布人/时间，不生成任何分派。分派是独立动作：运营定向分派（`batch_assign` / `batch_assign_multi`）会把任务分配方式改为 `direct`；大厅任务由 C 端 `claim` 自行生成分派。
+发布（`publish` / `batch_publish`）**只做状态流转** DRAFT → PUBLISHED 并写发布人/时间，不生成任何分派。分派是独立动作：运营定向分派（`batch_assign` / `batch_assign_multi`）会把任务分配方式改为 `direct`，**并把仍处于 DRAFT 的任务一并置为 PUBLISHED**（定向派发即上线）；大厅任务由 C 端 `claim` 自行生成分派。
 
 ## 大厅接单是幂等防重，不是占名额
 
@@ -66,7 +66,7 @@ parent: market-domain
 
 - **任务列表默认包含草稿**。项目发布只创建 `DRAFT` 任务实例，需要运营再逐条/批量「发布」或「批量分配」；列表页曾经硬编码 `exclude_status=DRAFT`（初始参数与刷新条件各一处），导致「发布项目后任务页是空的」——现已去掉，靠状态筛选显式过滤。
 - **不把「项目发布」改成「任务直接 PUBLISHED」**：定向派发是真实需求（指定执行人），任务必须先建出来再挑人，若建出来就是「已发布」会立刻进公开大厅。所以草稿态保留，发布与定向分派是两个独立动作。
-- 已知缺口：`AssignmentService.my_assignments` / `grouped_my_assignments` **不按任务状态过滤**，因此把草稿任务定向派发后，被指派人立刻能在「我的任务」看到并提交（任务此时仍是 `DRAFT`，未发布）。当前行为是有意保留还是应改为「分派即发布」，尚未定论。
+- **定向分派即发布**：`AssignmentService.batch_assign` 在 `source=assigned` 时把任务置为 `direct`，并且**若任务仍是 `DRAFT` 就一并置为 `PUBLISHED`**（写 `publisher_id` / `published_at`）。理由：`my_assignments` 不按任务状态过滤，被指派人立刻就能看到并提交；「已指定执行人」本身就是上线信号，否则会出现「执行人在做、任务还是草稿」的状态脱节。不需要定向分派的任务仍由运营显式「发布」进大厅——两条路径最终都到 `PUBLISHED`。
 - **侧边栏目录只显示确实有任务的（分类, 模板）**。树节点来自 `TaskCategoryService.tree()`（完整主数据 6 分类 / 18 模板），与任务是否存在无关，空库时会显示一整棵没有任务对应的目录；`GET /market/tasks/facets` 返回 `[{category_id, template_id, task_count}]`，前端据此裁剪节点并显示任务数，任务增删后刷新（页面 `keep_alive`，用 `onActivated` 覆盖从项目页发布后切回的场景）。
 - 「任务目录」菜单页（`/market/task-catalog`）是三级目录的维护入口，默认**只看已用目录**（`GET /market/items/usage` 返回被未删除项目引用的 `item_ids` / `template_ids`），开关「只看已用目录」关掉后显示全量，新增/维护目录时用它。
 

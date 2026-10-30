@@ -1901,6 +1901,23 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — 定向分派即发布：草稿任务被派发后不再留在 DRAFT
+
+#### 1. 原因
+
+`AssignmentService.my_assignments` / `grouped_my_assignments` 只按 `user_id` 过滤，**不按任务状态过滤**；而项目发布只生成 `DRAFT` 任务。于是运营把草稿任务定向派发给某人后，这个人立刻能在「我的任务」看到并提交成果，任务状态却还是草稿——执行状态与任务状态脱节，结算/看板统计也会偏低。
+
+#### 2. 改法
+
+`batch_assign`（`source=assigned`）在把任务改成 `direct` 的同时，若任务仍是 `DRAFT` 就一并置为 `PUBLISHED` 并写 `publisher_id` / `published_at`。定向分派本身就是「指定了执行人 = 上线执行」的语义；不需要定向分派的任务仍由运营显式「发布」进大厅，两条路径最终都到 `PUBLISHED`。`claim`（大厅接单）不受影响。
+
+#### 3. 验证
+
+- 新增 `test_direct_assign_publishes_draft_task`：草稿任务派发后 `status=PUBLISHED`、`assign_mode=direct`，且被指派人能在 `/market/mini/assignments` 看到该分派；原有 `test_assign_open_task_switches_to_direct` 追加「已发布 + 有发布人与时间」断言。
+- `uv run pytest`（`fastapiadmin_test` 库）→ **318 passed**；`ruff check` 通过。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
