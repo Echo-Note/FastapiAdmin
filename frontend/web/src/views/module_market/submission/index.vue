@@ -35,7 +35,7 @@
         <template #statusTag="{ row }"><component :is="dictTag('market_submission_status', row?.status)" /></template>
       </FaDescriptions>
       <ElDivider content-position="left">采集数据</ElDivider>
-      <FaFormDataViewer :form-data="detailData.form_data" :section-names="sectionNames" />
+      <FaFormDataViewer :form-data="detailData.form_data" :schema="detailData.form_schema" />
     </ElDialog>
 
     <!-- 审核对话框 -->
@@ -45,7 +45,7 @@
         <template #statusTag="{ row }"><component :is="dictTag('market_submission_status', row?.status)" /></template>
       </FaDescriptions>
       <ElDivider content-position="left">采集数据</ElDivider>
-      <FaFormDataViewer :form-data="reviewData.form_data" :section-names="sectionNames" />
+      <FaFormDataViewer :form-data="reviewData.form_data" :schema="reviewData.form_schema" />
       <ElDivider content-position="left">审核意见</ElDivider>
       <FaForm
         ref="reviewFormRef"
@@ -70,6 +70,9 @@
 import { h } from "vue";
 import SubmissionAPI, { type SubmissionTable } from "@/api/module_market/submission";
 import UserAPI from "@/api/module_system/user";
+import ProjectAPI from "@/api/module_market/project";
+import TaskTemplateAPI from "@/api/module_market/task-template";
+import TaskItemAPI, { type TaskItemTable } from "@/api/module_market/task-item";
 import { useDictStore } from "@stores";
 import StatusTag from "@/components/display/fa-status-tag/index.vue";
 import type { SearchFormItem } from "@/components/forms/fa-search-bar/index.vue";
@@ -99,16 +102,37 @@ function dictTag(dictType: string, val?: unknown) {
   return h(StatusTag, { type: (item.list_class as StatusType) ?? "info", label: item.dict_label ?? strVal });
 }
 
-const searchForm = ref<{ assignment_id?: number; user_id?: number; status?: string }>({ assignment_id: undefined, user_id: undefined, status: initialStatus });
+const searchForm = ref<{
+  archive_no?: string;
+  project_id?: number;
+  template_id?: number;
+  item_id?: number;
+  user_id?: number;
+  period?: string;
+  status?: string;
+}>({ status: initialStatus });
 const showSearchBar = ref(true);
 const searchBarRef = ref<InstanceType<typeof FaSearchBar> | null>(null);
 
 const userOptions = ref<OptionType[]>([]);
 const userMap = ref<Record<number, string>>({});
+const projectOptions = ref<OptionType[]>([]);
+const templateOptions = ref<OptionType[]>([]);
+const itemOptions = ref<Array<OptionType & { templateId?: number }>>([]);
 
+/** 任务（三级任务）按当前选中的模板缩小可选范围，没选模板则列全部 */
+const templateItemOptions = computed<OptionType[]>(() => {
+  const templateId = searchForm.value.template_id;
+  if (!templateId) return itemOptions.value;
+  return itemOptions.value.filter((item) => item.templateId === templateId);
+});
 const searchItems = computed<SearchFormItem[]>(() => [
-  { label: "分派ID", key: "assignment_id", type: "number", props: { placeholder: "请输入分派ID", controlsPosition: "right" }, span: 6 },
-  { label: "用户", key: "user_id", type: "select", props: { placeholder: "请选择用户", options: userOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "档案号", key: "archive_no", type: "input", props: { placeholder: "请输入档案号", clearable: true }, span: 6 },
+  { label: "项目", key: "project_id", type: "select", props: { placeholder: "请选择项目", options: projectOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "任务模板", key: "template_id", type: "select", props: { placeholder: "请选择任务模板", options: templateOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "任务", key: "item_id", type: "select", props: { placeholder: "请选择任务", options: templateItemOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "提交人", key: "user_id", type: "select", props: { placeholder: "请选择提交人", options: userOptions.value, filterable: true, clearable: true }, span: 6 },
+  { label: "提交月份", key: "period", type: "date", props: { type: "month", format: "YYYY-MM", placeholder: "请选择提交月份" }, span: 6 },
   { label: "状态", key: "status", type: "select", props: { placeholder: "请选择状态", options: statusOptions.value, clearable: true }, span: 6 },
 ]);
 
@@ -130,17 +154,24 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
       apiFn: SubmissionAPI.listSubmission,
       apiParams: { page_no: 1, page_size: 10, ...(initialStatus ? { status: initialStatus } : {}) },
       columnsFactory: () => [
-        { type: "globalIndex", width: 56, label: "序号" },
-        { prop: "institution", label: "机构", minWidth: 150, formatter: (row: SubmissionTable) => row.institution?.name ?? row.subject_name ?? "—" },
+        { type: "globalIndex", width: 56, label: "序号", fixed: "left" },
+        { prop: "project_name", label: "项目", minWidth: 110, showOverflowTooltip: true, formatter: (row: SubmissionTable) => row.task?.project_name ?? "—" },
+        { prop: "category_name", label: "分类", minWidth: 130, showOverflowTooltip: true, formatter: (row: SubmissionTable) => row.task?.category_name ?? "—" },
+        { prop: "template_name", label: "任务模板", minWidth: 130, showOverflowTooltip: true, formatter: (row: SubmissionTable) => row.task?.template_name ?? "—" },
+        { prop: "item_name", label: "任务", minWidth: 130, showOverflowTooltip: true, formatter: (row: SubmissionTable) => row.task?.item_name ?? "—" },
+        { prop: "task_no", label: "任务编号", width: 110, formatter: (row: SubmissionTable) => row.task?.task_no ?? "—" },
+        // 采集对象合并「机构名 / 受访对象名」，非机构对象不再整列为空
+        { prop: "subject_name", label: "采集对象", minWidth: 150, showOverflowTooltip: true, formatter: (row: SubmissionTable) => row.institution?.name ?? row.subject_name ?? "—" },
         { prop: "subject_type", label: "对象类型", width: 100, formatter: (row: SubmissionTable) => dictTag("market_subject_type", row.subject_type) },
-        { prop: "user_id", label: "用户", minWidth: 120, formatter: (row: SubmissionTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
-        { prop: "region", label: "区域", width: 110, showOverflowTooltip: true },
-        { prop: "archive_no", label: "档案号", width: 120, showOverflowTooltip: true },
+        { prop: "region", label: "区域", width: 150, showOverflowTooltip: true },
+        { prop: "user_id", label: "提交人", width: 110, formatter: (row: SubmissionTable) => userMap.value[row.user_id!] ?? `#${row.user_id}` },
+        { prop: "archive_no", label: "档案号", width: 110, showOverflowTooltip: true },
         { prop: "period", label: "提交月份", width: 100 },
         { prop: "status", label: "状态", width: 92, formatter: (row: SubmissionTable) => dictTag("market_submission_status", row.status) },
-        { prop: "version", label: "版本", width: 70, align: "center" },
-        { prop: "ai_check_status", label: "AI 校验", width: 100, formatter: (row: SubmissionTable) => row.ai_check_status ?? "—" },
         { prop: "created_time", label: "提交时间", width: 168, showOverflowTooltip: true },
+        // 列设置里可打开：驳回重提的版本号、一期恒空的 AI 预检
+        { prop: "version", label: "版本", width: 70, align: "center", visible: false },
+        { prop: "ai_check_status", label: "AI 校验", width: 100, visible: false, formatter: (row: SubmissionTable) => row.ai_check_status ?? "—" },
         { prop: "operation", label: "操作", width: 140, fixed: "right", align: "center", formatter: (row: SubmissionTable) => renderTableOperationCell(buildRowActions(row), { wrapperClass: "inline-flex flex-wrap items-center justify-end gap-1 align-middle" }) },
       ],
     },
@@ -149,25 +180,18 @@ const { columns, columnChecks, data, loading, pagination, getData, replaceSearch
 // ── 详情 ──
 const detailVisible = ref(false);
 const detailData = ref<Partial<SubmissionTable>>({});
-/** 采集表单分节 code → 中文标题（成果详情接口不返回 form_schema，故用约定映射） */
-const sectionNames: Record<string, string> = {
-  execution_info: "执行信息",
-  management_verification: "管理核实",
-  delivery_coordination: "配送协调",
-  inventory_check: "库存盘点",
-  price_check: "价格核查",
-  competitor_research: "竞品调研",
-  sales_reconciliation: "销售对账",
-  bidding_procurement: "招标采购",
-  display_optimization: "陈列优化",
-};
 
 const detailItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "机构", prop: "institution.name" },
-  { label: "对象名称", prop: "subject_name" },
+  { label: "项目", prop: "task.project_name" },
+  { label: "分类", prop: "task.category_name" },
+  { label: "任务模板", prop: "task.template_name" },
+  { label: "任务", prop: "task.item_name" },
+  { label: "任务编号", prop: "task.task_no" },
+  { label: "采集对象", prop: "subject_name" },
   { label: "对象类型", prop: "subject_type", slot: "subjectType" },
   { label: "区域", prop: "region" },
   { label: "档案号", prop: "archive_no" },
+  { label: "提交人", prop: "user_id" },
   { label: "提交月份", prop: "period" },
   { label: "状态", prop: "status", slot: "statusTag" },
   { label: "版本", prop: "version" },
@@ -192,15 +216,19 @@ const reviewFormRef = ref<InstanceType<typeof FaForm> | null>(null);
 const reviewForm = ref<{ approved: boolean; review_comment?: string }>({ approved: true, review_comment: undefined });
 
 const reviewSummaryItems: import("@/components/display/fa-descriptions/index.vue").DescriptionsItem[] = [
-  { label: "机构", prop: "institution.name" },
-  { label: "对象名称", prop: "subject_name" },
+  { label: "项目", prop: "task.project_name" },
+  { label: "分类", prop: "task.category_name" },
+  { label: "任务模板", prop: "task.template_name" },
+  { label: "任务", prop: "task.item_name" },
+  { label: "任务编号", prop: "task.task_no" },
+  { label: "采集对象", prop: "subject_name" },
   { label: "对象类型", prop: "subject_type", slot: "subjectType" },
   { label: "区域", prop: "region" },
   { label: "档案号", prop: "archive_no" },
+  { label: "提交人", prop: "user_id" },
   { label: "提交月份", prop: "period" },
   { label: "状态", prop: "status", slot: "statusTag" },
   { label: "版本", prop: "version" },
-  { label: "AI 校验", prop: "ai_check_status" },
   { label: "提交时间", prop: "created_time" },
 ];
 
@@ -238,9 +266,29 @@ async function handleReviewSubmit() {
 }
 
 async function loadOptions() {
-  const userRes = await UserAPI.listUser({ page_no: 1, page_size: 100 });
+  const [userRes, projectRes, templateRes, items] = await Promise.all([
+    UserAPI.listUser({ page_no: 1, page_size: 100 }),
+    ProjectAPI.listProject({ page_no: 1, page_size: 100 }),
+    TaskTemplateAPI.listTemplate({ page_no: 1, page_size: 100 }),
+    loadAllTaskItems(),
+  ]);
   userOptions.value = userRes.data.data.items.map((u) => ({ value: u.id!, label: `${u.name ?? u.username ?? ""}` }));
   userMap.value = Object.fromEntries(userRes.data.data.items.map((u) => [u.id!, u.name ?? u.username ?? ""]));
+  projectOptions.value = projectRes.data.data.items.map((p) => ({ value: p.id!, label: p.name ?? `#${p.id}` }));
+  templateOptions.value = templateRes.data.data.items.map((t) => ({ value: t.id!, label: t.name ?? `#${t.id}` }));
+  // 任务选项记住所属模板，供「选了模板只列该模板的任务」过滤
+  itemOptions.value = items.map((i) => ({ value: i.id!, label: i.name ?? `#${i.id}`, templateId: i.template_id }));
+}
+
+/** 三级任务可能超过一页（page_size 上限 100），按 has_next 取完，避免下拉漏项 */
+async function loadAllTaskItems() {
+  const all: Array<TaskItemTable> = [];
+  for (let pageNo = 1; pageNo <= 10; pageNo += 1) {
+    const res = await TaskItemAPI.listItem({ page_no: pageNo, page_size: 100 });
+    all.push(...res.data.data.items);
+    if (!res.data.data.has_next) break;
+  }
+  return all;
 }
 
 onMounted(async () => {
@@ -267,9 +315,20 @@ async function handleSearch(params: Record<string, unknown>) {
 }
 
 async function onResetSearch() {
-  searchForm.value = { assignment_id: undefined, user_id: undefined, status: undefined };
+  searchForm.value = { status: undefined };
   await resetSearchParams();
 }
+
+// 切换模板时清掉不再可选的「任务」，避免选出模板+任务的矛盾组合
+watch(
+  () => searchForm.value.template_id,
+  (templateId) => {
+    if (!templateId || !searchForm.value.item_id) return;
+    if (!templateItemOptions.value.some((item) => item.value === searchForm.value.item_id)) {
+      searchForm.value.item_id = undefined;
+    }
+  }
+);
 </script>
 
 <style scoped>

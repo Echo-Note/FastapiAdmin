@@ -1972,6 +1972,80 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-01 — 成果审核页：采集数据渲染中文字段名 + 补齐机构/对象名称/区域/档案号
+
+#### 1. 原因
+
+运营在「任务审核 → 成果审核」弹窗里看到两处不可用：
+
+1. **采集数据全是英文字段名**：`FaFormDataViewer` 的注释写着「不依赖 form_schema」，字段名/分节名直接拿 `form_data` 的 key 渲染，审核员看到的是 `region` / `executor` / `hospital_name` / `qty` / `batch_no`…，无从判断。前端当时只有一张硬编码的 `sectionNames`（9 个分节 code → 中文），**字段名和子表列名完全没有映射**，且该映射是第二份真相源，会和 `collection_schema.py` 漂移。
+2. **机构 / 对象名称 / 档案号 / 区域四格永远为空**：
+   - `SubmissionOutSchema` 没有 `institution` 字段（只有 `institution_id`），前端写的是 `institution.name`，永远渲染 `—`；
+   - C 端提交只传 `{assignment_id, period, form_data}`，`subject_name` / `region` 两列**没有任何代码写入**；
+   - `archive_no`（开发档案编号）在 model / schema / 前端都存在，但**全库没人赋值**，`numbering.py` 也没有对应前缀。
+
+#### 2. 改法（后端回填真相源，前端只做渲染）
+
+- **`task/schema.py`**：新增 `SubmissionInstitutionBriefSchema`（id/name/type/region）；`SubmissionOutSchema` 增 `institution` 与 `form_schema: list[FormSchemaSection]`，两者**只在详情类接口回填**（列表不加载，避免 N+1）。
+- **`task/service.py`**：
+  - `_submission_display_fields()`：从 `form_data` 推导对象名称（机构对象取 `hospital_name`/`org_name`，会议/个人对象取 `meeting_name`/`staff_name`/`patient_name`/`name`）与区域（`region` 字段）。
+  - `create()`：落库时补齐 `subject_name` / `region`；`archive_no` 走 `next_code(NumberPrefix.ARCHIVE)` 生成 `ARC-0001` 序列。
+  - `detail()`：预加载 `institution` + `assignment.task(.template/.item)`，回填 `institution` 与强类型 `form_schema`（三级任务优先、模板兜底）；并对存量行**只补空值地自愈回写** `subject_name`/`region`/`archive_no`，让列表页也能看到；schema 不合规时降级返回 `None` + warning，不让存量脏 schema 把详情打成 500。
+  - `page()` / `my_submissions()`：补 `preload=["institution"]`。
+- **`numbering.py`**：新增 `NumberPrefix.ARCHIVE = "ARC"`。
+- **`FaFormDataViewer`**：`sectionNames` 之外新增 `schema` prop，分节名取 `section.name`、字段名取 `fields[key].label`、子表列按 `columns` 的中文 `label` **并按 schema 列序排列**（schema 里没声明的列按数据键名追加在后）；无 schema 时回退英文 key，保证组件不依赖调用方。
+- **`views/module_market/submission/index.vue`**：删除硬编码的 `sectionNames` 常量，两处 viewer 改传 `form_schema`；`api/module_market/submission.ts` 补 `form_schema` 类型。
+
+#### 3. 关键口径
+
+- **`form_data` 的英文 key 到中文标签，只能由任务自带 `form_schema` 反查**（后端 Pydantic 是唯一真相源，见硬口径 4）。前端不要再维护任何「code → 中文」的静态映射表，否则与 `collection_schema.py` 必然漂移。
+- **档案号 `ARC-NNNN`** = 一份成果一个号，提交时由计数器原子分配，C 端不填；与 `TK`（任务流水号）语义不同，勿混用。
+- 存量成果的摘要三列采用**读详情时自愈回填**（只补空值、不覆盖已有值），不写迁移脚本；新数据在 `create` 阶段就已补齐。
+
+#### 4. 验证
+
+- 后端：`uv run ruff check` 通过；`uv run pytest` **325 passed**（新增 3 条：摘要字段落库、详情带 institution/form_schema 且每个 form_data 键都有中文标签、存量行自愈并同步到列表）。
+- 前端：`vue-tsc --noEmit` 通过；`eslint` 0 error。
+- 真实 dev 库核对：`GET /market/submissions/detail/1` 返回 `institution.name=xxsdsd`、`region=北京市/市辖区/东城区`、`archive_no=ARC-0001`，`form_schema` 三节的中文标签（医院名称/医院等级/产品名称/批号/配送数量…）齐全。
+
+---
+
+### 2026-11-01 — 任务审核列表重设计（项目/分类/模板/任务完整层级）+ 搜索栏重做
+
+#### 1. 原因
+
+运营看「任务审核 → 成果审核」列表时提两个问题：① 看不出这份成果属于哪个项目/分类/模板/任务，只能看到机构、对象类型、用户、区域、档案号；② 非机构对象（医务人员/患者/会议）行里「机构」「区域」天然为空，像数据缺失；③ 搜索栏的筛选项是「分派ID」——数据库自增 id，人工无法使用。
+
+根因：成果表只存 `assignment_id`，项目/分类/模板/任务隔了两层外键，出参里根本没有这层信息；列表列是围绕「机构」这一种采集对象设计的。
+
+定案（与用户确认）：列选**完整层级平铺**（项目/分类/模板/任务/任务编号各一列）；机构与对象名称合并为「采集对象」（对象名称对机构对象取机构名、对个人对象取受访人）；计价（单价×单位）本轮不加——因为结算只读**模板**级 unit/price，三级任务的价格覆盖尚未参与结算，现在展示会给审核员错误预期；搜索栏一并重做。
+
+#### 2. 改法
+
+- **出参（`task/schema.py`）**：新增 `SubmissionTaskContextSchema`（扁平：`task_no`/`name` + `project_id|name` + `category_id|name` + `template_id|name` + `item_id|name`），`SubmissionOutSchema` 增 `task`，列表与详情都回填。
+- **服务层（`task/service.py`）**：
+  - `_SUBMISSION_PRELOAD` 统一预加载（institution + assignment.task.project/item/template.category），`_task_context()` 升维、`_to_out()` 统一转出参、`_page_out()` 让列表与「我的成果」共用；
+  - `_fill_summary_fields()` 把「区域/对象名称」的回填提到**出参层**（不只详情），存量行在列表也不再空白，详情再把差异落库；
+  - `_SUBJECT_NAME_FIELDS` 补 `respondent`：医务人员/患者调研类采集表用「受访对象」存对象名（store_name 是门店，不是对象）；
+  - `_apply_task_filter()` 把 `project_id`/`template_id`/`item_id` 改写为 `assignment_id IN (SELECT market_assignment.id JOIN market_task ...)` 子查询（这三个字段不是成果表列，必须先摘出查询字典，否则 `_build_conditions` 在模型上找不到列）；同时给了 `assignment_id` 时并进同一子查询。`archive_no` 由等值改模糊。
+- **列表页（`views/module_market/submission/index.vue`）**：列改为 序号(左固定)/项目/分类/任务模板/任务/任务编号/采集对象/对象类型/区域/提交人/档案号/提交月份/状态/提交时间/操作(右固定)；`版本`、`AI 校验` 用 `visible: false` 默认隐藏（列设置可开）；搜索栏换成 档案号/项目/任务模板/任务/提交人/提交月份/状态，模板与任务联动（换模板清掉不再可选的已选任务），三级任务按 `has_next` 翻页取全（page_size 上限 100）。
+- **弹窗**：详情/审核摘要同步换成任务上下文，并去掉重复的「机构 + 对象名称」两行（统一为「采集对象」）。
+
+#### 3. 关键口径
+
+- **成果列表的层级信息必须由后端升维**：成果表只有 `assignment_id`，前端拿不到项目/分类/模板/任务；同理筛选也只能在后端用子查询实现，不要让前端先取全量 id 再回传。
+- **凡是 `SubmissionQueryParam` 里新增「非成果表列」的字段，必须在服务层先摘出去**（`_pop_task_filter`）——否则 `_build_conditions` 会 `getattr(model, key)` 直接 `AttributeError`。
+- 「采集对象」是一列而不是两列：机构对象展示机构名、个人对象展示受访人（`respondent`），否则总有一种对象类型整列为空。
+
+#### 4. 验证
+
+- 后端：`uv run pytest` **327 passed**（新增：列表任务上下文 + 三层筛选/AND/模糊匹配、staff 调研对象名取 respondent）；`uv run ruff check` 通过。
+- 真实接口逐项验证：`project_id=2`→[1]、`project_id=4`→[2]、`template_id=1`→[1]、`item_id=32`→[2]、`item_id=1&project_id=4`→[]、`archive_no=ARC-000`→[1,2]。
+- 前端：`vue-tsc --noEmit` 通过；`eslint` 0 error。
+- 浏览器实机未点验（Playwright profile 被占用），已用「改前/改后」HTML mockup 交付预期效果。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -2053,3 +2127,7 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 20. **`@wot-ui/router` 的 `router.push({ name, query })` 会静默丢弃 query → 详情页加载失败**（2026-10-30）
    - 现象：小程序任务大厅/我的任务点卡片进详情页，详情页显示「加载失败」，后端日志没有任何详情请求（`/mini/tasks/{id}`、`/mini/assignments/{id}`）。逐层排查发现页面跳转成功、`onLoad` 也触发，但 `query` 为空——`@wot-ui/router` 的 `resolve` 在 `to.name` 分支误写 `const finalQuery = to.params || {}`（应为 `to.query`），把 query 当成 params 丢弃，跳转 URL 无参数。
    - 结论：凡需跨页传参的跳转，用 `router.push({ path: '/完整路径', query: {...} })`（走 `resolvePath` 分支，query 正确序列化到 URL），**不要用 `name`**。`name` 分支只适合无参跳转。同根因的还有工单详情（`tickets → ticket-detail`），已一并修复。
+
+21. **「列存在、没人写」的字段在运营端永远是空的——`OutSchema` 漏一个嵌套对象就够**（2026-11-01）
+   - 现象：成果审核弹窗里「机构 / 对象名称 / 档案号 / 区域」四格全空。逐个查证：`institution` 只有 `institution_id`、`SubmissionOutSchema` 没有 `institution` 字段（前端写 `institution.name` 永远取不到）；`subject_name` / `region` / `archive_no` 在 model、schema、前端都存在，但**全库没有任何代码写入**（C 端只提交 `form_data`，`archive_no` 连编号前缀都没定义）。同一弹窗里采集数据还全是英文字段名——前端当时只有硬编码的分节名映射，字段名/子表列名无映射。
+   - 结论：① 排查「页面空」先分清**三件事**——出参 Schema 有没有这个字段、DB 里有没有值、有没有代码写过它；只补前端渲染是最常见的错误修法。② C 端只提交 `form_data` 时，运营端要展示的摘要列（对象名称/区域）应由**后端**从 `form_data` 推导落库，不要让前端拼；存量行用「读详情时只补空值自愈」代替迁移脚本。③ `form_data` 的英文 key → 中文标签**只能查任务自带的 `form_schema`**（`detail` 接口回填），禁止在前端维护第二份静态映射表（与硬口径 4 同源）。

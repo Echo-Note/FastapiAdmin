@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from pydantic import ValidationError
 from redis.asyncio.client import Redis
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.enums import RedisInitKeyConfig
 from app.core.base_schema import AuthSchema, PageResultSchema
 from app.core.exceptions import CustomException
+from app.core.logger import logger
 from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
@@ -29,6 +31,7 @@ from ..enums import (
     SubmitCadence,
     TaskStatus,
 )
+from ..form_schema import FormSchemaSection
 from ..institution.service import InstitutionService, extract_institution_info, map_institution_type
 from ..numbering import NumberPrefix, next_code
 from ..product.service import ProductService
@@ -48,6 +51,7 @@ from .schema import (
     SubmissionOutSchema,
     SubmissionQueryParam,
     SubmissionReviewSchema,
+    SubmissionTaskContextSchema,
     SubmissionUpdateSchema,
     TaskCategoryCreateSchema,
     TaskCategoryOutSchema,
@@ -121,6 +125,130 @@ def _resolve_form_schema(task: TaskModel) -> list[dict[str, Any]] | None:
     if isinstance(task.template.config, dict):
         return task.template.config.get("form_schema")
     return None
+
+
+# 成果对象名称候选字段（机构：hospital_name/org_name；个人：受访对象 respondent；会议：会议名）
+_SUBJECT_NAME_FIELDS: tuple[str, ...] = ("meeting_name", "subject_name", "respondent", "staff_name", "patient_name", "name")
+
+# 成果列表/详情都要展示任务上下文（项目/分类/模板/任务）与机构摘要
+_SUBMISSION_PRELOAD = [
+    "institution",
+    "assignment.task",
+    "assignment.task.project",
+    "assignment.task.item",
+    "assignment.task.template",
+    "assignment.task.template.category",
+]
+
+
+def _find_form_value(form_data: dict[str, Any] | None, keys: tuple[str, ...]) -> str:
+    """跨分节按字段名取 ``form_data`` 里第一个非空标量值，未命中返回空串。
+
+    :param form_data: 按分节 code 嵌套的采集表单数据
+    :param keys: 候选字段名（按优先级）
+    :return: 去空白后的文本值；无匹配返回 ``""``
+    """
+    for section in (form_data or {}).values():
+        if not isinstance(section, dict):
+            continue
+        for key in keys:
+            value = section.get(key)
+            if isinstance(value, str | int | float) and str(value).strip():
+                return str(value).strip()
+    return ""
+
+
+def _submission_display_fields(form_data: dict[str, Any] | None, subject_type: str) -> dict[str, str]:
+    """从采集表单推导成果摘要字段（对象名称 / 区域）。
+
+    C 端提交只传 ``form_data``，成果表的 ``subject_name`` / ``region`` 两列曾经无人赋值，
+    导致审核页永远空白。提交时由本函数提取写入，存量数据在详情接口自愈回填。
+    机构对象取机构名称（采集表里是 ``hospital_name`` / ``org_name``），其余对象类型取
+    会议名/受访对象名等候选字段。
+
+    :param form_data: 按分节 code 嵌套的采集表单数据
+    :param subject_type: 采集对象类型（见 ``SubjectType``）
+    :return: 含 ``subject_name`` / ``region`` 的字典（未命中为空串）
+    """
+    info = extract_institution_info(form_data or {}) if subject_type == SubjectType.INSTITUTION.value else None
+    name = info["name"] if info else _find_form_value(form_data, _SUBJECT_NAME_FIELDS)
+    region = (info["region"] if info else "") or _find_form_value(form_data, ("region",))
+    return {"subject_name": name, "region": region}
+
+
+def _resolve_form_schema_sections(task: TaskModel) -> list[FormSchemaSection] | None:
+    """把任务自带的 ``form_schema`` 强类型化，供前端把 ``form_data`` 的字段名渲染成中文标签。
+
+    历史库里可能存在不符合当前 Pydantic 定义的旧 schema（如缺 ``label``），此时降级返回
+    None——前端会回退到英文 key，不能因为一个存量任务让整个成果详情 500。
+
+    :param task: 任务实例（需已预加载 ``item`` 与 ``template``）
+    :return: 分节列表；未配置或不合规时返回 None
+    """
+    raw = _resolve_form_schema(task)
+    if not raw:
+        return None
+    try:
+        return [FormSchemaSection.model_validate(section) for section in raw]
+    except ValidationError:
+        logger.warning(f"任务 {task.id} 的 form_schema 不合规，成果详情按字段名展示：{raw}")
+        return None
+
+
+def _task_context(task: TaskModel) -> SubmissionTaskContextSchema:
+    """把 ``assignment.task`` 升维成审核列表需要的扁平层级上下文（项目/分类/模板/任务）。
+
+    :param task: 任务实例（需已预加载 ``project`` / ``item`` / ``template.category``）
+    :return: 扁平的任务上下文 Schema
+    """
+    template = task.template
+    category = template.category
+    return SubmissionTaskContextSchema(
+        id=task.id,
+        task_no=task.task_no,
+        name=task.name,
+        project_id=task.project_id,
+        project_name=task.project.name,
+        category_id=category.id,
+        category_name=category.name,
+        template_id=template.id,
+        template_name=template.name,
+        item_id=task.item_id,
+        item_name=task.item.name if task.item else None,
+    )
+
+
+def _pop_task_filter(search: dict[str, Any], key: str) -> int | None:
+    """从查询字典里摘出「任务层级」过滤值（它们不是成果表列，不能留给 ``_build_conditions``）。"""
+    value = search.pop(key, None)
+    return value[1] if isinstance(value, tuple) else value
+
+
+def _apply_task_filter(search: dict[str, Any]) -> None:
+    """把项目/模板/任务过滤改写为 ``assignment_id IN (子查询)``，现场修改 ``search``。
+
+    成果表只存 ``assignment_id``，而项目/模板/任务是隔两层的外键，因此用一条子查询
+    （``market_assignment JOIN market_task``）把层级条件下推给数据库，避免先取 id 再回传。
+    """
+    conditions = [
+        (attr, _pop_task_filter(search, key))
+        for key, attr in (
+            ("project_id", TaskModel.project_id),
+            ("template_id", TaskModel.template_id),
+            ("item_id", TaskModel.item_id),
+        )
+    ]
+    conditions = [(attr, value) for attr, value in conditions if value is not None]
+    if not conditions:
+        return
+    stmt = select(AssignmentModel.id).join(TaskModel, AssignmentModel.task_id == TaskModel.id)
+    for attr, value in conditions:
+        stmt = stmt.where(attr == value)
+    # 同时给了分配ID 时并进同一个子查询，否则子查询会盖掉分配ID 条件
+    assignment_id = _pop_task_filter(search, "assignment_id")
+    if assignment_id is not None:
+        stmt = stmt.where(AssignmentModel.id == assignment_id)
+    search["assignment_id"] = ("in", stmt)
 
 
 class TaskCategoryService:
@@ -919,9 +1047,77 @@ class SubmissionService:
         self.db = db
 
     async def detail(self, id: int) -> SubmissionOutSchema:
-        """查询成果详情。"""
-        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(id=id)
-        return SubmissionOutSchema.model_validate(submission)
+        """查询成果详情。
+
+        除基础字段外回填四样只读信息（都是审核员看页面时必须有的）：
+
+        1. ``task``：项目/分类/模板/任务的扁平上下文（成果表只有 ``assignment_id``）；
+        2. ``institution``：只有 ``institution_id`` 时前端无法反查机构名称；
+        3. ``form_schema``：该任务的采集表单结构，是 ``form_data`` 英文字段名 → 中文标签的
+           唯一映射源（前端不重复维护字段名）；
+        4. ``region`` / ``subject_name`` / ``archive_no``：早期提交只落 ``form_data``，这三列
+           从未赋值，这里按 ``form_data`` 推导并**顺手补写回表**（只补空值，一次性自愈，
+           让列表页也能看到）；档案号按 ``ARC-`` 序列生成。
+        """
+        crud = SubmissionCRUD(self.auth, self.db)
+        submission = await crud.get_or_404(id=id, preload=_SUBMISSION_PRELOAD)
+        out = self._to_out(submission)
+        out.form_schema = _resolve_form_schema_sections(submission.assignment.task)
+
+        # 存量行：把出参层算出的摘要值真正落库（只补空值），档案号同理
+        patch: dict[str, Any] = {
+            field: getattr(out, field) for field in ("subject_name", "region") if getattr(out, field) and not getattr(submission, field)
+        }
+        if not out.archive_no:
+            out.archive_no = await next_code(self.db, NumberPrefix.ARCHIVE)
+            patch["archive_no"] = out.archive_no
+        if patch:
+            await crud.update(id=id, data=patch)
+        return out
+
+    def _to_out(self, submission: Any) -> SubmissionOutSchema:
+        """ORM 成果行 → 出参：补任务上下文，并按需算出摘要字段（只影响出参，不落库）。"""
+        out = SubmissionOutSchema.model_validate(submission)
+        out.task = _task_context(submission.assignment.task)
+        self._fill_summary_fields(out)
+        return out
+
+    @staticmethod
+    def _fill_summary_fields(out: SubmissionOutSchema) -> None:
+        """按机构 / ``form_data`` 回填空的摘要字段（对象名称、区域），已有值不覆盖。
+
+        存量行的这两列从未写入，如果只在详情里补，列表仍是一片空白；因此出参层统一补齐，
+        详情再把差异落库（见 ``detail``）。
+        """
+        derived = _submission_display_fields(out.form_data, out.subject_type)
+        if not out.subject_name:
+            out.subject_name = (out.institution.name if out.institution else "") or derived["subject_name"] or None
+        if not out.region:
+            out.region = (out.institution.region if out.institution else "") or derived["region"] or None
+
+    async def _page_out(
+        self,
+        page_no: int,
+        page_size: int,
+        search: dict[str, Any],
+        order_by: list[dict[str, str]] | None = None,
+    ) -> PageResultSchema[SubmissionOutSchema]:
+        """分页取成果并逐行补任务上下文（列表与「我的成果」共用）。"""
+        offset = (page_no - 1) * page_size
+        result = await SubmissionCRUD(self.auth, self.db).page(
+            offset=offset,
+            limit=page_size,
+            order_by=order_by or [{"id": "desc"}],
+            search=search,
+            preload=_SUBMISSION_PRELOAD,
+        )
+        return PageResultSchema[SubmissionOutSchema](
+            page_no=result.page_no,
+            page_size=result.page_size,
+            total=result.total,
+            has_next=result.has_next,
+            items=[self._to_out(submission) for submission in result.items],
+        )
 
     async def page(
         self,
@@ -930,15 +1126,10 @@ class SubmissionService:
         search: SubmissionQueryParam | None = None,
         order_by: list[dict[str, str]] | None = None,
     ) -> PageResultSchema[SubmissionOutSchema]:
-        """分页查询成果。"""
-        offset = (page_no - 1) * page_size
-        return await SubmissionCRUD(self.auth, self.db).page(
-            offset=offset,
-            limit=page_size,
-            order_by=order_by or [{"id": "desc"}],
-            search=search_to_dict(search),
-            out_schema=SubmissionOutSchema,
-        )
+        """分页查询成果（可按项目/模板/任务层级过滤，见 ``_apply_task_filter``）。"""
+        cond = search_to_dict(search) or {}
+        _apply_task_filter(cond)
+        return await self._page_out(page_no=page_no, page_size=page_size, search=cond, order_by=order_by)
 
     async def create(self, data: SubmissionCreateSchema) -> SubmissionOutSchema:
         """提交成果（落库即 ``PENDING`` 待审核），并按模板采集对象类型归集机构。
@@ -971,6 +1162,13 @@ class SubmissionService:
         create_data["user_id"] = self.auth.user.id
         create_data["subject_type"] = subject_type
         create_data["status"] = SubmissionStatus.PENDING.value
+
+        # 摘要字段由后端从 form_data 推导（C 端只传 form_data）：对象名称 / 区域
+        display_fields = _submission_display_fields(data.form_data, subject_type)
+        create_data["subject_name"] = data.subject_name or display_fields["subject_name"] or None
+        create_data["region"] = data.region or display_fields["region"] or None
+        # 档案号：成果的开发档案编号，C 端不填写，由运营端开后即时分配（唯一、可搜索）
+        create_data["archive_no"] = data.archive_no or await next_code(self.db, NumberPrefix.ARCHIVE)
 
         if subject_type == SubjectType.INSTITUTION.value:
             info = extract_institution_info(data.form_data)
@@ -1039,16 +1237,10 @@ class SubmissionService:
         self, page_no: int, page_size: int, search: SubmissionQueryParam | None = None
     ) -> PageResultSchema[SubmissionOutSchema]:
         """我的成果：按当前登录用户过滤的成果列表。"""
-        offset = (page_no - 1) * page_size
         cond = search_to_dict(search) or {}
         cond["user_id"] = self.auth.user.id
-        return await SubmissionCRUD(self.auth, self.db).page(
-            offset=offset,
-            limit=page_size,
-            order_by=[{"id": "desc"}],
-            search=cond,
-            out_schema=SubmissionOutSchema,
-        )
+        _apply_task_filter(cond)
+        return await self._page_out(page_no=page_no, page_size=page_size, search=cond)
 
     async def review(self, id: int, data: SubmissionReviewSchema) -> SubmissionOutSchema:
         """审核成果：approved→APPROVED，否则 REJECTED+review_comment，回写 assignment.status。"""

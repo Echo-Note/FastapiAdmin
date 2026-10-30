@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.base_schema import BaseQueryParam, BaseSchema, UserByQueryParam, UserBySchema
 from app.core.validator import DateStr, DateTimeStr
+from app.modules.market.form_schema import FormSchemaSection
 
 from ..config import TaskConfig, TaskItemConfig
 
@@ -355,20 +356,64 @@ class AssignmentQueryParam(BaseQueryParam, UserByQueryParam):
     status: str | None = Field(default=None, description="分配状态", json_schema_extra={"q": "eq"})
 
 
+class SubmissionInstitutionBriefSchema(BaseModel):
+    """成果所属机构摘要（审核页「机构」列/摘要用）"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = Field(description="机构ID")
+    name: str = Field(description="机构名称")
+    type: str = Field(description="机构类型")
+    region: str | None = Field(default=None, description="所在区域")
+
+
+class SubmissionTaskContextSchema(BaseModel):
+    """成果归属的任务上下文（项目 / 分类 / 模板 / 任务）。
+
+    审核列表要把「这份成果是哪个项目下、哪个模板、哪个任务」一眼看重，而成果表只存
+    ``assignment_id``，所以由服务层从 ``assignment.task`` 升维后**扁平**回填（避免多层嵌套）。
+    """
+
+    id: int = Field(description="任务实例ID")
+    task_no: str = Field(description="任务编号(如 TK-0056)")
+    name: str = Field(description="任务显示名(项目-模板-任务)")
+    project_id: int = Field(description="所属项目ID")
+    project_name: str = Field(description="所属项目名")
+    category_id: int = Field(description="一级分类ID")
+    category_name: str = Field(description="一级分类名")
+    template_id: int = Field(description="二级模板ID")
+    template_name: str = Field(description="二级模板名")
+    item_id: int | None = Field(default=None, description="三级任务ID(叶子模板为空)")
+    item_name: str | None = Field(default=None, description="三级任务名(叶子模板为空)")
+
+
 class SubmissionOutSchema(BaseSchema, UserBySchema):
-    """成果提交响应模型"""
+    """成果提交响应模型
+
+    ``task`` / ``institution`` 在列表与详情都回填（审核需要任务上下文与采集对象）；
+    ``form_schema`` 只在**详情类**接口回填（列表不需要字段标签，不做无谓开销）：
+    - ``task``：项目/分类/模板/任务的扁平上下文，成果表只有 ``assignment_id``；
+    - ``institution``：仅有 ``institution_id`` 时前端无法反查机构名称；
+    - ``form_schema``：该任务自带的采集表单结构，是 ``form_data`` 英文 key → 中文标签的
+      唯一映射源（后端 Pydantic 为权威定义，前端不重复维护字段名）。
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
     assignment_id: int = Field(description="分配ID")
+    task: SubmissionTaskContextSchema | None = Field(default=None, description="任务上下文(项目/分类/模板/任务)")
     user_id: int = Field(description="提交用户ID")
     subject_type: str = Field(default="institution", description="采集对象类型(institution/staff/patient/meeting)")
     institution_id: int | None = Field(default=None, description="机构ID(对象为机构时)")
-    subject_name: str | None = Field(default=None, description="对象名称(非机构对象时)")
+    institution: SubmissionInstitutionBriefSchema | None = Field(default=None, description="所属机构摘要(对象为机构时)")
+    subject_name: str | None = Field(default=None, description="对象名称(机构对象=机构名称，个人对象=受访人)")
     region: str | None = Field(default=None, description="所在区域")
-    archive_no: str | None = Field(default=None, description="档案编号")
+    archive_no: str | None = Field(default=None, description="档案编号(提交时自动生成 ARC-NNNN)")
     period: str = Field(description="提交月份(如 2026-03)")
     form_data: dict[str, Any] = Field(description="采集表单数据")
+    form_schema: list[FormSchemaSection] | None = Field(
+        default=None, description="采集表单结构(详情接口回填，供前端把字段名渲染成中文标签)"
+    )
     status: str = Field(default="DRAFT", description="成果状态")
     version: int = Field(default=1, description="版本号(驳回重提 +1)")
     reviewer_id: int | None = Field(default=None, description="审核人ID")
@@ -384,9 +429,11 @@ class SubmissionCreateSchema(BaseModel):
     assignment_id: int = Field(gt=0, description="分配ID")
     subject_type: Literal["institution", "staff", "patient", "meeting"] = Field(default="institution", description="采集对象类型")
     institution_id: int | None = Field(default=None, gt=0, description="机构ID(对象为机构时)")
-    subject_name: str | None = Field(default=None, max_length=128, description="对象名称(非机构对象时)")
-    region: str | None = Field(default=None, max_length=64, description="所在区域")
-    archive_no: str | None = Field(default=None, max_length=64, description="档案编号")
+    subject_name: str | None = Field(default=None, max_length=128, description="对象名称(非机构对象时；机构对象由后端取机构名称)")
+    region: str | None = Field(default=None, max_length=64, description="所在区域(缺省由后端从 form_data 提取)")
+    archive_no: str | None = Field(
+        default=None, max_length=64, description="档案编号(留空由后端自动生成 ARC-NNNN)"
+    )
     period: str = Field(min_length=1, max_length=16, description="提交月份(如 2026-03)")
     form_data: dict[str, Any] = Field(description="采集表单数据")
 
@@ -404,13 +451,21 @@ class SubmissionUpdateSchema(BaseModel):
 
 
 class SubmissionQueryParam(BaseQueryParam, UserByQueryParam):
-    """成果提交查询参数"""
+    """成果提交查询参数
+
+    ``project_id`` / ``template_id`` / ``item_id`` 不是成果表列，而是任务层级：服务层会把它们
+    转成 ``assignment_id IN (SELECT id FROM market_assignment JOIN market_task ...)`` 子查询，
+    因此**必须先从查询字典里摘出去**，否则 ``_build_conditions`` 会在模型上找不到对应列。
+    """
 
     assignment_id: int | None = Field(default=None, description="分配ID", json_schema_extra={"q": "eq"})
+    project_id: int | None = Field(default=None, description="项目ID(按任务所属项目过滤)")
+    template_id: int | None = Field(default=None, description="任务模板ID(按任务所属模板过滤)")
+    item_id: int | None = Field(default=None, description="任务ID(三级任务，按任务过滤)")
     user_id: int | None = Field(default=None, description="提交用户ID", json_schema_extra={"q": "eq"})
     subject_type: str | None = Field(default=None, description="采集对象类型", json_schema_extra={"q": "eq"})
     institution_id: int | None = Field(default=None, description="机构ID", json_schema_extra={"q": "eq"})
-    archive_no: str | None = Field(default=None, description="档案编号", json_schema_extra={"q": "eq"})
+    archive_no: str | None = Field(default=None, description="档案编号", json_schema_extra={"q": "like"})
     period: str | None = Field(default=None, description="提交月份", json_schema_extra={"q": "eq"})
     status: str | None = Field(default=None, description="成果状态", json_schema_extra={"q": "eq"})
     ai_check_status: str | None = Field(default=None, description="AI 预检状态", json_schema_extra={"q": "eq"})

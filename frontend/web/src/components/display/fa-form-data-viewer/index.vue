@@ -9,30 +9,30 @@
         <ElTable v-for="table in section.tables" :key="table.key" :data="table.rows" size="small" border class="mb-2">
           <ElTableColumn
             v-for="col in table.columns"
-            :key="col"
-            :label="col"
+            :key="col.name"
+            :label="col.label"
             min-width="120"
             show-overflow-tooltip
           >
             <template #default="{ row }">
-              <template v-if="imageList(row[col]).length">
+              <template v-if="imageList(row[col.name]).length">
                 <ElImage
-                  v-for="(url, i) in imageList(row[col])"
+                  v-for="(url, i) in imageList(row[col.name])"
                   :key="`${url}-${i}`"
                   :src="url"
-                  :preview-src-list="imageList(row[col])"
+                  :preview-src-list="imageList(row[col.name])"
                   :initial-index="i"
                   fit="cover"
                   preview-teleported
                   class="viewer-thumb"
                 />
               </template>
-              <template v-else-if="fileList(row[col]).length">
-                <a v-for="(url, i) in fileList(row[col])" :key="`${url}-${i}`" :href="url" target="_blank" rel="noopener">
+              <template v-else-if="fileList(row[col.name]).length">
+                <a v-for="(url, i) in fileList(row[col.name])" :key="`${url}-${i}`" :href="url" target="_blank" rel="noopener">
                   {{ fileName(url) }}
                 </a>
               </template>
-              <span v-else>{{ displayText(row[col]) }}</span>
+              <span v-else>{{ displayText(row[col.name]) }}</span>
             </template>
           </ElTableColumn>
         </ElTable>
@@ -80,21 +80,32 @@
 /**
  * 采集表单数据（`form_data`）只读预览。
  *
- * 不依赖 `form_schema`：成果详情接口不返回任务 schema，因此按数据结构推断渲染形态——
- * 图片/附件按 URL 拓展名识别并渲染缩略图（点击大图预览），对象数组按子表渲染，
- * 其余按文本渲染，最后保留原始 JSON 供排查。
+ * 渲染形态按数据结构推断：图片/附件按 URL 拓展名识别并渲染缩略图（点击大图预览），
+ * 对象数组按子表渲染，其余按文本渲染，最后保留原始 JSON 供排查。
+ *
+ * **中文标签的唯一来源是 `schema`**（后端详情接口回填的任务 `form_schema`）——
+ * `form_data` 的键是英文字段名（`hospital_name` / `batch_no` …），审核员看不懂，
+ * 因此分节名、字段名、子表列名都先查 schema 的中文 `name` / `label`，查不到才回退到英文键。
  *
  * 值形态兼容：单值字符串（历史数据）与字符串数组（2026-11 起多图/多附件）都按数组处理。
  */
+import type { FormSchema } from "@/api/module_market/form-schema";
+
 const props = defineProps<{
   /** 按分节 code 嵌套的表单数据：{分节code: {字段名: 值}} */
   formData?: Record<string, any> | null;
-  /** 分节 code → 中文名（不传则直接显示 code） */
+  /** 该任务的采集表单结构：分节名 / 字段名 / 子表列名的中文标签来源 */
+  schema?: FormSchema | null;
+  /** 分节 code → 中文名（无 schema 时的兑底；两者都缺则显示 code） */
   sectionNames?: Record<string, string>;
 }>();
 
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i;
 
+interface ViewerColumn {
+  name: string;
+  label: string;
+}
 interface ViewerField {
   key: string;
   label: string;
@@ -103,7 +114,7 @@ interface ViewerField {
 interface ViewerTable {
   key: string;
   rows: Record<string, any>[];
-  columns: string[];
+  columns: ViewerColumn[];
 }
 interface ViewerSection {
   code: string;
@@ -147,9 +158,21 @@ function displayText(value: any): string {
 
 const rawText = computed(() => JSON.stringify(props.formData ?? {}, null, 2));
 
+/** 分节 code → 分节结构（后端 form_schema） */
+const schemaByCode = computed(() => new Map((props.schema ?? []).map((section) => [section.code, section])));
+
+/** 子表列：先按 schema 的列定义顺序取名与中文标签，schema 里没定义的列按数据键名追加在后 */
+function buildColumns(tableKey: string, rowKeys: string[], sectionCode: string): ViewerColumn[] {
+  const schemaColumns = schemaByCode.value.get(sectionCode)?.fields?.[tableKey]?.columns ?? [];
+  const declared = schemaColumns.filter((col) => rowKeys.includes(col.name));
+  const extra = rowKeys.filter((key) => !declared.some((col) => col.name === key));
+  return [...declared.map((col) => ({ name: col.name, label: col.label })), ...extra.map((name) => ({ name, label: name }))];
+}
+
 const sections = computed<ViewerSection[]>(() => {
   const data = props.formData ?? {};
   return Object.entries(data).map(([code, raw]) => {
+    const schema = schemaByCode.value.get(code);
     const fields: ViewerField[] = [];
     const tables: ViewerTable[] = [];
     if (isObject(raw)) {
@@ -157,14 +180,14 @@ const sections = computed<ViewerSection[]>(() => {
         // 对象数组 = 多行子表；其余都按单值字段
         if (Array.isArray(value) && value.some((row) => isObject(row))) {
           const rows = value.filter((row) => isObject(row)) as Record<string, any>[];
-          const columns = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
-          tables.push({ key, rows, columns });
+          const rowKeys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
+          tables.push({ key, rows, columns: buildColumns(key, rowKeys, code) });
         } else {
-          fields.push({ key, label: key, value });
+          fields.push({ key, label: schema?.fields?.[key]?.label ?? key, value });
         }
       }
     }
-    return { code, name: props.sectionNames?.[code] ?? code, fields, tables };
+    return { code, name: schema?.name ?? props.sectionNames?.[code] ?? code, fields, tables };
   });
 });
 </script>

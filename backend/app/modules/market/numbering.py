@@ -28,6 +28,7 @@ class NumberPrefix:
     COMPANY = "CO"  # 医药公司（market_company）
     PROJECT = "PRJ"  # 项目（market_project）
     TASK = "TK"  # 任务实例流水号（market_task.task_no）
+    ARCHIVE = "ARC"  # 成果档案编号（market_submission.archive_no）
 
 
 class MarketNumberCounterModel(MappedBase):
