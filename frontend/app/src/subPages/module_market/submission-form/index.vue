@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { FormSchema, FormSchemaColumn, FormSchemaField, TaskItemDetail } from '@/api/module_market'
 import { onLoad } from '@dcloudio/uni-app'
+import { pcaTextArr } from 'element-china-area-data'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { taskDisplayName } from '@/constants'
 import { useUserStore } from '@/store/userStore'
-import { pcaTextArr } from 'element-china-area-data'
 
 definePage({ name: 'market-submission-form', style: { navigationBarTitleText: '提交成果' } })
 
@@ -98,23 +98,105 @@ function removeTableRow(sectionCode: string, fieldName: string, index: number) {
   rows.splice(index, 1)
 }
 
-/** 动态下拉字段选择器 */
-const activeField = ref<FormSchemaField | null>(null)
-const activeSectionCode = ref('')
-const activeFieldName = ref('')
-const showFieldPicker = ref(false)
-const fieldPickerColumns = computed(() => [(activeField.value?.options ?? []).map(o => ({ value: o.value, label: o.label }))])
+/**
+ * 取值目标：单值字段（rowIndex=null）与子表某行的某一列（rowIndex 有值）共用同一套改写器，
+ * 避免 select/date/region 三套选择器各写一遍「单值 vs 列」分支。
+ */
+interface ValueTarget {
+  sectionCode: string
+  /** 子表字段名（单值字段与写入键同名） */
+  fieldName: string
+  /** 写入的具体键：单值字段=字段名；子表列=列名 */
+  key: string
+  /** 子表行下标，null 表示单值字段 */
+  rowIndex: number | null
+}
 
-/** 执行日期选择器（date 字段复用同一实例）：modelValue 为毫秒时间戳 */
+function singleTarget(sectionCode: string, name: string): ValueTarget {
+  return { sectionCode, fieldName: name, key: name, rowIndex: null }
+}
+
+function columnTarget(sectionCode: string, fieldName: string, rowIndex: number, key: string): ValueTarget {
+  return { sectionCode, fieldName, key, rowIndex }
+}
+
+function targetValue(target: ValueTarget | null): any {
+  if (!target)
+    return ''
+  if (target.rowIndex === null)
+    return sectionData(target.sectionCode)[target.key]
+  return rowsOf(target.sectionCode, target.fieldName)[target.rowIndex]?.[target.key] ?? ''
+}
+
+function setTargetValue(target: ValueTarget | null, value: any) {
+  if (!target)
+    return
+  if (target.rowIndex === null) {
+    sectionData(target.sectionCode)[target.key] = value
+    return
+  }
+  const row = rowsOf(target.sectionCode, target.fieldName)[target.rowIndex]
+  if (row)
+    row[target.key] = value
+}
+
+/** 选项选择器：单值字段（select/radio）与子表 select/radio 列共用 */
+const optionTarget = ref<ValueTarget | null>(null)
+const optionItems = ref<{ label: string, value: string }[]>([])
+const optionPickerVisible = ref(false)
+const optionPickerColumns = computed(() => [optionItems.value.map(o => ({ value: o.value, label: o.label }))])
+
+function openOptionPicker(target: ValueTarget, options: { label: string, value: string }[] = []) {
+  if (!options.length)
+    return
+  optionTarget.value = target
+  optionItems.value = options
+  optionPickerVisible.value = true
+}
+
+function onOptionConfirm(e: { value: Array<string | number> }) {
+  setTargetValue(optionTarget.value, e.value[0])
+  optionPickerVisible.value = false
+}
+
+/** 日期选择器：单值 date 字段与子表 date 列共用（modelValue 为毫秒时间戳） */
+const dateTarget = ref<ValueTarget | null>(null)
 const datePickerVisible = ref(false)
 const datePickerValue = ref<number>(Date.now())
-const activeDateSectionCode = ref('')
-const activeDateFieldName = ref('')
 
-/** 区域选择器（region 字段复用同一实例）：省市区三级联动，options 使用 pcaTextArr */
+/** 打开日期选择器：有值回显，无值默认今天 */
+function openDatePicker(target: ValueTarget) {
+  dateTarget.value = target
+  const v = targetValue(target)
+  const ts = typeof v === 'string' && v ? parseDateStr(v) : null
+  datePickerValue.value = ts ?? Date.now()
+  datePickerVisible.value = true
+}
+
+/** 确认日期：时间戳转 YYYY-MM-DD 写入目标 */
+function onDateConfirm(e: { value: number | string }) {
+  const ts = typeof e.value === 'number' ? e.value : Number(e.value)
+  if (!Number.isNaN(ts))
+    setTargetValue(dateTarget.value, formatDateStr(ts))
+  datePickerVisible.value = false
+}
+
+/** 区域选择器（region 字段）：省市区三级联动，options 使用 pcaTextArr */
+const regionTarget = ref<ValueTarget | null>(null)
 const regionPickerVisible = ref(false)
-const activeRegionSectionCode = ref('')
-const activeRegionFieldName = ref('')
+
+function openRegionPicker(target: ValueTarget) {
+  regionTarget.value = target
+  regionPickerVisible.value = true
+}
+
+/** 确认区域：selectedOptions 取完整路径（省/市/区），以 / 拼接写回目标 */
+function onRegionConfirm(e: { value: string | number, selectedOptions: Array<{ label?: string }> }) {
+  const path = (e.selectedOptions ?? []).map(o => o.label ?? '').filter(Boolean).join('/')
+  if (path)
+    setTargetValue(regionTarget.value, path)
+  regionPickerVisible.value = false
+}
 
 const submitting = ref(false)
 
@@ -127,52 +209,18 @@ function usePicker(field: FormSchemaField) {
   return field.type === 'select' || field.type === 'radio' || !!field.options?.length
 }
 
-function openFieldPicker(sectionCode: string, name: string, field: FormSchemaField) {
-  if (!field.options?.length)
-    return
-  activeField.value = field
-  activeSectionCode.value = sectionCode
-  activeFieldName.value = name
-  showFieldPicker.value = true
+/** 子表列是否使用选项选择器 */
+function useColumnPicker(col: FormSchemaColumn) {
+  return col.type === 'select' || col.type === 'radio' || !!col.options?.length
 }
 
-function onFieldPickerConfirm(e: { value: Array<string | number> }) {
-  if (activeSectionCode.value && activeFieldName.value)
-    sectionData(activeSectionCode.value)[activeFieldName.value] = e.value[0]
-  showFieldPicker.value = false
-}
-
-/** 打开日期选择器：有值回显，无值默认今天 */
-function openDatePicker(sectionCode: string, name: string) {
-  activeDateSectionCode.value = sectionCode
-  activeDateFieldName.value = name
-  const v = sectionData(sectionCode)[name]
-  const ts = typeof v === 'string' && v ? parseDateStr(v) : null
-  datePickerValue.value = ts ?? Date.now()
-  datePickerVisible.value = true
-}
-
-/** 确认日期：时间戳转 YYYY-MM-DD 写入表单 */
-function onDateConfirm(e: { value: number | string }) {
-  const ts = typeof e.value === 'number' ? e.value : Number(e.value)
-  if (activeDateSectionCode.value && activeDateFieldName.value && !Number.isNaN(ts))
-    sectionData(activeDateSectionCode.value)[activeDateFieldName.value] = formatDateStr(ts)
-  datePickerVisible.value = false
-}
-
-/** 打开区域选择器 */
-function openRegionPicker(sectionCode: string, name: string) {
-  activeRegionSectionCode.value = sectionCode
-  activeRegionFieldName.value = name
-  regionPickerVisible.value = true
-}
-
-/** 确认区域：selectedOptions 取完整路径（省/市/区），以 / 拼接写回表单 */
-function onRegionConfirm(e: { value: string | number, selectedOptions: Array<{ label?: string }> }) {
-  const path = (e.selectedOptions ?? []).map(o => o.label ?? '').filter(Boolean).join('/')
-  if (activeRegionSectionCode.value && activeRegionFieldName.value && path)
-    sectionData(activeRegionSectionCode.value)[activeRegionFieldName.value] = path
-  regionPickerVisible.value = false
+/** 子表列值的展示文案（select 列展示选项 label） */
+function columnValueText(col: FormSchemaColumn, value: any) {
+  if (value === undefined || value === null || value === '')
+    return ''
+  if (useColumnPicker(col))
+    return col.options?.find(o => String(o.value) === String(value))?.label ?? String(value)
+  return String(value)
 }
 
 /** 时间戳 → YYYY-MM-DD */
@@ -209,8 +257,8 @@ function fieldValueText(sectionCode: string, name: string, field: FormSchemaFiel
   return String(v)
 }
 
-/** 当前正在上传的字段（分节.字段名，防止重复上传） */
-const uploadingField = ref('')
+/** 当前正在上传的目标（防止重复上传） */
+const uploadingKey = ref('')
 
 /** 解析上传响应，返回 file_url，失败提示并返回 null */
 function parseUploadUrl(result: UniApp.UploadFileSuccessCallbackResult): string | null {
@@ -226,60 +274,49 @@ function parseUploadUrl(result: UniApp.UploadFileSuccessCallbackResult): string 
   return null
 }
 
-/** 选择并上传图片（image 字段） */
-function chooseAndUploadImage(sectionCode: string, name: string) {
-  const key = `${sectionCode}.${name}`
-  if (uploadingField.value)
+/** 上传选中文件并写入目标（单值字段与子表列共用） */
+async function uploadInto(target: ValueTarget, filePath: string, key: string) {
+  uploadingKey.value = key
+  try {
+    const result = await MarketAPI.uploadFile(filePath)
+    const url = parseUploadUrl(result)
+    if (url)
+      setTargetValue(target, url)
+  }
+  catch {
+    toast.error('上传失败')
+  }
+  finally {
+    uploadingKey.value = ''
+  }
+}
+
+/** 选择并上传图片（image 字段 / 子表 image 列） */
+function chooseAndUploadImage(target: ValueTarget, key: string) {
+  if (uploadingKey.value)
     return
   uni.chooseImage({
     count: 1,
     sizeType: ['compressed'],
-    success: async (res) => {
+    success: (res) => {
       const filePath = res.tempFilePaths?.[0]
-      if (!filePath)
-        return
-      uploadingField.value = key
-      try {
-        const result = await MarketAPI.uploadFile(filePath)
-        const url = parseUploadUrl(result)
-        if (url)
-          sectionData(sectionCode)[name] = url
-      }
-      catch {
-        toast.error('上传失败')
-      }
-      finally {
-        uploadingField.value = ''
-      }
+      if (filePath)
+        void uploadInto(target, filePath, key)
     },
   })
 }
 
-/** 选择并上传文件（file 字段） */
-function chooseAndUploadFile(sectionCode: string, name: string) {
-  const key = `${sectionCode}.${name}`
-  if (uploadingField.value)
+/** 选择并上传文件（file 字段 / 子表 file 列） */
+function chooseAndUploadFile(target: ValueTarget, key: string) {
+  if (uploadingKey.value)
     return
   uni.chooseFile({
     count: 1,
-    success: async (res) => {
+    success: (res) => {
       const tempFiles = res.tempFiles as any
       const filePath = Array.isArray(tempFiles) ? tempFiles[0]?.path : tempFiles?.path
-      if (!filePath)
-        return
-      uploadingField.value = key
-      try {
-        const result = await MarketAPI.uploadFile(filePath)
-        const url = parseUploadUrl(result)
-        if (url)
-          sectionData(sectionCode)[name] = url
-      }
-      catch {
-        toast.error('上传失败')
-      }
-      finally {
-        uploadingField.value = ''
-      }
+      if (filePath)
+        void uploadInto(target, filePath, key)
     },
   })
 }
@@ -456,7 +493,77 @@ onLoad((query) => {
                     <view class="mb-1 text-2.5" style="color: var(--wot-text-auxiliary)">
                       {{ col.label }}{{ col.required ? ' *' : '' }}
                     </view>
-                    <wd-input v-model="row[col.name]" :placeholder="col.placeholder || col.label" />
+
+                    <!-- 选项类列（select/radio 带 options）：唤起选项选择器 -->
+                    <wd-cell
+                      v-if="useColumnPicker(col)"
+                      :value="columnValueText(col, row[col.name])"
+                      :placeholder="`请选择${col.label}`"
+                      is-link
+                      :border="false"
+                      @click="openOptionPicker(columnTarget(section.code, fieldName, rowIndex, col.name), col.options)"
+                    />
+                    <!-- 日期列：唤起日期选择器 -->
+                    <wd-cell
+                      v-else-if="col.type === 'date'"
+                      :value="row[col.name] || ''"
+                      :placeholder="`请选择${col.label}`"
+                      is-link
+                      :border="false"
+                      @click="openDatePicker(columnTarget(section.code, fieldName, rowIndex, col.name))"
+                    />
+                    <!-- 图片列：上传后回显缩略图 -->
+                    <view
+                      v-else-if="col.type === 'image'"
+                      @click="chooseAndUploadImage(columnTarget(section.code, fieldName, rowIndex, col.name), `${section.code}.${fieldName}.${rowIndex}.${col.name}`)"
+                    >
+                      <image
+                        v-if="row[col.name]"
+                        :src="row[col.name]"
+                        mode="aspectFill"
+                        class="h-40 w-40 rounded-2 object-cover"
+                      />
+                      <view
+                        v-else
+                        class="h-24 flex flex-col items-center justify-center border rounded-2 border-dashed text-2.5"
+                        style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                      >
+                        <view class="text-4">
+                          +
+                        </view>
+                        <view class="mt-1">
+                          {{ uploadingKey === `${section.code}.${fieldName}.${rowIndex}.${col.name}` ? '上传中…' : '点击上传图片' }}
+                        </view>
+                      </view>
+                    </view>
+                    <!-- 文件列 -->
+                    <view
+                      v-else-if="col.type === 'file'"
+                      class="h-12 flex items-center justify-between border rounded-2 border-dashed px-3 text-2.5"
+                      style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
+                      @click="chooseAndUploadFile(columnTarget(section.code, fieldName, rowIndex, col.name), `${section.code}.${fieldName}.${rowIndex}.${col.name}`)"
+                    >
+                      <text>{{ row[col.name] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
+                      <text style="color: var(--wot-text-auxiliary)">
+                        {{ uploadingKey === `${section.code}.${fieldName}.${rowIndex}.${col.name}` ? '上传中…' : '' }}
+                      </text>
+                    </view>
+                    <!-- 数字列：数字键盘 -->
+                    <wd-input
+                      v-else-if="col.type === 'number'"
+                      v-model="row[col.name]"
+                      type="number"
+                      :placeholder="col.placeholder || `请输入${col.label}`"
+                    />
+                    <!-- 备注类列：多行 -->
+                    <wd-input
+                      v-else-if="col.type === 'textarea'"
+                      v-model="row[col.name]"
+                      type="textarea"
+                      :placeholder="col.placeholder || `请输入${col.label}`"
+                    />
+                    <!-- 其余文本列 -->
+                    <wd-input v-else v-model="row[col.name]" :placeholder="col.placeholder || `请输入${col.label}`" />
                   </view>
                 </view>
                 <view class="py-1 text-center">
@@ -475,12 +582,12 @@ onLoad((query) => {
                 </view>
 
                 <!-- 选择类字段（select/radio/checkbox 带 options）：下拉/单选选择 -->
-                <view v-else-if="usePicker(field)" class="flex-1" @click="openFieldPicker(section.code, fieldName, field)">
+                <view v-else-if="usePicker(field)" class="flex-1" @click="openOptionPicker(singleTarget(section.code, fieldName), field.options)">
                   <wd-cell :value="fieldValueText(section.code, fieldName, field)" is-link :border="false" />
                 </view>
 
                 <!-- 日期字段：点击唤起日期选择器 -->
-                <view v-else-if="field.type === 'date'" class="flex-1" @click="openDatePicker(section.code, fieldName)">
+                <view v-else-if="field.type === 'date'" class="flex-1" @click="openDatePicker(singleTarget(section.code, fieldName))">
                   <wd-cell
                     :value="formData[section.code][fieldName] || ''"
                     :placeholder="selectPlaceholder(field)"
@@ -490,7 +597,7 @@ onLoad((query) => {
                 </view>
 
                 <!-- 区域字段：点击唤起省市区三级联动 -->
-                <view v-else-if="field.type === 'region'" class="flex-1" @click="openRegionPicker(section.code, fieldName)">
+                <view v-else-if="field.type === 'region'" class="flex-1" @click="openRegionPicker(singleTarget(section.code, fieldName))">
                   <wd-cell
                     :value="formData[section.code][fieldName] || ''"
                     :placeholder="selectPlaceholder(field)"
@@ -505,7 +612,7 @@ onLoad((query) => {
                   type="textarea"
                   :placeholder="field.placeholder || fieldLabel(field)"
                 />
-                <view v-else-if="field.type === 'image'" class="flex-1" @click="chooseAndUploadImage(section.code, fieldName)">
+                <view v-else-if="field.type === 'image'" class="flex-1" @click="chooseAndUploadImage(singleTarget(section.code, fieldName), `${section.code}.${fieldName}`)">
                   <image
                     v-if="formData[section.code][fieldName]"
                     :src="formData[section.code][fieldName]"
@@ -521,18 +628,18 @@ onLoad((query) => {
                       +
                     </view>
                     <view class="mt-1">
-                      {{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '点击上传图片' }}
+                      {{ uploadingKey === `${section.code}.${fieldName}` ? '上传中…' : '点击上传图片' }}
                     </view>
                   </view>
                 </view>
-                <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(section.code, fieldName)">
+                <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(singleTarget(section.code, fieldName), `${section.code}.${fieldName}`)">
                   <view
                     class="h-12 flex items-center justify-between border rounded-2 border-dashed px-3 text-2.5"
                     style="border-color: var(--wot-primary-3); color: var(--wot-primary-6)"
                   >
                     <text>{{ formData[section.code][fieldName] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
                     <text style="color: var(--wot-text-auxiliary)">
-                      {{ uploadingField === `${section.code}.${fieldName}` ? '上传中…' : '' }}
+                      {{ uploadingKey === `${section.code}.${fieldName}` ? '上传中…' : '' }}
                     </text>
                   </view>
                 </view>
@@ -546,7 +653,12 @@ onLoad((query) => {
             </template>
           </template>
         </wd-form>
-        <wd-picker :visible="showFieldPicker" :columns="fieldPickerColumns" @confirm="onFieldPickerConfirm" @cancel="showFieldPicker = false" />
+        <wd-picker
+          :visible="optionPickerVisible"
+          :columns="optionPickerColumns"
+          @confirm="onOptionConfirm"
+          @cancel="optionPickerVisible = false"
+        />
         <wd-datetime-picker
           v-model="datePickerValue"
           v-model:visible="datePickerVisible"

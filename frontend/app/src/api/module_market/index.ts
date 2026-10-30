@@ -24,6 +24,8 @@ export interface FormSchemaColumn {
   required?: boolean
   placeholder?: string
   options?: { label: string, value: string }[]
+  /** 产品库角色：name 列检索产品库并回填同行的 spec / manufacturer 列 */
+  product_role?: 'name' | 'spec' | 'manufacturer' | null
 }
 
 /** 采集字段定义（对齐后端 form_schema.py FormSchemaField，字段名由外层 dict 的 key 表达） */
