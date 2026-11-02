@@ -65,6 +65,18 @@ class TicketBatchSchema(BaseModel):
     status: int = Field(..., ge=0, le=3, description="状态(0:待处理 1:处理中 2:已完成 3:已关闭)")
 
 
+class FeedbackCreateSchema(BaseModel):
+    """C 端意见反馈（无标题：标题由内容首行自动截取）
+
+    复用 `sys_ticket` 存储，但对外契约里不暴露标题/状态/处理人：
+    C 端只负责把话说清楚，怎么归档是运营侧的事。
+    """
+
+    content: str = Field(..., min_length=1, max_length=2000, description="反馈内容")
+    ticket_type: TicketTypeEnum = Field(default=TicketTypeEnum.SUGGESTION, description="反馈类型(suggestion/bug/optimize/other)")
+    images: str | None = Field(default=None, description="图片URL列表(JSON数组字符串)")
+
+
 class TicketStatsSchema(BaseModel):
     """工单状态聚合统计（已关闭不计入）"""
 

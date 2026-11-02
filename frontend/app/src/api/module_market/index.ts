@@ -149,6 +149,8 @@ export interface TaskItem {
   exec_standard?: string | null
   /** 执行要求（后端已扁平透出：item.config 优先，回退 template.config） */
   executor_requirement?: string | null
+  /** 已分派/接收人数（列表聚合字段） */
+  assignment_count?: number
 }
 
 /** 任务分配/接收（对齐后端 AssignmentOutSchema） */
@@ -184,10 +186,22 @@ export interface SubmissionItem {
   ai_check_result?: Record<string, unknown> | null
 }
 
+/** 我的待办计数（对齐后端 mini/task-stats） */
+export interface MyTaskStats {
+  pending?: number
+  accepted?: number
+  submitted?: number
+  reviewed?: number
+  settled?: number
+  rejected_submissions?: number
+}
+
 /** 我的发放/津贴（对齐后端 mini/payout 返回） */
 export interface PayoutSummary {
   user_id?: number
   period?: string
+  /** 本月应发（该周期结算单应发合计，收益卡主数字） */
+  payable?: number
   payout_limit?: number
   allowance_balance?: number
   allowance_items?: {
@@ -277,6 +291,20 @@ export const MarketAPI = {
   },
 
   /** 我的发放额度/津贴 */
+  /** 我的待办计数（TabBar / 状态 Tab 角标：分派状态分组 + 被驳回成果数） */
+  getMyTaskStats() {
+    const method = http.Get<MyTaskStats>(`${MARKET_BASE}/mini/task-stats`)
+    method.config.cacheFor = 0
+    return method
+  },
+
+  /** 我的成果详情（驳回后修改重提回填原表单；只能读自己的） */
+  getMySubmission(id: number) {
+    const method = http.Get<SubmissionItem>(`${MARKET_BASE}/mini/submissions/${id}`)
+    method.config.cacheFor = 0
+    return method
+  },
+
   getMyPayout(period: string) {
     const params: Record<string, any> = { period }
     const method = http.Get<PayoutSummary>(`${MARKET_BASE}/mini/payout`, { params })

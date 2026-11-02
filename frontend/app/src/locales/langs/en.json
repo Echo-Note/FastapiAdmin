@@ -51,12 +51,20 @@
     "subscribeTitle": "Enable Message Notifications",
     "subscribeContent": "You have disabled message notifications. Go to settings to enable?",
     "subscribeGoSetting": "Go to Settings",
-    "tab": { "home": "Home", "work": "Workbench", "mine": "Me" },
+    "tab": {
+      "home": "Home",
+      "work": "Workbench",
+      "mine": "Me",
+      "taskHall": "Task Hall",
+      "myTask": "My Tasks"
+    },
     "nav": {
       "notices": "Notices",
       "tickets": "Tickets",
       "aiChat": "AI Chat",
-      "aiModels": "AI Models"
+      "aiModels": "AI Models",
+      "feedback": "Feedback",
+      "dashboard": "Ops Dashboard"
     },
     "status": {
       "enabled": "Enabled",
@@ -172,7 +180,16 @@
     "processingTickets": "Processing",
     "doneTickets": "Done",
     "shareTitle": "{name} invites you to join FastapiAdmin",
-    "roleFallback": "Super Admin · Tech Dept"
+    "roleFallback": "Super Admin · Tech Dept",
+    "monthPayable": "Payable this month",
+    "allowanceBalance": "Allowance balance",
+    "payoutLimit": "Payout limit",
+    "earningsDetail": "Earnings detail",
+    "earningsFailed": "Failed to load earnings — tap to retry",
+    "allFeatures": "All features",
+    "allFeaturesTip": "Ops and dev tools (super admin only)",
+    "mobileUnbound": "No phone bound",
+    "executor": "Executor"
   },
   "profile": {
     "navTitle": "Profile",
@@ -234,7 +251,9 @@
     "contentPlaceholder": "Please enter content",
     "type": "Notice Type",
     "notice": "Notice",
-    "announce": "Announcement"
+    "announce": "Announcement",
+    "detail": "Notice",
+    "readOnlyTip": "Notices are published by the operator — read only"
   },
   "chat": {
     "title": "AI Assistant",
@@ -363,7 +382,9 @@
     "nameFallback": "FastapiAdmin",
     "roleFallback": "Super Admin",
     "searchPlaceholder": "Search modules",
-    "emptyTip": "No matching module, try another keyword"
+    "emptyTip": "No matching module, try another keyword",
+    "opsTools": "Ops Tools",
+    "superuserOnly": "These features are super-admin only"
   },
   "theme": {
     "colors": {
@@ -419,5 +440,93 @@
     "draftSaved": "Draft saved",
     "submit": "Submit",
     "submitSuccess": "Submitted"
+  },
+  "hall": {
+    "title": "Task Hall",
+    "shareTitle": "Task Hall · Grab a task",
+    "searchPlaceholder": "Search task name or number",
+    "filterAll": "All",
+    "filterPeriodic": "Recurring",
+    "filterQuota": "Quota",
+    "count": "{count} available",
+    "remain": "{count} left",
+    "deadlinePassed": "Closed",
+    "deadlineToday": "Due today",
+    "deadlineDays": "{days} days left",
+    "emptySearch": "No matching task — try another keyword",
+    "view": "View",
+    "truncated": "Showing the first {count} tasks",
+    "unnamed": "Untitled task",
+    "joined": "{count} joined"
+  },
+  "taskDetail": {
+    "title": "Task detail",
+    "shareTitle": "Task detail",
+    "execStandard": "Execution standard",
+    "execStandardEmpty": "No standard published — contact the operator before claiming",
+    "formFields": "Fields to fill ({count})",
+    "formFieldsEmpty": "No form needed — submit offline as instructed after claiming",
+    "priceRule": "Pricing",
+    "unitLabel": "Unit",
+    "maxEarn": "Max earning",
+    "claimNow": "Claim task",
+    "claimTitle": "Claim task",
+    "claimConfirm": "Claim “{name}”? Submit the result under My Tasks afterwards.",
+    "notFound": "Task is unavailable",
+    "priceTbd": "Price on request",
+    "execRequirement": "Executor requirement",
+    "directOnly": "Assigned task — accept it in My Tasks"
+  },
+  "myTask": {
+    "title": "My Tasks",
+    "shareTitle": "My Tasks",
+    "tabTask": "Tasks",
+    "tabResult": "Results",
+    "statusAll": "All",
+    "statusPending": "To accept",
+    "statusActive": "In progress",
+    "statusSubmitted": "Submitted",
+    "statusReviewed": "Reviewed",
+    "resultAll": "All",
+    "resultPending": "In review",
+    "resultApproved": "Approved",
+    "resultRejected": "Rejected",
+    "resultDraft": "Draft",
+    "rejectReason": "Rejection reason",
+    "rejectedCount": "{count} rejected — please resubmit",
+    "accept": "Accept",
+    "submit": "Submit result",
+    "resubmit": "Edit and resubmit",
+    "emptyTask": "No tasks here yet — check the Task Hall",
+    "emptyResult": "No result submitted yet",
+    "emptyRejected": "No rejected result",
+    "institution": "Target institution",
+    "submittedAt": "Submitted {time}",
+    "version": "Submission #{version}",
+    "statusSettled": "Settled",
+    "acceptedAt": "Accepted {time}"
+  },
+  "feedback": {
+    "title": "Feedback",
+    "typeLabel": "Type",
+    "typeSuggestion": "Suggestion",
+    "typeBug": "Problem",
+    "typeOptimize": "Improvement",
+    "typeOther": "Other",
+    "contentLabel": "Your feedback",
+    "contentPlaceholder": "What is hard to use? What would you change?",
+    "contentRequired": "Please describe your feedback",
+    "contentTooLong": "Feedback is limited to 2000 characters",
+    "imagesLabel": "Screenshots (optional, up to 3)",
+    "submit": "Submit feedback",
+    "submitSuccess": "Thanks — we have received your feedback",
+    "mine": "My feedback",
+    "empty": "No feedback submitted yet",
+    "reply": "Official reply",
+    "statusPending": "Pending",
+    "statusProcessing": "In progress",
+    "statusDone": "Done",
+    "statusClosed": "Closed",
+    "submittedAt": "Submitted {time}"
   }
 }

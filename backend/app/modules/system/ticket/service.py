@@ -10,6 +10,7 @@ from app.utils.excel_util import ExcelUtil
 
 from .crud import TicketCommentCRUD, TicketCRUD
 from .schema import (
+    FeedbackCreateSchema,
     TicketBatchSchema,
     TicketCommentCreateSchema,
     TicketCommentOutSchema,
@@ -96,6 +97,35 @@ class TicketService:
     async def detail(self, id: int) -> TicketOutSchema:
         obj = await TicketCRUD(self.auth, self.db).get_or_404(id=id, preload=_TICKET_PRELOAD)
         return TicketOutSchema.model_validate(obj)
+
+    async def my_page(self, page_no: int, page_size: int) -> PageResultSchema[TicketOutSchema]:
+        """我的意见反馈列表（C 端）：只返回本人创建的记录。
+
+        过滤条件必须是 `created_id`（审计字段），这是 C 端越权隔离的唯一依据；
+        不使用 `user_id`——工单表没有该业务字段。
+        """
+        return await TicketCRUD(self.auth, self.db).page(
+            offset=(page_no - 1) * page_size,
+            limit=page_size,
+            order_by=[{"id": "desc"}],
+            search={"created_id": self.auth.user.id},
+            out_schema=TicketOutSchema,
+            preload=_TICKET_PRELOAD,
+        )
+
+    async def my_create(self, data: FeedbackCreateSchema) -> TicketOutSchema:
+        """提交意见反馈：复用 `sys_ticket`，标题由内容首行自动截取（C 端不填标题）。"""
+        content = data.content.strip()
+        first_line = next((line.strip() for line in content.splitlines() if line.strip()), "")
+        return await self.create(
+            TicketCreateSchema(
+                title=(first_line or "意见反馈")[:30],
+                ticket_content=content,
+                summary=content[:200],
+                ticket_type=data.ticket_type,
+                images=data.images,
+            )
+        )
 
     async def create(self, data: TicketCreateSchema) -> TicketOutSchema:
         obj = await TicketCRUD(self.auth, self.db).create(data=data)

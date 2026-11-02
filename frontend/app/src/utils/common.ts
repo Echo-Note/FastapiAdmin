@@ -20,6 +20,20 @@ export const CommonUtil = {
    * 优先使用原生 structuredClone（支持 Date/Map/Set/循环引用等），
    * 失败时（如 Vue reactive Proxy 无法被 structuredClone 序列化）回退 JSON 深拷贝。
    */
+  /**
+   * 金额展示：千分位 + 固定小数位，非数字按 0 处理。
+   *
+   * 不走 `toLocaleString`：部分小程序运行时的 ICU 被裁剪，分隔符会丢失，
+   * 金额是 C 端最敏感的信息，宁可自己格式化。
+   */
+  formatMoney(value?: number | string | null, decimals = 0): string {
+    const num = Number(value ?? 0)
+    const fixed = (Number.isFinite(num) ? num : 0).toFixed(decimals)
+    const [int, dec] = fixed.split('.')
+    const withSeparator = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+    return dec ? `${withSeparator}.${dec}` : withSeparator
+  },
+
   deepClone<T>(obj: T): T {
     if (typeof structuredClone === 'function') {
       try {

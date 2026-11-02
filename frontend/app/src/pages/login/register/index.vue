@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import AuthAPI from '@/api/module_system/auth'
 import UserAPI from '@/api/module_system/user'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
-import { REMEMBER_ME_KEY } from '@/constants'
+import { HOME_ROUTE, REMEMBER_ME_KEY } from '@/constants'
 import { useConfigStore } from '@/store/configStore'
 import { useUserStore } from '@/store/userStore'
 import { Storage } from '@/utils/storage'
@@ -94,7 +94,7 @@ async function autoLoginAfterRegister(username: string, password: string) {
       return
     }
     await userStore.login({ username, password, remember: true, login_type: '移动端' })
-    uni.reLaunch({ url: '/pages/index/index' })
+    uni.reLaunch({ url: HOME_ROUTE })
   }
   catch {
     Storage.set(REMEMBER_ME_KEY, { username, remember: true })

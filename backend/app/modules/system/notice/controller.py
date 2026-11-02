@@ -87,13 +87,18 @@ async def batch_set_available_notice_controller(
     return SuccessResponse(msg="批量修改公告状态成功")
 
 
-@NoticeRouter.get("/available", summary="获取全局启用公告", response_model=ResponseSchema[list[NoticeOutSchema]])
+@NoticeRouter.get("/available", summary="获取已发布公告", response_model=ResponseSchema[list[NoticeOutSchema]])
 async def get_notice_list_available_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
     db: Annotated[AsyncSession, Depends(db_getter)],
+    limit: Annotated[int, Query(ge=1, le=100, description="返回条数上限(默认 10，C 端公告页传 50)")] = 10,
 ) -> JSONResponse:
-    result_dict: PageResultSchema[NoticeOutSchema] = await NoticeService(auth, db).available_page()
-    return SuccessResponse(data=result_dict.items, msg="查询已启用公告列表成功")
+    """已发布公告列表（`status=1`，倒序）。
+
+    C 端只读公告页与管理端首页共用；`limit` 让 C 端一次多拿一些，避免固定 10 条看不全。
+    """
+    result = await NoticeService(auth, db).available_list(limit=limit)
+    return SuccessResponse(data=result, msg="查询已发布公告列表成功")
 
 
 @NoticeRouter.get("/stream", summary="通知实时流(SSE)", response_class=EventSourceResponse)
