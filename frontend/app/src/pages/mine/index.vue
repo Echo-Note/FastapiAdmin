@@ -296,17 +296,9 @@ async function handleSubmitPassword() {
       </wd-cell-group>
     </view>
 
-    <!-- 退出登录：弱化为文字行，不做成红色大按钮 -->
-    <view class="mx-3 mt-4">
-      <wd-cell-group border custom-class="rounded-2! overflow-hidden">
-        <wd-cell center custom-class="justify-center" @click="handleLogout">
-          <template #title>
-            <view class="logout">
-              {{ t('mine.logout') }}
-            </view>
-          </template>
-        </wd-cell>
-      </wd-cell-group>
+    <!-- 退出登录：弱化为一条居中的文字行，不做成红色大按钮 -->
+    <view class="logout mx-3 mt-4" hover-class="logout--pressed" @click="handleLogout">
+      {{ t('mine.logout') }}
     </view>
 
     <!-- 修改密码弹窗 -->
@@ -463,11 +455,17 @@ async function handleSubmitPassword() {
   color: var(--wot-text-auxiliary);
 }
 
-/* 退出登录：文字行，不用红色大按钮抢视觉 */
+/* 退出登录：一条居中的文字行，不用红色大按钮抢视觉 */
 .logout {
-  width: 100%;
+  padding: 28rpx 0;
+  border-radius: 20rpx;
+  background: var(--wot-filled-oppo);
   text-align: center;
   font-size: 28rpx;
   color: var(--wot-text-secondary);
+
+  &--pressed {
+    opacity: 0.72;
+  }
 }
 </style>
