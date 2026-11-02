@@ -695,7 +695,6 @@ declare module 'vue' {
     readonly useWindowFocus: UnwrapRef<typeof import('@vueuse/core')['useWindowFocus']>
     readonly useWindowScroll: UnwrapRef<typeof import('@vueuse/core')['useWindowScroll']>
     readonly useWindowSize: UnwrapRef<typeof import('@vueuse/core')['useWindowSize']>
-    readonly useWorkDeskFilter: UnwrapRef<typeof import('./composables/useWorkDeskFilter')['useWorkDeskFilter']>
     readonly useWxLogin: UnwrapRef<typeof import('./composables/useWxLogin')['useWxLogin']>
     readonly watch: UnwrapRef<typeof import('vue')['watch']>
     readonly watchArray: UnwrapRef<typeof import('@vueuse/core')['watchArray']>
