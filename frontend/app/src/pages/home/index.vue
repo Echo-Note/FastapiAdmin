@@ -49,6 +49,13 @@ const todoCount = computed(
 
 const hasWeekWork = computed(() => todoCount.value > 0)
 
+/** 成果概览三个数字：待审核 / 已通过 / 被驳回 */
+const resultCells = computed(() => [
+  { key: 'RESULT_PENDING' as const, label: t('home.resultPending'), count: stats.value.submissions_pending ?? 0 },
+  { key: 'RESULT_APPROVED' as const, label: t('home.resultApproved'), count: stats.value.submissions_approved ?? 0 },
+  { key: 'RESULT_REJECTED' as const, label: t('home.resultRejected'), count: stats.value.rejected_submissions ?? 0 },
+])
+
 /** 本周按时完成：本周没有到期任务时不画进度条 */
 const weekDue = computed(() => week.value?.due ?? 0)
 const weekDone = computed(() => week.value?.done ?? 0)
@@ -217,30 +224,20 @@ onPullDownRefresh(() => {
           </template>
         </view>
 
-        <view class="hero__cells">
-          <view class="hero__cell" hover-class="hero__cell--pressed" @click="goDesk('PENDING')">
-            <text class="hero__num">
-              {{ stats.pending ?? 0 }}
-            </text>
-            <text class="hero__label">
-              {{ t('home.pending') }}
-            </text>
-          </view>
-          <view class="hero__cell" hover-class="hero__cell--pressed" @click="goDesk('ACCEPTED')">
-            <text class="hero__num">
-              {{ stats.accepted ?? 0 }}
-            </text>
-            <text class="hero__label">
-              {{ t('home.active') }}
-            </text>
-          </view>
-          <view class="hero__cell" hover-class="hero__cell--pressed" @click="goDesk('REJECTED')">
-            <text class="hero__num" :class="{ 'hero__num--alert': (stats.rejected_submissions ?? 0) > 0 }">
-              {{ stats.rejected_submissions ?? 0 }}
-            </text>
-            <text class="hero__label">
-              {{ t('home.rejected') }}
-            </text>
+        <!-- 公告：Hero 里放滚动公告，替代原来的三个数字 -->
+        <view class="hero__notice">
+          <wd-notice-bar
+            v-if="notice"
+            :text="notice.notice_title || ''"
+            prefix="notification"
+            scrollable
+            color="#FFFFFF"
+            background-color="rgba(255, 255, 255, 0.16)"
+            custom-class="hero-notice"
+            @click="goto('work-notices')"
+          />
+          <view v-else class="hero__notice-empty">
+            {{ t('home.noNotice') }}
           </view>
         </view>
 
@@ -250,17 +247,6 @@ onPullDownRefresh(() => {
             {{ latestDeadline }}
           </text>
         </view>
-      </view>
-
-      <!-- 公告：横向滚动条，和原版首页一致 -->
-      <view v-if="notice" class="mx-3 mt-3" @click="goto('work-notices')">
-        <wd-notice-bar
-          :text="notice.notice_title || ''"
-          prefix="notification"
-          closable
-          type="info"
-          custom-class="home-notice"
-        />
       </view>
 
       <!-- 收益 -->
@@ -306,6 +292,24 @@ onPullDownRefresh(() => {
         </view>
         <view v-if="weekDue > 0" class="week__track">
           <view class="week__fill" :style="{ width: `${weekPercent}%` }" />
+        </view>
+      </view>
+
+      <!-- 我的成果：三个数字，点进去看对应状态 -->
+      <view class="results mx-3 mt-3">
+        <view
+          v-for="cell in resultCells"
+          :key="cell.key"
+          class="results__cell"
+          hover-class="results__cell--pressed"
+          @click="goDesk(cell.key)"
+        >
+          <text class="results__num" :class="{ 'results__num--alert': cell.key === 'RESULT_REJECTED' && cell.count > 0 }">
+            {{ cell.count }}
+          </text>
+          <text class="results__label">
+            {{ cell.label }}
+          </text>
         </view>
       </view>
 
@@ -467,41 +471,14 @@ onPullDownRefresh(() => {
     font-variant-numeric: tabular-nums;
   }
 
-  &__cells {
+  &__notice {
     position: relative;
-    display: flex;
-    margin-top: 26rpx;
+    margin-top: 24rpx;
   }
 
-  &__cell {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2rpx;
-    padding: 8rpx 0;
-    border-radius: 12rpx;
-
-    &--pressed {
-      background: rgba(255, 255, 255, 0.12);
-    }
-  }
-
-  &__num {
-    font-size: 46rpx;
-    font-weight: 700;
-    line-height: 1.1;
-    color: #fff;
-    font-variant-numeric: tabular-nums;
-
-    /* 被驳回在暗色渐变上不能用红字，改用暖黄点出来 */
-    &--alert {
-      color: #ffe08a;
-    }
-  }
-
-  &__label {
-    font-size: 22rpx;
-    color: rgba(255, 255, 255, 0.8);
+  &__notice-empty {
+    font-size: 24rpx;
+    color: rgba(255, 255, 255, 0.78);
   }
 
   &__deadline {
@@ -627,6 +604,43 @@ onPullDownRefresh(() => {
     height: 100%;
     border-radius: 9999rpx;
     background: var(--wot-success-main);
+  }
+}
+
+/* 我的成果：三格数字，点进工作台的对应状态 */
+.results {
+  display: flex;
+  padding: 24rpx 8rpx;
+  border-radius: 20rpx;
+  background: var(--wot-filled-oppo);
+
+  &__cell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4rpx;
+    border-radius: 12rpx;
+
+    &--pressed {
+      opacity: 0.7;
+    }
+  }
+
+  &__num {
+    font-size: 38rpx;
+    font-weight: 700;
+    color: var(--wot-text-main);
+    font-variant-numeric: tabular-nums;
+
+    &--alert {
+      color: var(--wot-danger-main);
+    }
+  }
+
+  &__label {
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
   }
 }
 

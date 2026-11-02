@@ -546,7 +546,11 @@
     "goHall": "Grab one in Task Hall",
     "weekTitle": "Done on time this week",
     "weekNone": "Nothing due this week",
-    "latestTasks": "New tasks"
+    "latestTasks": "New tasks",
+    "resultPending": "In review",
+    "resultApproved": "Approved",
+    "resultRejected": "Rejected",
+    "noNotice": "No notice yet"
   },
   "workDesk": {
     "title": "Workbench",
