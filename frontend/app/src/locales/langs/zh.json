@@ -254,7 +254,11 @@
     "notice": "通知",
     "announce": "公告",
     "detail": "公告详情",
-    "readOnlyTip": "公告由运营发布，这里只看不改"
+    "readOnlyTip": "公告由运营发布，这里只看不改",
+    "unread": "未读",
+    "unreadCount": "{count} 条未读",
+    "markAllRead": "全部已读",
+    "markAllReadSuccess": "已全部标为已读"
   },
   "chat": {
     "title": "AI 助手",

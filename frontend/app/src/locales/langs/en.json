@@ -254,7 +254,11 @@
     "notice": "Notice",
     "announce": "Announcement",
     "detail": "Notice",
-    "readOnlyTip": "Notices are published by the operator — read only"
+    "readOnlyTip": "Notices are published by the operator — read only",
+    "unread": "Unread",
+    "unreadCount": "{count} unread",
+    "markAllRead": "Mark all read",
+    "markAllReadSuccess": "All marked as read"
   },
   "chat": {
     "title": "AI Assistant",

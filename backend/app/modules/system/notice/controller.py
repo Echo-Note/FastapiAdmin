@@ -13,7 +13,7 @@ from app.core.dependencies import AuthPermission, db_getter, get_current_user
 from app.core.router_class import OperationLogRoute
 from app.core.sse_manager import SSE_QUEUE_MAX_SIZE
 
-from .schema import NoticeCreateSchema, NoticeOutSchema, NoticeQueryParam, NoticeUpdateSchema
+from .schema import NoticeCreateSchema, NoticeOutSchema, NoticeQueryParam, NoticeReadSchema, NoticeUnreadSchema, NoticeUpdateSchema
 from .service import NoticeService
 from .stream import notice_stream_manager
 
@@ -120,3 +120,34 @@ async def notice_stream_controller(
             yield ServerSentEvent(event=str(message.get("type", "message")), data=message.get("data", message))
     finally:
         notice_stream_manager.disconnect(auth.user.id, queue)
+
+
+@NoticeRouter.get("/unread-count", summary="我的未读公告数", response_model=ResponseSchema[NoticeUnreadSchema])
+async def notice_unread_count_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """当前用户的未读公告数（C 端首页公告条红点）；登录即可，不要求 RBAC 权限码。"""
+    unread = await NoticeService(auth, db).unread_count(user_id=auth.user.id)
+    return SuccessResponse(data=NoticeUnreadSchema(unread=unread), msg="获取未读公告数成功")
+
+
+@NoticeRouter.get("/read-ids", summary="我读过的公告ID", response_model=ResponseSchema[list[int]])
+async def notice_read_ids_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """当前用户已读的公告 id（C 端列表页标未读圆点）。"""
+    ids = await NoticeService(auth, db).read_ids(user_id=auth.user.id)
+    return SuccessResponse(data=ids, msg="获取已读公告ID成功")
+
+
+@NoticeRouter.post("/read", summary="标记公告已读", response_model=ResponseSchema[NoticeUnreadSchema])
+async def notice_mark_read_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    data: Annotated[NoticeReadSchema, Body(description="公告ID列表，缺省表示全部")],
+) -> JSONResponse:
+    """标记公告已读：传 ``notice_ids`` 标指定公告，不传则全部标为已读。"""
+    unread = await NoticeService(auth, db).mark_read(user_id=auth.user.id, notice_ids=data.notice_ids)
+    return SuccessResponse(data=NoticeUnreadSchema(unread=unread), msg="标记已读成功")

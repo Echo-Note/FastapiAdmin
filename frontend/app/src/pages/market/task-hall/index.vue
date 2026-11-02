@@ -6,7 +6,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useNoticeDismiss, useNoticeOpen } from '@/composables/useNoticeDismiss'
+import { useNoticeOpen } from '@/composables/useNoticeOpen'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { taskDisplayName } from '@/constants'
@@ -39,11 +39,12 @@ const failed = ref(false)
 const keyword = ref('')
 const projectFilter = ref('')
 const notice = ref<NoticeItem | null>(null)
-const { isDismissed, dismiss } = useNoticeDismiss()
 const { requestOpen } = useNoticeOpen()
 
-/** 条幅只在最新公告没看过时出现 */
-const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
+/** 我读过的公告 id（后端已读表） */
+const readIds = ref<Set<number>>(new Set())
+/** 条幅只在「最新公告还没看过」时出现 */
+const showNoticeBar = computed(() => !!notice.value && notice.value.id != null && !readIds.value.has(notice.value.id))
 
 /** 标题短于容器时别滚动：滚动会把十几个字的标题滚出可视区，条幅看起来像空的 */
 const noticeScrollable = computed(() => (notice.value?.notice_title ?? '').length > 16)
@@ -115,8 +116,9 @@ function deadlineInfo(task: TaskItem) {
 
 async function loadNotices() {
   try {
-    const list = await NoticeAPI.getAvailable(1)
+    const [list, ids] = await Promise.all([NoticeAPI.getAvailable(1), NoticeAPI.getReadIds()])
     notice.value = list?.[0] ?? null
+    readIds.value = new Set(ids ?? [])
   }
   catch {
     // 公告失败不影响接单主流程，静默降级
@@ -147,12 +149,17 @@ function goDetail(task: TaskItem) {
   router.push({ name: 'market-task-detail', query: { id: String(task.id) } })
 }
 
-/** 点条幅 = 读它：收起并跳到该公告详情 */
-function openNoticeDetail() {
+/** 点条幅 = 读它：先标已读（条幅因此收起），再跳到该公告详情 */
+async function openNoticeDetail() {
   if (!notice.value?.id)
     return
-  dismiss(notice.value.id)
-  requestOpen(notice.value.id)
+  const id = notice.value.id
+  readIds.value = new Set([...readIds.value, id])
+  try {
+    await NoticeAPI.markRead([id])
+  }
+  catch { /* 已读记录失败不打断阅读 */ }
+  requestOpen(id)
   router.push({ name: 'work-notices' })
 }
 
