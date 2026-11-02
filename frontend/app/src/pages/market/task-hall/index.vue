@@ -6,6 +6,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
+import { useNoticeDismiss } from '@/composables/useNoticeDismiss'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { taskDisplayName } from '@/constants'
@@ -38,6 +39,10 @@ const failed = ref(false)
 const keyword = ref('')
 const projectFilter = ref('')
 const notice = ref<NoticeItem | null>(null)
+const { isDismissed, dismiss } = useNoticeDismiss()
+
+/** 条幅只在最新公告没看过时出现 */
+const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
 
 /** 项目筛选选项：直接由已加载的任务派生，避免为筛选项再发一次请求 */
 const projectOptions = computed(() => {
@@ -138,8 +143,12 @@ function goDetail(task: TaskItem) {
   router.push({ name: 'market-task-detail', query: { id: String(task.id) } })
 }
 
-function goNotices() {
-  router.push({ name: 'work-notices' })
+/** 点条幅 = 读它：收起并跳到该公告详情 */
+function openNoticeDetail() {
+  if (!notice.value?.id)
+    return
+  dismiss(notice.value.id)
+  router.push({ name: 'work-notices', query: { id: String(notice.value.id) } })
 }
 
 onLoad(() => {
@@ -155,22 +164,21 @@ onPullDownRefresh(() => {
 
 <template>
   <view class="tabbar-wraper hall-page">
-    <!-- 平台公告：C 端唯一的运营触达渠道，只展示最新一条 -->
-    <view v-if="notice" class="mx-3 mt-3" @click="goNotices">
-      <wd-notice-bar
-        :text="notice.notice_title || ''"
-        prefix="notification"
-        type="info"
-        closable
-        custom-class="hall-notice"
-      />
-    </view>
-
-    <!-- 头部：标题 + 搜索，直接顶到状态栏，不留空白带 -->
+    <!-- 头部：标题顶到状态栏，条幅紧随其后（原来条幅排在标题前，把标题挤下去，留出一条空白） -->
     <view class="hall-head">
       <view class="hall-head__title">
         {{ t('hall.title') }}
       </view>
+    </view>
+
+    <!-- 平台公告：C 端唯一的运营触达渠道，只展示最新一条 -->
+    <view v-if="showNoticeBar" class="mx-3 mb-3" @click="openNoticeDetail">
+      <wd-notice-bar
+        :text="notice?.notice_title || ''"
+        prefix="notification"
+        type="info"
+        custom-class="hall-notice"
+      />
     </view>
 
     <!-- 搜索 + 项目筛选 -->
@@ -360,6 +368,12 @@ onPullDownRefresh(() => {
 :deep(.hall-search .wd-search__block) {
   background: var(--wot-filled-oppo);
   box-shadow: 0 4rpx 16rpx rgba(28, 100, 253, 0.08);
+}
+
+/* 公告条幅：圆角 + 裁切，避免直角贴着内容区 */
+:deep(.hall-notice) {
+  border-radius: 16rpx;
+  overflow: hidden;
 }
 
 /* 项目筛选 chip：横向滚动，项目多时不挤压 */
