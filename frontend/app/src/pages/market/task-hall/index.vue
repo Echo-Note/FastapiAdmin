@@ -154,7 +154,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="tabbar-wraper">
+  <view class="tabbar-wraper hall-page">
     <!-- 平台公告：C 端唯一的运营触达渠道，只展示最新一条 -->
     <view v-if="notice" class="mx-3 mt-3" @click="goNotices">
       <wd-notice-bar
@@ -350,11 +350,11 @@ onPullDownRefresh(() => {
   }
 }
 
-/* wd-search 的 light 变体自带整块浅底（宽屏下会变成一条白色横带），
-   这里把它还原成透明容器 + 白色胶囊，让头部只留一个视觉块 */
-:deep(.hall-search) {
-  padding: 0;
-  background: transparent;
+/* wd-search 的 light 变体自带整块浅底与内边距（宽屏下会变成一条白色横带），
+   用组件暴露的 CSS 变量还原成「透明容器 + 白色胶囊」，只留一个视觉块 */
+.hall-page {
+  --wot-search-light-bg: transparent;
+  --wot-search-padding: 0;
 }
 
 :deep(.hall-search .wd-search__block) {
