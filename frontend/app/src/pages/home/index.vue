@@ -604,6 +604,101 @@ onPullDownRefresh(() => {
   }
 }
 
+/* 本周进度：一条细进度 + 一行数字 */
+.week {
+  padding: 24rpx 28rpx;
+  border-radius: 20rpx;
+  background: var(--wot-filled-oppo);
+
+  &__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  &__label {
+    font-size: 24rpx;
+    color: var(--wot-text-secondary);
+  }
+
+  &__value {
+    font-size: 32rpx;
+    font-weight: 700;
+    color: var(--wot-success-main);
+    font-variant-numeric: tabular-nums;
+
+    &--muted {
+      font-size: 24rpx;
+      font-weight: 500;
+      color: var(--wot-text-placeholder);
+    }
+  }
+
+  &__sub {
+    font-size: 22rpx;
+    font-weight: 500;
+    color: var(--wot-text-auxiliary);
+  }
+
+  &__track {
+    height: 8rpx;
+    margin-top: 16rpx;
+    border-radius: 9999rpx;
+    background: var(--wot-filled-content);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: 9999rpx;
+    background: var(--wot-success-main);
+  }
+}
+
+/* 我的成果：三格数字，点进工作台的对应状态 */
+.results {
+  display: flex;
+  padding: 24rpx 8rpx;
+  border-radius: 20rpx;
+  background: var(--wot-filled-oppo);
+
+  &__cell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4rpx;
+    border-radius: 12rpx;
+
+    &--pressed {
+      opacity: 0.7;
+    }
+  }
+
+  &__num {
+    font-size: 38rpx;
+    font-weight: 700;
+    color: var(--wot-text-main);
+    font-variant-numeric: tabular-nums;
+
+    &--alert {
+      color: var(--wot-danger-main);
+    }
+  }
+
+  &__label {
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
+  }
+}
+
+.queue__price {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--wot-danger-main);
+  font-variant-numeric: tabular-nums;
+}
+
 .sect {
   display: flex;
   align-items: baseline;
