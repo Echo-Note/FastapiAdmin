@@ -473,15 +473,21 @@ class PayoutService:
         await PayoutConfigCRUD(self.auth, self.db).delete(ids=ids)
 
     async def my_payout(self, user_id: int, period: str) -> dict:
-        """查询我的发放情况：发放额度、津贴余额、津贴明细。"""
+        """查询我的发放情况：本月应发、发放额度、津贴余额、津贴明细。
+
+        `payable` 是 C 端「我的」页收益卡的主数字（这个月能拿多少）；它由结算单按周期
+        汇总而来（`period_payable`），不是把明细行加起来——明细存的是期末余额，求和会重复计滚存。
+        """
         allowance = await AllowanceCRUD(self.auth, self.db).get(user_id=user_id)
         config = await PayoutConfigCRUD(self.auth, self.db).get(user_id=user_id, period=period)
         details = await AllowanceDetailCRUD(self.auth, self.db).get_list(
             search={"user_id": user_id}, order_by=[{"id": "asc"}]
         )
+        payable = await self.period_payable(user_id, period)
         return {
             "user_id": user_id,
             "period": period,
+            "payable": float(payable),
             "payout_limit": float(config.payout_limit) if config and config.enabled else float(DEFAULT_PAYOUT_LIMIT),
             "allowance_balance": float(allowance.balance) if allowance else 0.0,
             "allowance_items": [AllowanceDetailOutSchema.model_validate(d).model_dump(mode="json") for d in details],

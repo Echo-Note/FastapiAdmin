@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAccess } from '@/composables/useAccess'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
-import { useTabbarActive } from '@/composables/useTabbarActive'
-import { useTicketStats } from '@/composables/useTicketStats'
+import { ALL_FEATURES_GROUPS, NAV_TONE_STYLE } from '@/constants/nav'
 import { useUserStore } from '@/store/userStore'
 
 const { t } = useI18n()
@@ -16,68 +16,37 @@ useShare({
 
 definePage({
   name: 'work',
-  layout: 'tabbar',
-  style: { navigationBarTitleText: '工作台' },
+  layout: 'default',
+  style: { navigationBarTitleText: '全部功能' },
 })
 useI18nNavTitle('work.navTitle')
 
 const router = useRouter()
 const userStore = useUserStore()
 const userInfo = computed(() => userStore.userInfo)
+const { visibleGroups } = useAccess()
+
 function navigateTo(name: string) {
   router.push({ name })
 }
 
-/** 工单统计（共享缓存，与 mine 页面复用，仅预热缓存，展示在 mine 页） */
-const { loadTicketStats } = useTicketStats()
+/** 分组与条目全部来自 constants/nav 真值表，按权限过滤后渲染 */
+const groups = computed(() => visibleGroups(ALL_FEATURES_GROUPS))
 
-useTabbarActive('pages/work/index', 'work', loadTicketStats)
-
-const groups = [
-  {
-    titleKey: 'work.businessCenter',
-    color: 'var(--wot-orange-6)',
-    bg: 'wot-bg-orange-1',
-    items: [
-      { icon: 'notification', titleKey: 'common.nav.notices', name: 'work-notices' },
-      { icon: 'message', titleKey: 'common.nav.tickets', name: 'work-tickets' },
-    ],
-  },
-  {
-    titleKey: 'market.title',
-    color: 'var(--wot-green-6)',
-    bg: 'wot-bg-green-1',
-    items: [
-      { icon: 'task', titleKey: 'market.taskHall', name: 'market-task-hall' },
-      { icon: 'order', titleKey: 'market.myTask', name: 'market-my-task' },
-      { icon: 'wallet', titleKey: 'market.myEarnings', name: 'market-my-earnings' },
-    ],
-  },
-  {
-    titleKey: 'work.devTools',
-    color: 'var(--wot-purple-6)',
-    bg: 'wot-bg-purple-1',
-    items: [
-      { icon: 'message', titleKey: 'common.nav.aiChat', name: 'work-chat' },
-      { icon: 'robot', titleKey: 'common.nav.aiModels', name: 'work-ai-models' },
-    ],
-  },
-]
-
-/** 搜索关键词，本地过滤模块分组 */
+/** 搜索关键词，本地过滤功能标题（分组被筛空则整组隐藏） */
 const keyword = ref('')
 const filteredGroups = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   if (!kw)
-    return groups
-  return groups
+    return groups.value
+  return groups.value
     .map(group => ({ ...group, items: group.items.filter(item => t(item.titleKey).toLowerCase().includes(kw)) }))
     .filter(group => group.items.length > 0)
 })
 </script>
 
 <template>
-  <view class="tabbar-wraper py-3">
+  <view class="page-wraper py-3">
     <!-- 用户信息卡（品牌渐变 + 极光装饰圆环） -->
     <view class="user-info-card mx-3 mb-4 flex items-center gap-4 rounded-3 px-5 py-6">
       <wd-avatar
@@ -96,15 +65,18 @@ const filteredGroups = computed(() => {
       </view>
     </view>
 
-    <!-- 模块搜索 -->
+    <!-- 功能搜索 + 可见范围说明 -->
     <view class="mx-3 mb-4">
       <wd-search v-model="keyword" :placeholder="t('work.searchPlaceholder')" variant="light" hide-cancel />
+      <view class="wot-text-text-auxiliary mt-2 px-1 text-2.5">
+        {{ t('work.superuserOnly') }}
+      </view>
     </view>
 
-    <!-- 模块分组 -->
-    <view v-for="(group, gi) in filteredGroups" :key="gi" class="mb-4">
+    <!-- 功能分组（数据驱动，入口可见性由真值表决定） -->
+    <view v-for="group in filteredGroups" :key="group.titleKey" class="mb-4">
       <view class="mb-2 mt-1 flex items-center gap-2 px-3">
-        <view class="h-3.5 w-1 rounded-full" :style="{ backgroundColor: group.color }" />
+        <view class="h-3.5 w-1 rounded-full" :style="{ backgroundColor: NAV_TONE_STYLE[group.tone].color }" />
         <wd-text class="wot-text-text-main text-3.5" :text="t(group.titleKey)" bold />
         <wd-text class="wot-text-text-auxiliary text-2.5" :text="group.items.length" />
       </view>
@@ -120,9 +92,9 @@ const filteredGroups = computed(() => {
             <view class="flex items-center gap-2.5">
               <view
                 class="h-8 w-8 flex shrink-0 items-center justify-center rounded-lg"
-                :class="group.bg"
+                :class="NAV_TONE_STYLE[item.tone].soft"
               >
-                <wd-icon :name="item.icon" size="16px" :color="group.color" />
+                <wd-icon :name="item.icon" size="16px" :color="NAV_TONE_STYLE[item.tone].color" />
               </view>
               <text>
                 {{ t(item.titleKey) }}

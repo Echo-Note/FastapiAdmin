@@ -36,6 +36,7 @@ from app.modules.system.params.controller import ParamsRouter
 from app.modules.system.position.controller import PositionRouter
 from app.modules.system.role.controller import RoleRouter
 from app.modules.system.ticket.controller import TicketRouter
+from app.modules.system.ticket.mini_controller import MiniTicketRouter
 from app.modules.system.user.controller import UserRouter
 from app.modules.system.versions.controller import VersionRouter
 from app.modules.task.cronjob.job.controller import CronJobRouter
@@ -58,6 +59,7 @@ DOMAIN_CONTROLLERS: dict[str, list[APIRouter]] = {
         ParamsRouter,
         NoticeRouter,
         TicketRouter,
+        MiniTicketRouter,
         VersionRouter,
         LogRouter,
     ],

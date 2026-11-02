@@ -36,13 +36,16 @@ class MemberService:
         if existing:
             return existing
         try:
-            return await crud.create(
-                data={
-                    "user_id": user_id,
-                    "member_no": await next_code(self.db, NumberPrefix.MEMBER),
-                    "status": MemberStatus.ACTIVE.value,
-                }
-            )
+            # 用 SAVEPOINT 包住建档：并发冲突时只回滚这一步，外层事务仍可用，
+            # 否则唯一约束报错会让整个事务进入 aborted 状态，回查档案也会一起失败（500）
+            async with self.db.begin_nested():
+                return await crud.create(
+                    data={
+                        "user_id": user_id,
+                        "member_no": await next_code(self.db, NumberPrefix.MEMBER),
+                        "status": MemberStatus.ACTIVE.value,
+                    }
+                )
         except Exception:
             # 唯一约束冲突（并发建档）或流水号异常：以库里已有档案为准
             retry = await crud.get(user_id=user_id)

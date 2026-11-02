@@ -15,7 +15,6 @@ import { NoticeAPI } from '@/api/module_system/notice'
 import { TicketAPI } from '@/api/module_system/ticket'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
-import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useThemeStore } from '@/store/themeStore'
 import { useUserStore } from '@/store/userStore'
 
@@ -46,9 +45,9 @@ echarts.use([
 ])
 
 definePage({
-  name: 'home',
-  layout: 'tabbar',
-  style: { navigationBarTitleText: '工作台概览' },
+  name: 'ops-dashboard',
+  layout: 'default',
+  style: { navigationBarTitleText: '运营仪表盘' },
 })
 useI18nNavTitle('index.navTitle')
 
@@ -302,8 +301,6 @@ onPullDownRefresh(() => {
   Promise.all([loadData(), loadNotices()])
 })
 
-useTabbarActive('pages/index/index', 'index')
-
 /** 星期名称常量：日期格式化是本地化逻辑而非模板文案，script 中不走 i18n */
 const WEEK_ZH = ['日', '一', '二', '三', '四', '五', '六']
 const WEEK_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -335,7 +332,7 @@ function getGreeting() {
 </script>
 
 <template>
-  <view class="tabbar-wraper">
+  <view class="page-wraper">
     <!-- 顶部通知栏：接入最新一条公告（无公告自动隐藏），点击进入公告列表 -->
     <wd-notice-bar
       :text="latestNotice"

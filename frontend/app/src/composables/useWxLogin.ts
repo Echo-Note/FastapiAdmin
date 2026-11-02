@@ -14,14 +14,14 @@ import { useUserStore } from '@/store/userStore'
  * // 微信一键登录
  * async function handleWxLogin() {
  *   await wxLogin()
- *   uni.reLaunch({ url: '/pages/index/index' })
+ *   uni.reLaunch({ url: HOME_ROUTE })
  * }
  *
  * // 手机号登录（配合 <button open-type="getPhoneNumber">）
  * async function handlePhoneLogin(e) {
  *   if (e.detail.errMsg !== 'getPhoneNumber:ok') return
  *   await wxPhoneLogin(e.detail.code)
- *   uni.reLaunch({ url: '/pages/index/index' })
+ *   uni.reLaunch({ url: HOME_ROUTE })
  * }
  * ```
  */

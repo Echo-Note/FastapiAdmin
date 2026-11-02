@@ -1,5 +1,12 @@
 <script lang="ts" setup>
-const { enabled: watermarkEnabled, content: watermarkContent, color: watermarkColor } = useWatermark()
+const {
+  enabled: watermarkEnabled,
+  content: watermarkContent,
+  color: watermarkColor,
+  width: watermarkWidth,
+  height: watermarkHeight,
+  opacity: watermarkOpacity,
+} = useWatermark()
 </script>
 
 <script lang="ts">
@@ -18,9 +25,9 @@ export default {
     v-if="watermarkEnabled"
     :content="watermarkContent"
     :color="watermarkColor"
-    :width="130"
-    :height="140"
-    :opacity="0.4"
+    :width="watermarkWidth"
+    :height="watermarkHeight"
+    :opacity="watermarkOpacity"
     layout="grid"
   />
 </template>

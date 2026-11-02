@@ -1,6 +1,7 @@
 /// <reference types="@uni-helper/vite-plugin-uni-pages/client" />
 import { createRouter } from '@wot-ui/router'
 import { pages, subPackages } from 'virtual:uni-pages'
+import { HOME_ROUTE } from '@/constants'
 import { useUserStore } from '@/store/userStore'
 
 function generateRoutes() {
@@ -38,9 +39,9 @@ router.beforeEach((to, from, next) => {
     })
     return
   }
-  // 已登录访问登录/注册页 → 回到首页
+  // 已登录访问登录/注册页 → 回到默认落地页（任务大厅）
   if (isAuthPage && userStore.isLoggedIn()) {
-    next({ path: '/pages/index/index', navType: 'pushTab' })
+    next({ path: HOME_ROUTE, navType: 'pushTab' })
     return
   }
   next()

@@ -7,7 +7,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AuthAPI from '@/api/module_system/auth'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
-import { REMEMBER_ME_KEY } from '@/constants'
+import { HOME_ROUTE, REMEMBER_ME_KEY } from '@/constants'
 import { useConfigStore } from '@/store/configStore'
 import { useUserStore } from '@/store/userStore'
 import { Storage } from '@/utils/storage'
@@ -21,7 +21,7 @@ const sliderCaptchaRef = ref<SlideVerifyInstance>()
 const loading = ref(false)
 const userStore = useUserStore()
 const configStore = useConfigStore()
-const redirect = ref('/pages/index/index')
+const redirect = ref(HOME_ROUTE)
 
 /** 规范化 BASE_URL（保证以 / 结尾），用于拼接静态资源路径：H5 下避免 base '/app' 拼出 /appstatic/xxx */
 const BASE_PATH = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`
