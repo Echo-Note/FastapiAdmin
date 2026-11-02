@@ -44,6 +44,7 @@ from .model import AssignmentModel, SubmissionModel, TaskItemModel, TaskModel, T
 from .schema import (
     AssignmentCreateSchema,
     AssignmentOutSchema,
+    AssignmentSubmissionStatsSchema,
     AssignmentQueryParam,
     AssignmentUpdateSchema,
     CatalogUsageSchema,
@@ -876,6 +877,33 @@ class AssignmentService:
                 TaskService._fill_task_exec_fields(item.task)
         return result
 
+    async def _attach_submission_stats(self, items: list[AssignmentOutSchema]) -> None:
+        """一次 group by 给整页分派补上成果进度（按 assignment_id 聚合）。"""
+        assignment_ids = [item.id for item in items if item.id is not None]
+        if not assignment_ids:
+            return
+        stmt = (
+            select(SubmissionModel.assignment_id, SubmissionModel.status, func.count(SubmissionModel.id))
+            .where(
+                SubmissionModel.assignment_id.in_(assignment_ids),
+                SubmissionModel.is_deleted.is_(False),
+            )
+            .group_by(SubmissionModel.assignment_id, SubmissionModel.status)
+        )
+        stats: dict[int, AssignmentSubmissionStatsSchema] = {}
+        for assignment_id, status, count in (await self.db.execute(stmt)).all():
+            entry = stats.setdefault(assignment_id, AssignmentSubmissionStatsSchema())
+            entry.total += int(count)
+            if status == SubmissionStatus.PENDING.value:
+                entry.pending += int(count)
+            elif status == SubmissionStatus.APPROVED.value:
+                entry.approved += int(count)
+            elif status == SubmissionStatus.REJECTED.value:
+                entry.rejected += int(count)
+        for item in items:
+            if item.id is not None:
+                item.submission_stats = stats.get(item.id) or AssignmentSubmissionStatsSchema()
+
     async def create(self, data: AssignmentCreateSchema) -> list[AssignmentOutSchema]:
         """批量创建分派（运营定向分派，一个任务指派给多个用户，跳过已分派）。"""
         await TaskCRUD(self.auth, self.db).get_or_404(id=data.task_id, msg="任务不存在")
@@ -1028,6 +1056,7 @@ class AssignmentService:
         for item in result.items:
             if item.task is not None:
                 TaskService._fill_task_exec_fields(item.task)
+        await self._attach_submission_stats(result.items)
         return result
 
     async def grouped_my_assignments(self, search: AssignmentQueryParam | None = None) -> list[MiniAssignmentGroupSchema]:

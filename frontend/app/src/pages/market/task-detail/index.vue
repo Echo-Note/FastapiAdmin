@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { useRouteIntent } from '@/composables/useRouteIntent'
 import { useShare } from '@/composables/useShare'
-import { taskDisplayName } from '@/constants'
+import { ASSIGNMENT_STATUS_MAP, statusMeta, taskDisplayName } from '@/constants'
 import { CommonUtil } from '@/utils/common'
 
 definePage({
@@ -17,9 +17,12 @@ definePage({
 const { t } = useI18n()
 const router = useRouter()
 const toast = useToast()
-const { take } = useRouteIntent()
+const { take, set: setRouteIntent } = useRouteIntent()
 
 const taskId = ref<number>()
+/** 从「工作台」点进来时带的分派 id：用已有分派详情接口取任务，不再单开页面 */
+const assignmentId = ref<number>()
+const assignmentStatus = ref<string>()
 const task = ref<TaskItem | null>(null)
 const loading = ref(true)
 const failed = ref(false)
@@ -57,13 +60,41 @@ const expired = computed(() => {
 const directOnly = computed(() => task.value?.assign_mode === 'direct')
 const claimable = computed(() => !!task.value && !directOnly.value && !expired.value)
 
+/** 我的分派：待接收可接收，其余可提交成果；已结算只读 */
+const assignmentInfo = computed(() => (assignmentStatus.value ? statusMeta(ASSIGNMENT_STATUS_MAP, assignmentStatus.value) : null))
+const canAcceptAssignment = computed(() => assignmentStatus.value === 'PENDING')
+const canSubmitAssignment = computed(() =>
+  ['ACCEPTED', 'SUBMITTED', 'REVIEWED'].includes(assignmentStatus.value ?? ''),
+)
+
+/** 我的任务入口进来的：接单区改成「接收 / 提交成果」 */
+function handleAssignmentAction() {
+  if (canAcceptAssignment.value && assignmentId.value) {
+    router.pushTab({ name: 'market-work-desk' })
+  }
+  else if (canSubmitAssignment.value && assignmentId.value) {
+    setRouteIntent('market-submission-form', { assignment_id: String(assignmentId.value) })
+    router.push({ name: 'market-submission-form' })
+  }
+}
+
 async function loadTask() {
-  if (!taskId.value)
+  if (!taskId.value && !assignmentId.value)
     return
   loading.value = true
   failed.value = false
   try {
-    task.value = await MarketAPI.getTaskDetail(taskId.value)
+    if (assignmentId.value) {
+      // 我的任务：分派详情里已含任务上下文，定向任务也能看
+      const detail = await MarketAPI.getAssignmentDetail(assignmentId.value)
+      assignmentStatus.value = detail.status
+      task.value = detail.task ?? null
+      if (!task.value)
+        failed.value = true
+    }
+    else if (taskId.value) {
+      task.value = await MarketAPI.getTaskDetail(taskId.value)
+    }
   }
   catch {
     failed.value = true
@@ -108,10 +139,13 @@ async function handleClaim() {
 
 onLoad((query) => {
   // 优先取一次性意图（列表点击），URL 上的 ?id 作为兜底（分享 / 深链）
-  const intentId = take('market-task-detail')?.id
+  const intent = take('market-task-detail')
+  const intentId = intent?.id
+  const intentAssignment = intent?.assignment_id
+  assignmentId.value = intentAssignment ? Number(intentAssignment) : undefined
   const id = intentId ? Number(intentId) : Number(query?.id)
   taskId.value = Number.isFinite(id) && id > 0 ? id : undefined
-  if (!taskId.value) {
+  if (!taskId.value && !assignmentId.value) {
     failed.value = true
     loading.value = false
     return
@@ -155,6 +189,9 @@ onPullDownRefresh(() => {
             </text>
           </view>
           <view class="mt-2 flex flex-wrap items-center gap-1.5">
+            <text v-if="assignmentInfo" class="detail-chip detail-chip--mine">
+              {{ t('taskDetail.myTaskTag') }} · {{ assignmentInfo.label }}
+            </text>
             <text v-if="deadlineText" class="detail-chip" :class="expired ? 'detail-chip--muted' : 'detail-chip--urgent'">
               {{ t('market.deadline') }} {{ deadlineText }}
             </text>
@@ -206,7 +243,7 @@ onPullDownRefresh(() => {
       <!-- 底部固定操作条：内容区已预留等高内边距，避免被遮住 -->
       <view class="detail-cta">
         <view class="flex-1">
-          <view v-if="directOnly" class="detail-cta__label">
+          <view v-if="directOnly && !assignmentId" class="detail-cta__label">
             {{ t('taskDetail.directOnly') }}
           </view>
           <template v-else>
@@ -222,6 +259,17 @@ onPullDownRefresh(() => {
           </template>
         </view>
         <wd-button
+          v-if="assignmentId"
+          type="primary"
+          round
+          :disabled="!canAcceptAssignment && !canSubmitAssignment"
+          custom-class="detail-cta__button"
+          @click="handleAssignmentAction"
+        >
+          {{ canSubmitAssignment ? t('myTask.submit') : (canAcceptAssignment ? t('myTask.accept') : assignmentInfo?.label) }}
+        </wd-button>
+        <wd-button
+          v-else
           type="primary"
           round
           :disabled="!claimable"
@@ -327,6 +375,13 @@ $cta-height: 128rpx;
   &--muted {
     color: var(--wot-text-auxiliary);
     background: var(--wot-filled-content);
+  }
+
+  /* 我的任务：与大厅进入区分开，一眼知道这是已经接过的单 */
+  &--mine {
+    color: var(--wot-primary-6);
+    background: var(--wot-primary-1);
+    font-weight: 600;
   }
 }
 

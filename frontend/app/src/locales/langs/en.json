@@ -484,7 +484,8 @@
     "notFound": "Task is unavailable",
     "priceTbd": "Price on request",
     "execRequirement": "Executor requirement",
-    "directOnly": "Assigned task — accept it in My Tasks"
+    "directOnly": "Assigned task — accept it in My Tasks",
+    "myTaskTag": "My task"
   },
   "myTask": {
     "title": "My Tasks",
@@ -566,6 +567,9 @@
     "shareTitle": "Workbench · my tasks and results",
     "todayToDo": "To handle today",
     "weekProgress": "Done on time this week",
-    "weekNone": "N/A"
+    "weekNone": "N/A",
+    "progressPending": "{count} in review",
+    "progressRejected": "{count} rejected",
+    "progressApproved": "{count} approved"
   }
 }

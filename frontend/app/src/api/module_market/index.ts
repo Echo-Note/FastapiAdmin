@@ -154,9 +154,19 @@ export interface TaskItem {
 }
 
 /** 任务分配/接收（对齐后端 AssignmentOutSchema） */
+/** 某条分派下的成果进度（C 端卡片角标） */
+export interface AssignmentSubmissionStats {
+  total?: number
+  pending?: number
+  approved?: number
+  rejected?: number
+}
+
 export interface AssignmentItem {
   id?: number
   task_id?: number
+  /** 成果进度：已提交总数 / 待审 / 通过 / 驳回 */
+  submission_stats?: AssignmentSubmissionStats | null
   task?: TaskItem | null
   user_id?: number
   source?: string

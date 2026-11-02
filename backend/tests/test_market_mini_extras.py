@@ -193,3 +193,28 @@ class TestTaskStatsSubmissionBreakdown:
         after_review = _stats(test_client, user)
         assert after_review["submissions_pending"] == before["submissions_pending"]
         assert after_review["submissions_approved"] == before["submissions_approved"] + 1
+
+
+class TestAssignmentSubmissionStats:
+    def test_assignment_carries_submission_progress(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """「我的任务」列表每张卡都带成果进度：已提交 / 待审 / 通过 / 驳回。"""
+        user = _login(test_client, "user", "123456")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        sid = _submit(test_client, user, assignment_id).json()["data"]["id"]
+
+        items = test_client.get(
+            "/market/mini/assignments", params={"page_no": 1, "page_size": 50}, headers=user
+        ).json()["data"]["items"]
+        target = next(item for item in items if item["id"] == assignment_id)
+        stats = target["submission_stats"]
+        assert stats["total"] >= 1
+        assert stats["pending"] >= 1
+        assert stats["rejected"] == 0
+
+        _review(test_client, auth_headers, sid, approved=False)
+        items = test_client.get(
+            "/market/mini/assignments", params={"page_no": 1, "page_size": 50}, headers=user
+        ).json()["data"]["items"]
+        target = next(item for item in items if item["id"] == assignment_id)
+        assert target["submission_stats"]["rejected"] == 1
+        assert target["submission_stats"]["pending"] == 0

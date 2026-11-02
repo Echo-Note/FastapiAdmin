@@ -484,7 +484,8 @@
     "notFound": "任务不存在或已下架",
     "priceTbd": "面议",
     "execRequirement": "执行要求",
-    "directOnly": "定向任务，请在「我的任务」中接收"
+    "directOnly": "定向任务，请在「我的任务」中接收",
+    "myTaskTag": "我的任务"
   },
   "myTask": {
     "title": "我的任务",
@@ -566,6 +567,9 @@
     "shareTitle": "工作台 · 我的任务与成果",
     "todayToDo": "今天要处理",
     "weekProgress": "本周按时完成",
-    "weekNone": "暂无"
+    "weekNone": "暂无",
+    "progressPending": "{count} 份待审核",
+    "progressRejected": "{count} 份被驳回",
+    "progressApproved": "{count} 份已通过"
   }
 }

@@ -331,6 +331,19 @@ class TaskStatusUpdateSchema(BaseModel):
     status: Literal["PUBLISHED", "IN_PROGRESS", "COMPLETED", "SETTLED", "ARCHIVED"] = Field(description="目标状态")
 
 
+class AssignmentSubmissionStatsSchema(BaseModel):
+    """某条分派下的成果进度（C 端「我的任务」卡片角标）
+
+    C 端要看的是「这一单我还要交几份、被驳回几份」，而不是一堆成果明细，
+    所以按状态给计数，列表一次带出，避免前端再抓一遍成果列表自己聚合。
+    """
+
+    total: int = Field(default=0, description="已提交成果总数(含草稿)")
+    pending: int = Field(default=0, description="待审核数")
+    approved: int = Field(default=0, description="已通过数")
+    rejected: int = Field(default=0, description="已驳回数(需修改重提)")
+
+
 class AssignmentOutSchema(BaseSchema, UserBySchema):
     """任务分配/接收响应模型"""
 
@@ -343,6 +356,9 @@ class AssignmentOutSchema(BaseSchema, UserBySchema):
     status: str = Field(default="PENDING", description="分配状态")
     accepted_at: DateTimeStr | None = Field(default=None, description="接收时间")
     submitted_at: DateTimeStr | None = Field(default=None, description="提交时间")
+    submission_stats: AssignmentSubmissionStatsSchema | None = Field(
+        default=None, description="成果进度(我的任务列表按分派聚合，运营端列表为 None)"
+    )
 
 
 class AssignmentCreateSchema(BaseModel):
