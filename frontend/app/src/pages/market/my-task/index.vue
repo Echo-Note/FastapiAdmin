@@ -137,12 +137,20 @@ function taskBadge(value?: string) {
   return count > 0 ? { value: count, type: 'danger' as const } : undefined
 }
 
-function amountText(item: AssignmentItem) {
-  const price = item.task?.item?.config?.price ?? item.task?.template?.config?.price
-  return price == null ? '' : `¥${CommonUtil.formatMoney(price)}`
+/** 单价：三级任务配置优先，回退模板配置；两者都没有时为「面议」 */
+function priceOf(item: AssignmentItem) {
+  return item.task?.item?.config?.price ?? item.task?.template?.config?.price ?? null
 }
 
+function amountText(item: AssignmentItem) {
+  const price = priceOf(item)
+  return price == null ? t('taskDetail.priceTbd') : `¥${CommonUtil.formatMoney(price)}`
+}
+
+/** 单位只在有单价时展示，否则会出现「面议 /元/份」这种半截文案 */
 function unitText(item: AssignmentItem) {
+  if (priceOf(item) == null)
+    return ''
   const unit = item.task?.item?.config?.unit ?? item.task?.template?.config?.unit
   return unit ? `/${unit}` : ''
 }
