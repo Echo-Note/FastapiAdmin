@@ -7,7 +7,13 @@ import { ref } from 'vue'
  * （小程序端会直接丢掉 query）。这里用一个模块级的一次性信号：首页写入，
  * 工作台 onShow 读取并清空，跨端行为一致。
  */
-export type WorkDeskFilter = 'PENDING' | 'ACCEPTED' | 'REJECTED'
+export type WorkDeskFilter
+  = | 'PENDING'
+    | 'ACCEPTED'
+    | 'REJECTED'
+    | 'RESULT_PENDING'
+    | 'RESULT_APPROVED'
+    | 'RESULT_REJECTED'
 
 const pendingFilter = ref<WorkDeskFilter | null>(null)
 

@@ -111,3 +111,20 @@ class TestWeekProgress:
         final = test_client.get("/market/mini/week-progress", headers=user).json()["data"]
         assert final["due"] == after["due"]
         assert final["done"] == after["done"]
+
+
+class TestTaskStatsSubmissionBreakdown:
+    def test_submission_counts_by_status(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """角标里同时给出成果维度计数：待审核 / 已通过 / 被驳回。"""
+        user = _login(test_client, "user", "123456")
+        before = _stats(test_client, user)
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        sid = _submit(test_client, user, assignment_id).json()["data"]["id"]
+
+        after_submit = _stats(test_client, user)
+        assert after_submit["submissions_pending"] == before["submissions_pending"] + 1
+
+        _review(test_client, auth_headers, sid, approved=True)
+        after_review = _stats(test_client, user)
+        assert after_review["submissions_pending"] == before["submissions_pending"]
+        assert after_review["submissions_approved"] == before["submissions_approved"] + 1

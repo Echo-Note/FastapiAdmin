@@ -48,9 +48,9 @@ export default defineUniPages({
     list: [{
       pagePath: 'pages/home/index',
     }, {
-      pagePath: 'pages/market/work-desk/index',
-    }, {
       pagePath: 'pages/market/task-hall/index',
+    }, {
+      pagePath: 'pages/market/work-desk/index',
     }, {
       pagePath: 'pages/mine/index',
     }],
