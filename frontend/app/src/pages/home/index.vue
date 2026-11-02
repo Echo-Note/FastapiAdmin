@@ -44,6 +44,9 @@ const notice = ref<NoticeItem | null>(null)
 /** 条幅只在「最新公告还没看过」时出现；看过（或手动关闭）后收起 */
 const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
 
+/** 标题短于容器时别滚动：滚动会把十几个字的标题滚出可视区，条幅看起来像空的 */
+const noticeScrollable = computed(() => (notice.value?.notice_title ?? '').length > 16)
+
 /** 点条幅 = 读它：收起条幅并跳到该公告详情 */
 function openNoticeDetail() {
   if (!notice.value?.id)
@@ -245,7 +248,7 @@ onPullDownRefresh(() => {
           <wd-notice-bar
             :text="notice?.notice_title || ''"
             prefix="notification"
-            scrollable
+            :scrollable="noticeScrollable"
             color="#FFFFFF"
             background-color="rgba(255, 255, 255, 0.16)"
             custom-class="hero-notice"
