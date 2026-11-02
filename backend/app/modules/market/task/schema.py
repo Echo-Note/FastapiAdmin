@@ -213,6 +213,21 @@ class MyAssignmentStatsOutSchema(BaseModel):
     rejected_submissions: int = Field(default=0, description="被驳回成果数(需修改重提)")
 
 
+class MyWeekProgressOutSchema(BaseModel):
+    """C 端工作台「本周进度」：本周到期多少、其中交了多少、通过多少。
+
+    口径：以**任务截止日期（`task.period`）落在本周**的分派为「本周应完成」，
+    其中推进到 SUBMITTED/REVIEWED/SETTLED 的算「已完成」，REVIEWED/SETTLED 算「已通过」。
+    本周没有到期任务时 `due` 为 0，前端据此隐藏进度条，而不是画一条 0/0 的假仪表盘。
+    """
+
+    week_start: DateStr = Field(description="本周起始(周一)")
+    week_end: DateStr = Field(description="本周结束(周日)")
+    due: int = Field(default=0, description="本周应完成(截止日在本周的分派数)")
+    done: int = Field(default=0, description="本周已完成(已提交/已审核/已结算)")
+    approved: int = Field(default=0, description="本周已通过(已审核/已结算)")
+
+
 class MiniTaskGroupSchema(BaseModel):
     """C 端按项目分组的最小单元任务组。"""
 

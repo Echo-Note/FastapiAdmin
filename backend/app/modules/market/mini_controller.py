@@ -32,6 +32,7 @@ from .task.schema import (
     MiniAssignmentGroupSchema,
     MiniTaskGroupSchema,
     MyAssignmentStatsOutSchema,
+    MyWeekProgressOutSchema,
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
@@ -180,6 +181,16 @@ async def mini_my_task_stats_controller(
     """我的待办计数：分派状态分组 + 被驳回成果数（C 端 Tab / 状态 Tab 角标）。"""
     result = await AssignmentService(auth, db).my_stats()
     return SuccessResponse(data=result, msg="获取我的待办计数成功")
+
+
+@MiniRouter.get("/week-progress", summary="我的本周进度", response_model=ResponseSchema[MyWeekProgressOutSchema])
+async def mini_my_week_progress_controller(
+    auth: Annotated[AuthSchema, Security(require_market_member)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """本周进度：截止日在本周的分派中交了多少、通过多少（工作台顶部进度带）。"""
+    result = await AssignmentService(auth, db).my_week_progress()
+    return SuccessResponse(data=result, msg="获取本周进度成功")
 
 
 @MiniRouter.get("/submissions/{id}", summary="我的成果详情", response_model=ResponseSchema[SubmissionOutSchema])

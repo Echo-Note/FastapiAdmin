@@ -5,7 +5,7 @@
 """
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import ValidationError
@@ -50,6 +50,7 @@ from .schema import (
     MiniAssignmentGroupSchema,
     MiniTaskGroupSchema,
     MyAssignmentStatsOutSchema,
+    MyWeekProgressOutSchema,
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
@@ -967,6 +968,42 @@ class AssignmentService:
             reviewed=counts.get(AssignmentStatus.REVIEWED.value, 0),
             settled=counts.get(AssignmentStatus.SETTLED.value, 0),
             rejected_submissions=int(rejected or 0),
+        )
+
+    async def my_week_progress(self) -> MyWeekProgressOutSchema:
+        """本周进度（工作台顶部进度带）：截止日在本周的分派中，交付了多少。
+
+        以「任务截止日期」而不是「成果提交时间」为准：C 端关心的是「这周该交的活交了没」，
+        迟交的成果仍属于本周应完成的事，否则逾期会被悄悄算成「本周无任务」。
+        """
+        today = datetime.now(UTC).date()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+
+        async def count(statuses: tuple[str, ...] | None = None) -> int:
+            stmt = (
+                select(func.count(AssignmentModel.id))
+                .select_from(AssignmentModel)
+                .join(TaskModel, TaskModel.id == AssignmentModel.task_id)
+                .where(
+                    AssignmentModel.user_id == self.auth.user.id,
+                    AssignmentModel.is_deleted.is_(False),
+                    TaskModel.period >= week_start,
+                    TaskModel.period <= week_end,
+                )
+            )
+            if statuses:
+                stmt = stmt.where(AssignmentModel.status.in_(statuses))
+            return int((await self.db.scalar(stmt)) or 0)
+
+        return MyWeekProgressOutSchema(
+            week_start=week_start.isoformat(),
+            week_end=week_end.isoformat(),
+            due=await count(),
+            done=await count(
+                (AssignmentStatus.SUBMITTED.value, AssignmentStatus.REVIEWED.value, AssignmentStatus.SETTLED.value)
+            ),
+            approved=await count((AssignmentStatus.REVIEWED.value, AssignmentStatus.SETTLED.value)),
         )
 
     async def my_assignments(

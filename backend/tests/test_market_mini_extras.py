@@ -90,3 +90,24 @@ class TestPayoutPayable:
         resp = test_client.get("/market/mini/payout", params={"period": PERIOD}, headers=user)
         assert resp.json()["success"] is True, resp.text
         assert resp.json()["data"]["payable"] == expected
+
+
+class TestWeekProgress:
+    def test_week_progress_shape_and_scope(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """本周进度：结构正确；截止日不在本周的任务不进「本周应完成」。"""
+        user = _login(test_client, "user", "123456")
+        before = test_client.get("/market/mini/week-progress", headers=user).json()["data"]
+        assert set(before) == {"week_start", "week_end", "due", "done", "approved"}
+        assert before["due"] >= before["done"] >= before["approved"]
+
+        # 新建任务截止日是 2026-12-31（不在本周），不应改变本周口径
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        after = test_client.get("/market/mini/week-progress", headers=user).json()["data"]
+        assert after["due"] == before["due"]
+        assert after["done"] == before["done"]
+
+        # 提交成果：只有当该任务确实落本周，done 才会变
+        assert _submit(test_client, user, assignment_id).json()["success"] is True
+        final = test_client.get("/market/mini/week-progress", headers=user).json()["data"]
+        assert final["due"] == after["due"]
+        assert final["done"] == after["done"]
