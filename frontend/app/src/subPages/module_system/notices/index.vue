@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { NoticeAPI } from '@/api/module_system/notice'
 import { useAccess } from '@/composables/useAccess'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
-import { useNoticeOpen } from '@/composables/useNoticeOpen'
+import { useRouteIntent } from '@/composables/useRouteIntent'
 
 definePage({ name: 'work-notices', style: { navigationBarTitleText: '通知公告', enablePullDownRefresh: true } })
 useI18nNavTitle('notices.title')
@@ -15,7 +15,7 @@ const { t } = useI18n()
 const toast = useToast()
 const dialog = useGlobalDialog()
 const { isSuperuser } = useAccess()
-const { consumeOpen } = useNoticeOpen()
+const { take } = useRouteIntent()
 /** 从首页/任务大厅点条幅进来时的公告 id，加载完后直接打开它的详情 */
 const pendingDetailId = ref<number>()
 /** 我已读的公告 id（后端已读表）：列表据此展示“未读 / 已读” */
@@ -222,7 +222,8 @@ function handleDelete(item: NoticeItem) {
 
 onLoad((query) => {
   // 优先用一次性信号（首页/任务大厅点条幅），其次兼容 URL 上的 ?id
-  pendingDetailId.value = consumeOpen() ?? (query?.id ? Number(query.id) : undefined)
+  const intentId = take('work-notices')?.id
+  pendingDetailId.value = intentId ? Number(intentId) : (query?.id ? Number(query.id) : undefined)
   loadReadState()
   loadList().then(() => {
     if (pendingDetailId.value == null)

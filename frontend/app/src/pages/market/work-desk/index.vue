@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { useMarketListPage } from '@/composables/useMarketListPage'
+import { useRouteIntent } from '@/composables/useRouteIntent'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useTaskStats } from '@/composables/useTaskStats'
@@ -25,6 +26,7 @@ definePage({
 const { t } = useI18n()
 const router = useRouter()
 const { loadTaskStats } = useTaskStats()
+const routeIntent = useRouteIntent()
 const workDeskFilter = useWorkDeskFilter()
 
 useShare(() => ({ title: t('workDesk.shareTitle'), path: '/pages/market/work-desk/index' }))
@@ -291,17 +293,19 @@ async function handleAccept(item: AssignmentItem) {
 function goSubmit(item: AssignmentItem) {
   if (!item.id)
     return
-  router.push({ name: 'market-submission-form', query: { assignment_id: String(item.id) } })
+  routeIntent.set('market-submission-form', { assignment_id: String(item.id) })
+  router.push({ name: 'market-submission-form' })
 }
 
 function goResubmit(item: SubmissionItem) {
   if (!item.id || resubmittingId.value)
     return
   resubmittingId.value = item.id
-  router.push({
-    name: 'market-submission-form',
-    query: { assignment_id: String(item.assignment_id ?? ''), submission_id: String(item.id) },
+  routeIntent.set('market-submission-form', {
+    assignment_id: String(item.assignment_id ?? ''),
+    submission_id: String(item.id),
   })
+  router.push({ name: 'market-submission-form' })
   resubmittingId.value = undefined
 }
 

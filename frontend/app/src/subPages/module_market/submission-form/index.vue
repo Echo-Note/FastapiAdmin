@@ -5,12 +5,14 @@ import { pcaTextArr } from 'element-china-area-data'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
+import { useRouteIntent } from '@/composables/useRouteIntent'
 import { taskDisplayName } from '@/constants'
 import { useUserStore } from '@/store/userStore'
 
 definePage({ name: 'market-submission-form', style: { navigationBarTitleText: '提交成果' } })
 
 const { t } = useI18n()
+const { take } = useRouteIntent()
 const toast = useToast()
 const router = useRouter()
 const userStore = useUserStore()
@@ -811,9 +813,19 @@ async function applySubmission(id: number) {
 }
 
 onLoad((query) => {
-  assignmentId.value = Number(query?.assignment_id)
-  submissionId.value = query?.submission_id ? Number(query.submission_id) : undefined
-  taskNo.value = query?.task_no ?? ''
+  // 优先取一次性意图（列表点击），URL query 作为兜底（分享 / 深链）
+  const intent = take('market-submission-form')
+  const assignmentRaw = intent?.assignment_id ?? query?.assignment_id
+  const submissionRaw = intent?.submission_id ?? query?.submission_id
+  assignmentId.value = assignmentRaw ? Number(assignmentRaw) : undefined
+  submissionId.value = submissionRaw ? Number(submissionRaw) : undefined
+  taskNo.value = intent?.task_no ?? query?.task_no ?? ''
+  if (!assignmentId.value || Number.isNaN(assignmentId.value)) {
+    // 没拿到 assignment_id 就不能发请求（否则会打到 /assignments/NaN）
+    toast.error(t('common.loadFailed'))
+    formLoading.value = false
+    return
+  }
   loadAssignment()
 })
 </script>

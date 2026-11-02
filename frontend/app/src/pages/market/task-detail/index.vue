@@ -4,6 +4,7 @@ import { onLoad, onPullDownRefresh } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
+import { useRouteIntent } from '@/composables/useRouteIntent'
 import { useShare } from '@/composables/useShare'
 import { taskDisplayName } from '@/constants'
 import { CommonUtil } from '@/utils/common'
@@ -16,6 +17,7 @@ definePage({
 const { t } = useI18n()
 const router = useRouter()
 const toast = useToast()
+const { take } = useRouteIntent()
 
 const taskId = ref<number>()
 const task = ref<TaskItem | null>(null)
@@ -105,7 +107,9 @@ async function handleClaim() {
 }
 
 onLoad((query) => {
-  const id = Number(query?.id)
+  // 优先取一次性意图（列表点击），URL 上的 ?id 作为兜底（分享 / 深链）
+  const intentId = take('market-task-detail')?.id
+  const id = intentId ? Number(intentId) : Number(query?.id)
   taskId.value = Number.isFinite(id) && id > 0 ? id : undefined
   if (!taskId.value) {
     failed.value = true
