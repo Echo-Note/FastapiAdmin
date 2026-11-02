@@ -201,9 +201,17 @@ class AssignmentService:
         page_size: int,
         search: AssignmentQueryParam | None = None,
     ) -> PageResultSchema[AssignmentOutSchema]:
-        """我的任务列表（小程序端）：仅查询当前用户的分派。"""
+        """我的任务列表（小程序端）：仅查询当前用户的分派。
+
+        C 端把 `ACCEPTED`（已接收待填）与 `SUBMITTING`（已存草稿）都归为「进行中」，
+        所以 `status=ACTIVE` 是一个合成桶：展开成这两个状态，避免用户存了草稿就从列表里消失。
+        这是 C 端专属语义，运营端仍按单个真实状态查。
+        """
         cond = search_to_dict(search) or {}
         cond["user_id"] = self.auth.user.id
+        # search_to_dict 已把 status 规整为 ("eq", "ACTIVE") 元组，这里两种形态都认
+        if cond.get("status") in {"ACTIVE", ("eq", "ACTIVE")}:
+            cond["status"] = ("in", [AssignmentStatus.ACCEPTED.value, AssignmentStatus.SUBMITTING.value])
         offset = (page_no - 1) * page_size
         return await AssignmentCRUD(self.auth, self.db).page(
             offset=offset,

@@ -510,3 +510,88 @@ class TestMiniTaskStats:
         assert data["reviewed"] == 0
         assert data["rejected_submissions"] == 1
         assert data["settled"] == 0
+
+
+class TestMiniTaskDetail:
+    """任务大厅详情（C 端）：C 端没有 RBAC 权限码，详情必须走 mini 只读入口。"""
+
+    PERIOD = "2027-05"
+
+    def test_mini_task_detail_visible_for_open_task(self, test_client: TestClient, auth_headers: dict) -> None:
+        ttid = _create_task_type(test_client, auth_headers, "detail_tt_1")
+        tid = _create_published_task(test_client, auth_headers, "DETAIL-TASK-1", ttid, self.PERIOD, assign_mode="open", exec_qty=5)
+        user_h = _login_user(test_client)
+
+        resp = test_client.get(f"/market/mini/tasks/{tid}", headers=user_h)
+        assert resp.json()["success"] is True, resp.text
+        data = resp.json()["data"]
+        assert data["task_no"] == "DETAIL-TASK-1"
+        assert data["task_type"]["name"] == "detail_tt_1"
+
+    def test_mini_task_detail_rejects_direct_task(self, test_client: TestClient, auth_headers: dict) -> None:
+        """定向分派任务不属于大厅可见范围，C 端不能通过详情接口绕过。"""
+        ttid = _create_task_type(test_client, auth_headers, "detail_tt_2")
+        tid = _create_published_task(test_client, auth_headers, "DETAIL-TASK-2", ttid, self.PERIOD, assign_mode="direct")
+        user_h = _login_user(test_client)
+
+        resp = test_client.get(f"/market/mini/tasks/{tid}", headers=user_h)
+        assert resp.json()["success"] is False
+
+
+class TestMyAssignmentsActiveBucket:
+    """C 端「进行中」合成桶：ACCEPTED（已接收）与 SUBMITTING（存了草稿）都要出现。"""
+
+    PERIOD = "2027-06"
+
+    def test_active_bucket_contains_accepted_and_draft(self, test_client: TestClient, auth_headers: dict) -> None:
+        user_h, uid = _create_and_login_user(test_client, auth_headers, "active_bucket_user")
+        ttid = _create_task_type(test_client, auth_headers, "active_tt_1")
+        tid = _create_published_task(test_client, auth_headers, "ACTIVE-TASK-1", ttid, self.PERIOD, exec_qty=10, task_kind="quota")
+        aid = _assign_and_accept(test_client, auth_headers, user_h, tid, uid)
+
+        # 存一份草稿 → 分派流转到 SUBMITTING
+        iid = _create_institution(test_client, auth_headers, "草稿医院A")
+        draft = test_client.post(
+            "/market/mini/submissions",
+            json={"assignment_id": aid, "institution_id": iid, "form_data": {"hospital_name": "草稿医院A"}, "status": "DRAFT"},
+            headers=user_h,
+        )
+        assert draft.json()["success"] is True, draft.text
+
+        resp = test_client.get("/market/mini/assignments", params={"page_no": 1, "page_size": 20, "status": "ACTIVE"}, headers=user_h)
+        assert resp.json()["success"] is True
+        statuses = [item["status"] for item in resp.json()["data"]["items"]]
+        assert statuses == ["SUBMITTING"]
+
+        # 单状态过滤仍然是精确的（运营端语义不被污染）
+        exact = test_client.get("/market/mini/assignments", params={"page_no": 1, "page_size": 20, "status": "ACCEPTED"}, headers=user_h)
+        assert exact.json()["data"]["items"] == []
+
+
+class TestMySubmissionDetail:
+    """C 端成果详情：驳回后回填需要它，且只能看自己的成果。"""
+
+    PERIOD = "2027-07"
+
+    def test_my_submission_detail_only_owner(self, test_client: TestClient, auth_headers: dict) -> None:
+        owner_h, uid = _create_and_login_user(test_client, auth_headers, "sub_owner")
+        other_h, _ = _create_and_login_user(test_client, auth_headers, "sub_other")
+
+        ttid = _create_task_type(test_client, auth_headers, "sub_detail_tt")
+        tid = _create_published_task(test_client, auth_headers, "SUB-DETAIL-1", ttid, self.PERIOD, exec_qty=5, task_kind="quota")
+        aid = _assign_and_accept(test_client, auth_headers, owner_h, tid, uid)
+        iid = _create_institution(test_client, auth_headers, "详情医院A")
+        sub = test_client.post(
+            "/market/mini/submissions",
+            json={"assignment_id": aid, "institution_id": iid, "form_data": {"hospital_name": "详情医院A"}, "status": "DRAFT"},
+            headers=owner_h,
+        )
+        sid = sub.json()["data"]["id"]
+
+        own = test_client.get(f"/market/mini/submissions/{sid}", headers=owner_h)
+        assert own.json()["success"] is True, own.text
+        assert own.json()["data"]["form_data"]["hospital_name"] == "详情医院A"
+
+        # 别人看不到
+        other = test_client.get(f"/market/mini/submissions/{sid}", headers=other_h)
+        assert other.json()["success"] is False

@@ -10,7 +10,7 @@ from app.core.exceptions import CustomException
 from app.core.redis_crud import RedisCURD
 from app.utils.common_util import search_to_dict
 
-from ..enums import TaskKind, TaskStatus
+from ..enums import AssignMode, TaskKind, TaskStatus
 from ..project.crud import ProjectCRUD, ProjectTaskCRUD
 from .crud import TaskCRUD, TaskTypeCRUD
 from .schema import (
@@ -194,6 +194,29 @@ class TaskService:
             await ProjectTaskCRUD(self.auth, self.db).delete(ids=[link.id for link in existing])
         for pid in unique_ids:
             await ProjectTaskCRUD(self.auth, self.db).create(data={"project_id": pid, "task_id": task_id})
+
+    async def hall_task_detail(self, task_id: int, redis: Redis) -> TaskOutSchema:
+        """任务大厅任务详情（C 端）。
+
+        C 端不能走 `/market/tasks/detail`（要求 `module_market:task:query` 权限码），
+        所以单独提供一个只读入口；可见范围与大厅列表严格一致：
+        公开接单 + 已发布/进行中 + 未超出限定时间 + （定额任务）名额未满。
+        """
+        obj = await TaskCRUD(self.auth, self.db).get(id=task_id, preload=_TASK_PRELOAD)
+        if (
+            obj is None
+            or obj.assign_mode != AssignMode.OPEN.value
+            or obj.status not in {TaskStatus.PUBLISHED.value, TaskStatus.IN_PROGRESS.value}
+            or (obj.exec_time_end is not None and obj.exec_time_end <= datetime.now(UTC))
+        ):
+            raise CustomException(msg="任务不存在或已下架")
+
+        claim_key = f"{RedisInitKeyConfig.MARKET_TASK_CLAIM.key}:{obj.id}"
+        raw = await RedisCURD(redis).get(claim_key)
+        claimed = int(raw) if raw else 0
+        if obj.task_kind == TaskKind.QUOTA.value and claimed >= obj.exec_qty:
+            raise CustomException(msg="该任务名额已满")
+        return TaskOutSchema.model_validate(obj).model_copy(update={"claimed_count": claimed})
 
     async def hall_tasks(self, redis: Redis, page_no: int, page_size: int) -> PageResultSchema[TaskOutSchema]:
         """任务大厅：公开接单任务列表（定额任务过滤已满份数，返回剩余份数）。"""

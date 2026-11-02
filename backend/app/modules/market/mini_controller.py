@@ -54,6 +54,18 @@ async def mini_my_assignments_controller(
     return SuccessResponse(data=result, msg="获取我的任务成功")
 
 
+@MiniRouter.get("/tasks/{id}", summary="任务大厅任务详情", response_model=ResponseSchema[TaskOutSchema])
+async def mini_task_detail_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    redis: Annotated[Redis, Depends(redis_getter)],
+    id: Annotated[int, Path(description="任务ID", ge=1)],
+) -> JSONResponse:
+    """任务大厅任务详情（C 端）：接口要求的 RBAC 权限码 C 端没有，详情页改走这里。"""
+    result = await TaskService(auth, db).hall_task_detail(task_id=id, redis=redis)
+    return SuccessResponse(data=result, msg="获取任务详情成功")
+
+
 @MiniRouter.post("/assignments/{id}/accept", summary="接收任务", response_model=ResponseSchema[AssignmentOutSchema])
 async def mini_accept_assignment_controller(
     auth: Annotated[AuthSchema, Security(get_current_user)],
@@ -105,6 +117,17 @@ async def mini_my_submissions_controller(
 ) -> JSONResponse:
     result = await SubmissionService(auth, db).my_submissions(page_no=page.page_no, page_size=page.page_size, search=search)
     return SuccessResponse(data=result, msg="获取我的成果成功")
+
+
+@MiniRouter.get("/submissions/{id}", summary="我的成果详情", response_model=ResponseSchema[SubmissionOutSchema])
+async def mini_my_submission_detail_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="成果ID", ge=1)],
+) -> JSONResponse:
+    """我的成果详情（C 端）：驳回后修改重提需要回填原表单，此时不能走运营端 RBAC 接口。"""
+    result = await SubmissionService(auth, db).my_detail(id=id)
+    return SuccessResponse(data=result, msg="获取成果详情成功")
 
 
 @MiniRouter.get("/payout", summary="我的发放/津贴", response_model=ResponseSchema[dict])

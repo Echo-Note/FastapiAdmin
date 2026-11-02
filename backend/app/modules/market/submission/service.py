@@ -152,6 +152,16 @@ class SubmissionService:
         await SubmissionCRUD(self.auth, self.db).update(id=id, data=update_data)
         return await self.detail(id=id)
 
+    async def my_detail(self, id: int) -> SubmissionOutSchema:
+        """我的成果详情（C 端）：只允许看自己的成果，越权按「不存在」处理。
+
+        驳回后修改重提要回填原表单，C 端需要一个不带 RBAC 权限码的详情入口。
+        """
+        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(id=id, msg="成果不存在", preload=_SUBMISSION_PRELOAD)
+        if submission.user_id != self.auth.user.id:
+            raise CustomException(msg="成果不存在")
+        return SubmissionOutSchema.model_validate(submission)
+
     async def my_submissions(
         self,
         page_no: int,
