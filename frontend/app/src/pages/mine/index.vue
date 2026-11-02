@@ -34,6 +34,8 @@ useShare(() => ({
 
 const { isSuperuser, visibleEntries } = useAccess()
 const entries = computed(() => visibleEntries(MINE_ENTRIES))
+const serviceEntries = computed(() => entries.value.filter(entry => entry.section === 'service'))
+const accountEntries = computed(() => entries.value.filter(entry => entry.section !== 'service'))
 
 function navigateTo(name: string) {
   router.push({ name })
@@ -56,6 +58,14 @@ const monthPayableText = computed(() => Number(summary.value?.payable ?? 0).toFi
 const allowanceText = computed(() => Number(summary.value?.allowance_balance ?? 0).toFixed(2))
 const payoutLimitText = computed(() => Number(summary.value?.payout_limit ?? 0).toFixed(2))
 const periodText = computed(() => summary.value?.period || '')
+
+/** 额度进度：本月应发 / 发放额度；额度为 0 时不画进度（避免除零与假进度） */
+const quotaPercent = computed(() => {
+  const limit = Number(summary.value?.payout_limit ?? 0)
+  if (limit <= 0)
+    return 0
+  return Math.min(100, Math.round((Number(summary.value?.payable ?? 0) / limit) * 100))
+})
 
 /** 收益卡展示当月：后端 payout 需要显式周期，缺省用本机当月 */
 function currentPeriod() {
@@ -165,96 +175,84 @@ async function handleSubmitPassword() {
 
 <template>
   <view class="tabbar-wraper py-3">
-    <!-- 用户卡：头像 / 昵称 / 脱敏手机号，右侧设置入口 -->
-    <view class="user-info-card mx-3 mb-3 flex items-center gap-4 rounded-3 px-5 py-6">
+    <!-- 身份行：头像 / 昵称 / 脱敏手机号 + 设置入口，不再用整块渐变 -->
+    <view class="identity mx-3 mt-3">
       <wd-avatar
-        size="64px"
+        size="52px"
         round
         :src="userInfo?.avatar || ''"
         icon="user"
       />
       <view class="min-w-0 flex-1">
-        <view class="truncate text-4 text-white font-bold">
+        <view class="identity__name">
           {{ userInfo?.name || t('common.admin') }}
         </view>
-        <view class="mine-mobile">
-          {{ mobileText }}
+        <view class="identity__sub">
+          {{ mobileText }} · {{ t('mine.executor') }}
         </view>
       </view>
-      <view
-        class="mine-setting"
-        hover-class="mine-setting--pressed"
-        @click="navigateTo('setting')"
-      >
-        <wd-icon name="settings" size="20px" color="rgba(255, 255, 255, 0.9)" />
+      <view class="identity__action" hover-class="identity__action--pressed" @click="navigateTo('setting')">
+        <wd-icon name="settings" size="20px" color="var(--wot-text-auxiliary)" />
       </view>
     </view>
 
-    <!-- 收益卡：整卡进收益明细，失败态点击重试 -->
-    <view
-      class="earnings-card user-info-card mx-3 mb-3"
-      hover-class="earnings-card--pressed"
-      @click="handleEarningsTap"
-    >
+    <!-- 收益卡：白底 + 大数字 + 额度进度条，整卡进收益明细，失败态点击重试 -->
+    <view class="earn mx-3 mt-3" hover-class="earn--pressed" @click="handleEarningsTap">
       <view v-if="earningsLoading" class="flex items-center justify-center py-6">
-        <wd-loading color="rgba(255, 255, 255, 0.9)" />
+        <wd-loading />
       </view>
 
       <view v-else-if="earningsFailed" class="flex flex-col items-center gap-2 py-4">
-        <wd-icon name="exclamation-circle" size="24px" color="rgba(255, 255, 255, 0.9)" />
-        <text class="earnings-card__failed">
+        <wd-icon name="exclamation-circle" size="24px" color="var(--wot-warning-main)" />
+        <text class="earn__failed">
           {{ t('mine.earningsFailed') }}
         </text>
       </view>
 
       <template v-else>
-        <view class="flex items-start justify-between gap-3">
+        <view class="flex items-end justify-between gap-3">
           <view class="min-w-0">
-            <view class="earnings-card__label">
+            <view class="earn__label">
               {{ t('mine.monthPayable') }}
+              <text v-if="periodText" class="earn__period">
+                {{ periodText }}
+              </text>
             </view>
-            <view class="earnings-card__amount">
+            <view class="earn__amount">
               ¥{{ monthPayableText }}
             </view>
           </view>
-          <text class="earnings-card__link">
+          <text class="earn__link">
             {{ t('mine.earningsDetail') }} ›
           </text>
         </view>
 
-        <view class="earnings-card__footer">
-          <text>
-            {{ t('mine.allowanceBalance') }}
-            <text class="earnings-card__value">
-              ¥{{ allowanceText }}
-            </text>
-          </text>
-          <text>
-            {{ periodText ? `${periodText} ` : '' }}{{ t('mine.payoutLimit') }}
-            <text class="earnings-card__value">
-              ¥{{ payoutLimitText }}
-            </text>
-          </text>
+        <view class="earn__track">
+          <view class="earn__fill" :style="{ width: `${quotaPercent}%` }" />
+        </view>
+        <view class="earn__cap">
+          <text>{{ t('mine.payoutLimit') }} ¥{{ payoutLimitText }}</text>
+          <text>{{ t('mine.allowanceBalance') }} ¥{{ allowanceText }}</text>
         </view>
       </template>
     </view>
 
-    <!-- 功能列表：可见性统一由 nav 真值表 + useAccess 决定 -->
-    <view class="mx-3 mb-3">
+    <!-- 我的服务 -->
+    <view v-if="serviceEntries.length > 0" class="mx-3 mt-4">
+      <view class="sect">
+        {{ t('mine.services') }}
+      </view>
       <wd-cell-group border custom-class="rounded-2! overflow-hidden">
         <wd-cell
-          v-for="entry in entries"
+          v-for="entry in serviceEntries"
           :key="entry.name"
           center
           is-link
-          @click="entry.dialog === 'password' ? openPasswordDialog() : navigateTo(entry.name)"
+          @click="navigateTo(entry.name)"
         >
           <template #title>
             <view class="flex items-center gap-2.5">
-              <view
-                class="h-8 w-8 flex shrink-0 items-center justify-center rounded-lg"
-                :class="NAV_TONE_STYLE[entry.tone].soft"
-              >
+              <view class="h-8 w-8 flex shrink-0 items-center justify-center rounded-lg" :class="NAV_TONE_STYLE[entry.tone].soft">
                 <wd-icon :name="entry.icon" size="16px" :color="NAV_TONE_STYLE[entry.tone].color" />
               </view>
               <text>{{ t(entry.titleKey) }}</text>
@@ -264,23 +262,51 @@ async function handleSubmitPassword() {
       </wd-cell-group>
     </view>
 
-    <!-- 超管专属：全部功能 -->
-    <view v-if="isSuperuser" class="mx-3 mb-3">
+    <!-- 账号 -->
+    <view class="mx-3 mt-4">
+      <view class="sect">
+        {{ t('mine.accountSection') }}
+      </view>
       <wd-cell-group border custom-class="rounded-2! overflow-hidden">
         <wd-cell
+          v-for="entry in accountEntries"
+          :key="entry.name"
+          center
+          is-link
+          @click="entry.dialog === 'password' ? openPasswordDialog() : navigateTo(entry.name)"
+        >
+          <template #title>
+            <view class="flex items-center gap-2.5">
+              <view class="h-8 w-8 flex shrink-0 items-center justify-center rounded-lg" :class="NAV_TONE_STYLE[entry.tone].soft">
+                <wd-icon :name="entry.icon" size="16px" :color="NAV_TONE_STYLE[entry.tone].color" />
+              </view>
+              <text>{{ t(entry.titleKey) }}</text>
+            </view>
+          </template>
+        </wd-cell>
+        <!-- 仅超管：全部功能（运营 / 开发） -->
+        <wd-cell
+          v-if="isSuperuser"
+          center
+          is-link
           :title="t('mine.allFeatures')"
           :label="t('mine.allFeaturesTip')"
-          is-link
           @click="navigateTo('work')"
         />
       </wd-cell-group>
     </view>
 
-    <!-- 退出登录 -->
-    <view class="mx-3">
-      <wd-button type="danger" size="large" plain round block @click="handleLogout">
-        {{ t('mine.logout') }}
-      </wd-button>
+    <!-- 退出登录：弱化为文字行，不做成红色大按钮 -->
+    <view class="mx-3 mt-4">
+      <wd-cell-group border custom-class="rounded-2! overflow-hidden">
+        <wd-cell center custom-class="justify-center" @click="handleLogout">
+          <template #title>
+            <view class="logout">
+              {{ t('mine.logout') }}
+            </view>
+          </template>
+        </wd-cell>
+      </wd-cell-group>
     </view>
 
     <!-- 修改密码弹窗 -->
@@ -330,33 +356,46 @@ async function handleSubmitPassword() {
 </template>
 
 <style lang="scss" scoped>
-.mine-mobile {
-  margin-top: 8rpx;
-  font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.75);
-  font-variant-numeric: tabular-nums;
-}
-
-.mine-setting {
-  position: relative;
-  z-index: 10;
-  width: 72rpx;
-  height: 72rpx;
+/* 身份行：一行搞定，不再用整块渐变卡 */
+.identity {
   display: flex;
-  flex-shrink: 0;
   align-items: center;
-  justify-content: center;
-  border-radius: 9999rpx;
-  transition: opacity 0.15s ease;
+  gap: 24rpx;
+  padding: 8rpx 4rpx 12rpx;
 
-  &--pressed {
-    opacity: 0.7;
+  &__name {
+    font-size: 32rpx;
+    font-weight: 600;
+    color: var(--wot-text-main);
+  }
+
+  &__sub {
+    margin-top: 6rpx;
+    font-size: 24rpx;
+    color: var(--wot-text-auxiliary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__action {
+    width: 72rpx;
+    height: 72rpx;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999rpx;
+    transition: opacity 0.15s ease;
+
+    &--pressed {
+      opacity: 0.7;
+    }
   }
 }
 
-/* 收益卡：复用 user-info-card 的品牌渐变，金额作为主视觉 */
-.earnings-card {
-  padding: 32rpx;
+/* 收益卡：白底 + 大数字 + 额度进度，钱是主视觉但不是唯一元素 */
+.earn {
+  padding: 28rpx;
+  border-radius: 20rpx;
+  background: var(--wot-filled-oppo);
   transition: opacity 0.15s ease;
 
   &--pressed {
@@ -364,47 +403,71 @@ async function handleSubmitPassword() {
   }
 
   &__failed {
-    font-size: 26rpx;
-    color: rgba(255, 255, 255, 0.85);
+    font-size: 24rpx;
+    color: var(--wot-text-secondary);
   }
 
   &__label {
-    font-size: 24rpx;
-    color: rgba(255, 255, 255, 0.8);
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
+  }
+
+  &__period {
+    margin-left: 8rpx;
+    font-variant-numeric: tabular-nums;
   }
 
   &__amount {
-    margin-top: 8rpx;
-    font-size: 60rpx;
+    margin-top: 6rpx;
+    font-size: 56rpx;
     font-weight: 700;
     line-height: 1.1;
-    color: rgba(255, 255, 255, 1);
-    /* 金额按位数对齐，切换周期时不跳动 */
+    color: var(--wot-danger-main);
     font-variant-numeric: tabular-nums;
   }
 
   &__link {
     flex-shrink: 0;
-    font-size: 24rpx;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.9);
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
   }
 
-  &__footer {
+  &__track {
+    height: 8rpx;
+    margin-top: 22rpx;
+    border-radius: 9999rpx;
+    background: var(--wot-filled-content);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: 9999rpx;
+    background: var(--wot-primary-6);
+  }
+
+  &__cap {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8rpx 24rpx;
-    margin-top: 24rpx;
-    padding-top: 20rpx;
-    border-top: 1rpx solid rgba(255, 255, 255, 0.2);
-    font-size: 24rpx;
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  &__value {
-    font-weight: 600;
-    color: rgba(255, 255, 255, 1);
+    justify-content: space-between;
+    margin-top: 10rpx;
+    font-size: 20rpx;
+    color: var(--wot-text-auxiliary);
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* 分组标题 */
+.sect {
+  margin: 0 8rpx 12rpx;
+  font-size: 24rpx;
+  color: var(--wot-text-auxiliary);
+}
+
+/* 退出登录：文字行，不用红色大按钮抢视觉 */
+.logout {
+  width: 100%;
+  text-align: center;
+  font-size: 28rpx;
+  color: var(--wot-text-secondary);
 }
 </style>

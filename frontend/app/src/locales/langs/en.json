@@ -53,10 +53,9 @@
     "subscribeGoSetting": "Go to Settings",
     "tab": {
       "home": "Home",
-      "work": "Workbench",
-      "mine": "Me",
+      "workDesk": "Workbench",
       "taskHall": "Task Hall",
-      "myTask": "My Tasks"
+      "mine": "Me"
     },
     "nav": {
       "notices": "Notices",
@@ -189,7 +188,9 @@
     "allFeatures": "All features",
     "allFeaturesTip": "Ops and dev tools (super admin only)",
     "mobileUnbound": "No phone bound",
-    "executor": "Executor"
+    "executor": "Executor",
+    "services": "Services",
+    "accountSection": "Account"
   },
   "profile": {
     "navTitle": "Profile",
@@ -528,5 +529,27 @@
     "statusDone": "Done",
     "statusClosed": "Closed",
     "submittedAt": "Submitted {time}"
+  },
+  "home": {
+    "title": "Home",
+    "shareTitle": "Task Hall · Grab a task",
+    "todoHeadPrefix": "Today you have",
+    "todoHeadSuffix": "things due",
+    "todoEmpty": "Nothing due today",
+    "pending": "To accept",
+    "active": "To submit",
+    "rejected": "Rejected",
+    "latestDeadline": "Latest deadline",
+    "nextTitle": "Next up",
+    "viewAll": "All",
+    "emptyTasks": "No open task on hand",
+    "goHall": "Grab one in Task Hall"
+  },
+  "workDesk": {
+    "title": "Workbench",
+    "shareTitle": "Workbench · my tasks and results",
+    "todayToDo": "To handle today",
+    "weekProgress": "Done on time this week",
+    "weekEmpty": "Nothing due this week"
   }
 }

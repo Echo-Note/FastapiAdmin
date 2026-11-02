@@ -5,14 +5,15 @@
 
 type _LocationUrl =
   "/pages/market/task-hall/index" |
+  "/pages/home/index" |
   "/pages/index/index" |
   "/pages/login/index" |
   "/pages/mine/index" |
   "/pages/work/index" |
   "/pages/login/forget/index" |
   "/pages/login/register/index" |
-  "/pages/market/my-task/index" |
   "/pages/market/task-detail/index" |
+  "/pages/market/work-desk/index" |
   "/subPages/about/index" |
   "/subPages/setting/index" |
   "/subPages/module_ai/ai-models/index" |
@@ -31,7 +32,7 @@ interface NavigateToOptions {
 interface RedirectToOptions extends NavigateToOptions {}
 
 interface SwitchTabOptions {
-  url: "/pages/market/task-hall/index" | "/pages/market/my-task/index" | "/pages/mine/index"
+  url: "/pages/home/index" | "/pages/market/work-desk/index" | "/pages/market/task-hall/index" | "/pages/mine/index"
 }
 
 type ReLaunchOptions = NavigateToOptions | SwitchTabOptions;

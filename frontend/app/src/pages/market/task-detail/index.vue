@@ -93,7 +93,7 @@ async function handleClaim() {
     await MarketAPI.claimTask(task.value.id)
     toast.success(t('market.claimSuccess'))
     // 接单后去「我的任务」继续提交成果，避免详情页留在栈里
-    setTimeout(() => router.pushTab({ name: 'market-my-task' }), 600)
+    setTimeout(() => router.pushTab({ name: 'market-work-desk' }), 600)
   }
   catch {
     // http 层已统一提示（如名额已满 / 已接过）

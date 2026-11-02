@@ -19,7 +19,7 @@ export function useTaskStats() {
   const { setTabbarItem } = useTabbar()
 
   function syncBadge() {
-    setTabbarItem('market-my-task', todoCount.value)
+    setTabbarItem('market-work-desk', todoCount.value)
   }
 
   async function loadTaskStats(force = false) {

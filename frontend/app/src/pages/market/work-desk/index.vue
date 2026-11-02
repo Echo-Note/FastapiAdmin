@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AssignmentItem, MyTaskStats, SubmissionItem } from '@/api/module_market'
+import type { AssignmentItem, MyTaskStats, MyWeekProgress, SubmissionItem } from '@/api/module_market'
 import { onLoad, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,18 +13,18 @@ import { taskDisplayName } from '@/constants'
 import { CommonUtil } from '@/utils/common'
 
 definePage({
-  name: 'market-my-task',
+  name: 'market-work-desk',
   layout: 'tabbar',
-  style: { navigationBarTitleText: '我的任务', enablePullDownRefresh: true },
+  style: { navigationBarTitleText: '工作台', enablePullDownRefresh: true },
 })
-useI18nNavTitle('myTask.title')
+useI18nNavTitle('workDesk.title')
 
 const { t } = useI18n()
 const router = useRouter()
 const { loadTaskStats } = useTaskStats()
 
-useShare(() => ({ title: t('myTask.shareTitle'), path: '/pages/market/my-task/index' }))
-useTabbarActive('pages/market/my-task/index', 'market-my-task')
+useShare(() => ({ title: t('workDesk.shareTitle'), path: '/pages/market/work-desk/index' }))
+useTabbarActive('pages/market/work-desk/index', 'market-work-desk')
 
 type Layer = 'task' | 'result'
 type LoadMode = 'first' | 'refresh' | 'next'
@@ -61,6 +61,17 @@ const resultTabIndex = ref(0)
 const resultStatus = ref<string | undefined>()
 
 const stats = ref<MyTaskStats>({})
+const week = ref<MyWeekProgress | null>(null)
+
+/** 本周按时完成率：本周没有到期任务时不画进度条（0/0 的仪表盘没有信息量） */
+const weekDue = computed(() => week.value?.due ?? 0)
+const weekDone = computed(() => week.value?.done ?? 0)
+const weekPercent = computed(() => (weekDue.value > 0 ? Math.min(100, Math.round((weekDone.value / weekDue.value) * 100)) : 0))
+
+/** 今天要处理 = 待接收 + 进行中 + 被驳回，与 TabBar 角标同口径 */
+const todayCount = computed(
+  () => (stats.value.pending ?? 0) + (stats.value.accepted ?? 0) + (stats.value.rejected_submissions ?? 0),
+)
 const rejectedCount = computed(() => stats.value.rejected_submissions ?? 0)
 
 const taskFailed = ref(false)
@@ -109,6 +120,17 @@ function labelOf(meta: Record<string, StatusMeta>, status?: string) {
 
 function toneOf(meta: Record<string, StatusMeta>, status?: string) {
   return `status-chip--${meta[status ?? '']?.tone ?? 'muted'}`
+}
+
+/** 左侧状态条色调：待接收要警惕、进行中在处理、其余已完成 */
+function markTone(status?: string) {
+  if (status === 'PENDING')
+    return 'warn'
+  if (status === 'ACCEPTED')
+    return 'primary'
+  if (status === 'SUBMITTED')
+    return 'muted'
+  return 'success'
 }
 
 function taskStatusLabel(status?: string) {
@@ -164,12 +186,15 @@ function submittedTime(item: SubmissionItem) {
 }
 
 async function loadStats() {
-  try {
-    stats.value = await MarketAPI.getMyTaskStats()
-  }
-  catch {
-    // 角标是辅助信息：失败静默降级，保留上一次计数
-  }
+  const [statsRes, weekRes] = await Promise.allSettled([
+    MarketAPI.getMyTaskStats(),
+    MarketAPI.getMyWeekProgress(),
+  ])
+  if (statsRes.status === 'fulfilled')
+    stats.value = statsRes.value
+  if (weekRes.status === 'fulfilled')
+    week.value = weekRes.value
+  // 角标是辅助信息：失败静默降级，保留上一次值
 }
 
 async function loadTasks(mode: LoadMode = 'first') {
@@ -301,7 +326,42 @@ onPullDownRefresh(async () => {
 </script>
 
 <template>
-  <view class="tabbar-wraper my-task-page">
+  <view class="tabbar-wraper work-desk-page">
+    <!-- 本周进度带：回答「这周该交的活交了没」，没有到期任务就不画进度条 -->
+    <view class="week mx-3 mt-3">
+      <view class="week__row">
+        <view class="week__cell">
+          <text class="week__label">
+            {{ t('workDesk.todayToDo') }}
+          </text>
+          <text class="week__num">
+            {{ todayCount }}
+          </text>
+        </view>
+        <view class="week__cell week__cell--right">
+          <text class="week__label">
+            {{ t('workDesk.weekProgress') }}
+          </text>
+          <text class="week__num week__num--ok">
+            <template v-if="weekDue > 0">
+              {{ weekDone }} <text class="week__num-sub">
+                / {{ weekDue }}
+              </text>
+            </template>
+            <template v-else>
+              —
+            </template>
+          </text>
+        </view>
+      </view>
+      <view v-if="weekDue > 0" class="week__track">
+        <view class="week__fill" :style="{ width: `${weekPercent}%` }" />
+      </view>
+      <view v-else class="week__hint">
+        {{ t('workDesk.weekEmpty') }}
+      </view>
+    </view>
+
     <!-- 任务 / 成果两层：分段控件只负责换层，状态筛选交给下面的 Tab，避免两层筛选挤在一行 -->
     <view class="mx-3 mt-3">
       <view class="layer-switch">
@@ -375,40 +435,34 @@ onPullDownRefresh(async () => {
       </view>
 
       <view v-else class="mx-3 mt-3 flex flex-col gap-3">
-        <view v-for="item in taskList" :key="item.id" class="task-card">
-          <view class="flex items-start gap-3">
-            <view class="min-w-0 flex-1">
-              <view class="task-card__name">
-                {{ taskDisplayName(item.task) }}
-              </view>
-              <view class="task-card__no">
-                {{ item.task?.task_no }}
-              </view>
+        <view v-for="item in taskList" :key="item.id" class="queue">
+          <view class="queue__mark" :class="`queue__mark--${markTone(item.status)}`" />
+          <view class="min-w-0 flex-1">
+            <view class="queue__name">
+              {{ taskDisplayName(item.task) }}
             </view>
-            <text class="status-chip shrink-0" :class="taskStatusTone(item.status)">
-              {{ taskStatusLabel(item.status) }}
-            </text>
-          </view>
-
-          <view class="mt-2 flex flex-wrap items-center gap-1.5">
-            <text v-if="deadlineText(item)" class="task-card__meta">
-              {{ t('market.deadline') }} {{ deadlineText(item) }}
-            </text>
-          </view>
-
-          <view class="task-card__footer">
-            <view class="min-w-0 flex items-baseline gap-1">
-              <text class="task-card__amount">
-                {{ amountText(item) }}
+            <view class="queue__meta">
+              <text>{{ item.task?.task_no }}</text>
+              <text class="queue__dot">
+                ·
               </text>
-              <text v-if="unitText(item)" class="task-card__unit">
+              <text>{{ amountText(item) }}</text>
+              <text v-if="unitText(item)" class="queue__dot">
                 {{ unitText(item) }}
               </text>
             </view>
+          </view>
+          <view class="queue__side">
+            <text class="status-chip" :class="taskStatusTone(item.status)">
+              {{ taskStatusLabel(item.status) }}
+            </text>
+            <text v-if="deadlineText(item)" class="queue__deadline">
+              {{ deadlineText(item) }}
+            </text>
             <wd-button
               v-if="item.status === 'PENDING'"
               type="primary"
-              size="large"
+              size="small"
               round
               :loading="acceptingId != null && acceptingId === item.id"
               @click.stop="handleAccept(item)"
@@ -418,7 +472,7 @@ onPullDownRefresh(async () => {
             <wd-button
               v-else-if="item.status !== 'SETTLED'"
               type="primary"
-              size="large"
+              size="small"
               round
               @click.stop="goSubmit(item)"
             >
@@ -516,7 +570,7 @@ onPullDownRefresh(async () => {
 <style lang="scss" scoped>
 /* wd-tabs 默认 flex:1 + 大内边距：5 个中文状态标签在 375px 手机上会被截成「进…」，
    收紧字号与内边距后三字标签（待接收/进行中/已提交/已审核）可完整显示 */
-.my-task-page {
+.work-desk-page {
   --wot-tabs-nav-item-font-size: 26rpx;
   --wot-tabs-nav-item-padding: 14rpx 8rpx;
 }
@@ -577,7 +631,148 @@ onPullDownRefresh(async () => {
   }
 }
 
-.task-card,
+/* 本周进度带：两个数字 + 一条进度；没有到期任务时只给一句说明 */
+.week {
+  padding: 26rpx 28rpx;
+  border-radius: 20rpx;
+  background: var(--wot-filled-oppo);
+
+  &__row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16rpx;
+  }
+
+  &__cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4rpx;
+
+    &--right {
+      align-items: flex-end;
+    }
+  }
+
+  &__label {
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
+  }
+
+  &__num {
+    font-size: 44rpx;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--wot-text-main);
+    font-variant-numeric: tabular-nums;
+
+    &--ok {
+      color: var(--wot-success-main);
+    }
+
+    &-sub {
+      font-size: 24rpx;
+      font-weight: 500;
+      color: var(--wot-text-auxiliary);
+    }
+  }
+
+  &__track {
+    height: 8rpx;
+    margin-top: 20rpx;
+    border-radius: 9999rpx;
+    background: var(--wot-filled-content);
+    overflow: hidden;
+  }
+
+  &__fill {
+    height: 100%;
+    border-radius: 9999rpx;
+    background: var(--wot-success-main);
+  }
+
+  &__hint {
+    margin-top: 16rpx;
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
+  }
+}
+
+/* 队列行：左侧状态条表示「要我动手」的程度，右侧是状态、截止与唯一主操作 */
+.queue {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  background: var(--wot-filled-oppo);
+
+  &__mark {
+    width: 6rpx;
+    align-self: stretch;
+    border-radius: 9999rpx;
+
+    &--warn {
+      background: var(--wot-warning-main);
+    }
+
+    &--primary {
+      background: var(--wot-primary-6);
+    }
+
+    &--success {
+      background: var(--wot-success-main);
+    }
+
+    &--danger {
+      background: var(--wot-danger-main);
+    }
+
+    &--muted {
+      background: var(--wot-filled-strong);
+    }
+  }
+
+  &__name {
+    font-size: 28rpx;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--wot-text-main);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 6rpx;
+    margin-top: 8rpx;
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__dot {
+    color: var(--wot-text-disabled);
+  }
+
+  &__side {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8rpx;
+    flex-shrink: 0;
+  }
+
+  &__deadline {
+    font-size: 20rpx;
+    color: var(--wot-text-auxiliary);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
 .result-card {
   padding: 28rpx;
   border-radius: 20rpx;

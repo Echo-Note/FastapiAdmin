@@ -186,6 +186,15 @@ export interface SubmissionItem {
   ai_check_result?: Record<string, unknown> | null
 }
 
+/** 我的本周进度（对齐后端 mini/week-progress） */
+export interface MyWeekProgress {
+  week_start?: string
+  week_end?: string
+  due?: number
+  done?: number
+  approved?: number
+}
+
 /** 我的待办计数（对齐后端 mini/task-stats） */
 export interface MyTaskStats {
   pending?: number
@@ -294,6 +303,13 @@ export const MarketAPI = {
   /** 我的待办计数（TabBar / 状态 Tab 角标：分派状态分组 + 被驳回成果数） */
   getMyTaskStats() {
     const method = http.Get<MyTaskStats>(`${MARKET_BASE}/mini/task-stats`)
+    method.config.cacheFor = 0
+    return method
+  },
+
+  /** 我的本周进度（工作台顶部进度带） */
+  getMyWeekProgress() {
+    const method = http.Get<MyWeekProgress>(`${MARKET_BASE}/mini/week-progress`)
     method.config.cacheFor = 0
     return method
   },

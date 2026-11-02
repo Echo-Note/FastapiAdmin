@@ -753,7 +753,7 @@ async function handleSubmit() {
     // 已提交成功：本地草稿没有保留价值，清掉避免下次进来看到旧内容
     clearDraft()
     toast.success(t('market.submitSuccess'))
-    setTimeout(() => router.replace({ name: 'market-my-task' }), 300)
+    setTimeout(() => router.replace({ name: 'market-work-desk' }), 300)
   }
   catch {
     toast.error(t('common.operationFailed'))

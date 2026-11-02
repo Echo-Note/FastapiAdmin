@@ -19,6 +19,8 @@ export interface NavEntry {
   name: string
   /** 打开弹窗而非跳页（目前只有「修改密码」内嵌在「我的」页） */
   dialog?: 'password'
+  /** 「我的」页里的分组：我的服务 / 账号 */
+  section?: 'service' | 'account'
   /** i18n 标题键 */
   titleKey: string
   /** wd-icon 图标名 */
@@ -34,21 +36,22 @@ export interface NavGroup {
   items: NavEntry[]
 }
 
-/** 底部 TabBar（三种角色一致，顺序即展示顺序；任务大厅为默认落地页） */
+/** 底部 TabBar（所有角色一致，顺序即展示顺序；首页为默认落地页） */
 export const TABBAR_ITEMS: NavEntry[] = [
+  { name: 'home', titleKey: 'common.tab.home', icon: 'home', tone: 'primary', visibleTo: 'all' },
+  { name: 'market-work-desk', titleKey: 'common.tab.workDesk', icon: 'ordered-list', tone: 'green', visibleTo: 'all' },
   { name: 'market-task-hall', titleKey: 'common.tab.taskHall', icon: 'store', tone: 'primary', visibleTo: 'all' },
-  { name: 'market-my-task', titleKey: 'common.tab.myTask', icon: 'ordered-list', tone: 'green', visibleTo: 'all' },
   { name: 'mine', titleKey: 'common.tab.mine', icon: 'user', tone: 'primary', visibleTo: 'all' },
 ]
 
 /** 「我的」页功能列表（C 端可见） */
 export const MINE_ENTRIES: NavEntry[] = [
-  { name: 'feedback', titleKey: 'common.nav.feedback', icon: 'edit', tone: 'primary', visibleTo: 'all' },
-  { name: 'work-notices', titleKey: 'common.nav.notices', icon: 'notification', tone: 'green', visibleTo: 'all' },
-  { name: 'profile', titleKey: 'common.profile', icon: 'user', tone: 'primary', visibleTo: 'all' },
-  { name: 'password', titleKey: 'account.password', icon: 'lock', tone: 'primary', visibleTo: 'all', dialog: 'password' },
-  { name: 'setting', titleKey: 'common.settings', icon: 'settings', tone: 'primary', visibleTo: 'all' },
-  { name: 'about', titleKey: 'common.aboutUs', icon: 'info-circle', tone: 'primary', visibleTo: 'all' },
+  { name: 'feedback', titleKey: 'common.nav.feedback', icon: 'edit', tone: 'primary', visibleTo: 'all', section: 'service' },
+  { name: 'work-notices', titleKey: 'common.nav.notices', icon: 'notification', tone: 'green', visibleTo: 'all', section: 'service' },
+  { name: 'profile', titleKey: 'common.profile', icon: 'user', tone: 'primary', visibleTo: 'all', section: 'account' },
+  { name: 'password', titleKey: 'account.password', icon: 'lock', tone: 'primary', visibleTo: 'all', dialog: 'password', section: 'account' },
+  { name: 'setting', titleKey: 'common.settings', icon: 'settings', tone: 'primary', visibleTo: 'all', section: 'account' },
+  { name: 'about', titleKey: 'common.aboutUs', icon: 'info-circle', tone: 'primary', visibleTo: 'all', section: 'account' },
 ]
 
 /**
@@ -56,7 +59,7 @@ export const MINE_ENTRIES: NavEntry[] = [
  * 这些页面全部保留在小程序包里，只是没有入口。
  */
 export const SUPERUSER_ENTRIES: NavEntry[] = [
-  { name: 'home', titleKey: 'common.nav.dashboard', icon: 'dashboard', tone: 'orange', visibleTo: 'superuser' },
+  { name: 'ops-dashboard', titleKey: 'common.nav.dashboard', icon: 'dashboard', tone: 'orange', visibleTo: 'superuser' },
   { name: 'work-tickets', titleKey: 'common.nav.tickets', icon: 'message', tone: 'orange', visibleTo: 'superuser' },
   { name: 'work-chat', titleKey: 'common.nav.aiChat', icon: 'interaction', tone: 'cyan', visibleTo: 'superuser' },
   { name: 'work-ai-models', titleKey: 'common.nav.aiModels', icon: 'robot', tone: 'purple', visibleTo: 'superuser' },
@@ -76,7 +79,7 @@ export const ALL_FEATURES_GROUPS: NavGroup[] = [
     titleKey: 'work.opsTools',
     tone: 'purple',
     items: [
-      { name: 'home', titleKey: 'common.nav.dashboard', icon: 'dashboard', tone: 'orange', visibleTo: 'superuser' },
+      { name: 'ops-dashboard', titleKey: 'common.nav.dashboard', icon: 'dashboard', tone: 'orange', visibleTo: 'superuser' },
       { name: 'work-chat', titleKey: 'common.nav.aiChat', icon: 'interaction', tone: 'cyan', visibleTo: 'superuser' },
       { name: 'work-ai-models', titleKey: 'common.nav.aiModels', icon: 'robot', tone: 'purple', visibleTo: 'superuser' },
     ],

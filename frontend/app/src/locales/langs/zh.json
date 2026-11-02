@@ -53,10 +53,9 @@
     "subscribeGoSetting": "去设置",
     "tab": {
       "home": "首页",
-      "work": "工作台",
-      "mine": "我的",
+      "workDesk": "工作台",
       "taskHall": "任务大厅",
-      "myTask": "我的任务"
+      "mine": "我的"
     },
     "nav": {
       "notices": "通知公告",
@@ -189,7 +188,9 @@
     "allFeatures": "全部功能",
     "allFeaturesTip": "运营与开发功能（仅超管可见）",
     "mobileUnbound": "未绑定手机号",
-    "executor": "执行用户"
+    "executor": "执行用户",
+    "services": "我的服务",
+    "accountSection": "账号"
   },
   "profile": {
     "navTitle": "个人资料",
@@ -528,5 +529,27 @@
     "statusDone": "已完成",
     "statusClosed": "已关闭",
     "submittedAt": "提交于 {time}"
+  },
+  "home": {
+    "title": "首页",
+    "shareTitle": "任务大厅 · 一起接单",
+    "todoHeadPrefix": "今天有",
+    "todoHeadSuffix": "件事要交",
+    "todoEmpty": "今天没有要交的事",
+    "pending": "待接收",
+    "active": "待提交",
+    "rejected": "被驳回",
+    "latestDeadline": "最晚截止",
+    "nextTitle": "接下来要交的",
+    "viewAll": "全部",
+    "emptyTasks": "手上没有待办任务",
+    "goHall": "去任务大厅接单"
+  },
+  "workDesk": {
+    "title": "工作台",
+    "shareTitle": "工作台 · 我的任务与成果",
+    "todayToDo": "今天要处理",
+    "weekProgress": "本周按时完成",
+    "weekEmpty": "本周暂无到期任务"
   }
 }

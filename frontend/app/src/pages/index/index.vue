@@ -45,7 +45,7 @@ echarts.use([
 ])
 
 definePage({
-  name: 'home',
+  name: 'ops-dashboard',
   layout: 'default',
   style: { navigationBarTitleText: '运营仪表盘' },
 })
