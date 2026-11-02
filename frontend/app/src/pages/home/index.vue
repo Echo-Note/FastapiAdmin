@@ -49,13 +49,6 @@ const todoCount = computed(
 
 const hasWeekWork = computed(() => todoCount.value > 0)
 
-/** 成果概览三个数字 */
-const resultCells = computed(() => [
-  { key: 'RESULT_PENDING' as const, label: t('home.resultPending'), count: stats.value.submissions_pending ?? 0 },
-  { key: 'RESULT_APPROVED' as const, label: t('home.resultApproved'), count: stats.value.submissions_approved ?? 0 },
-  { key: 'RESULT_REJECTED' as const, label: t('home.resultRejected'), count: stats.value.rejected_submissions ?? 0 },
-])
-
 /** 本周按时完成：本周没有到期任务时不画进度条 */
 const weekDue = computed(() => week.value?.due ?? 0)
 const weekDone = computed(() => week.value?.done ?? 0)
@@ -313,24 +306,6 @@ onPullDownRefresh(() => {
         </view>
         <view v-if="weekDue > 0" class="week__track">
           <view class="week__fill" :style="{ width: `${weekPercent}%` }" />
-        </view>
-      </view>
-
-      <!-- 我的成果：三个数字，点进去看对应状态 -->
-      <view class="results mx-3 mt-3">
-        <view
-          v-for="cell in resultCells"
-          :key="cell.key"
-          class="results__cell"
-          hover-class="results__cell--pressed"
-          @click="goDesk(cell.key)"
-        >
-          <text class="results__num" :class="{ 'results__num--alert': cell.key === 'RESULT_REJECTED' && cell.count > 0 }">
-            {{ cell.count }}
-          </text>
-          <text class="results__label">
-            {{ cell.label }}
-          </text>
         </view>
       </view>
 
@@ -652,43 +627,6 @@ onPullDownRefresh(() => {
     height: 100%;
     border-radius: 9999rpx;
     background: var(--wot-success-main);
-  }
-}
-
-/* 我的成果：三格数字，点进工作台的对应状态 */
-.results {
-  display: flex;
-  padding: 24rpx 8rpx;
-  border-radius: 20rpx;
-  background: var(--wot-filled-oppo);
-
-  &__cell {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4rpx;
-    border-radius: 12rpx;
-
-    &--pressed {
-      opacity: 0.7;
-    }
-  }
-
-  &__num {
-    font-size: 38rpx;
-    font-weight: 700;
-    color: var(--wot-text-main);
-    font-variant-numeric: tabular-nums;
-
-    &--alert {
-      color: var(--wot-danger-main);
-    }
-  }
-
-  &__label {
-    font-size: 22rpx;
-    color: var(--wot-text-auxiliary);
   }
 }
 
