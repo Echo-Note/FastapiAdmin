@@ -258,8 +258,9 @@ function fieldValueText(sectionCode: string, name: string, field: FormSchemaFiel
 }
 
 /**
- * 产品库联想：产品名称列（product_role=name）停顿 500ms 或失焦后检索产品库。
- * 命中 1 条直接回填同行的规格与生产企业；命中多条（同名多厂商/多规格）弹半屏列表让用户选。
+ * 产品库联想：产品名称列（product_role=name）输入后行内下拉候选。
+ * 输入停顿约 300ms 检索产品库，候选贴着输入框向下展开；点选后把名称（归一为候选全名）、
+ * 规格、生产企业一起写回同行。候选缺规格/生产企业时只回填名称并提示信息不完整。
  * 未命中则保留用户手填的内容，提交时后端会把库里没有的产品自动入库为待审。
  */
 interface ProductCellContext {
@@ -279,16 +280,20 @@ function isProductNameColumn(col: FormSchemaColumn) {
   return col.product_role === 'name'
 }
 
-const PRODUCT_SEARCH_DEBOUNCE = 500
+const PRODUCT_SEARCH_DEBOUNCE = 300
+/** 失焦后延迟收起：让点候选的 click 先落地（移动端 tap 会先触发 blur） */
+const PRODUCT_BLUR_CLOSE_DELAY = 150
 
-const productCandidates = ref<ProductCandidate[]>([])
-const productPickerVisible = ref(false)
-/** 正在检索的行 / 刚匹配成功的行：按行对象身份判断，避免所有行共用同一条提示 */
+/** 当前展开的候选（按行对象身份判断，多行不共用同一份列表） */
+const productSuggestion = ref<{ row: Record<string, any>, keyword: string, items: ProductCandidate[] } | null>(null)
+/** 正在检索的行 */
 const productSearchingRow = ref<Record<string, any> | null>(null)
-const productMatchedRow = ref<Record<string, any> | null>(null)
+/** 最近一次回填结果：命中的行 + 候选是否缺规格/生产企业（行内提示据此区分文案） */
+const productFill = ref<{ row: Record<string, any>, incomplete: boolean } | null>(null)
 let productTarget: ProductCellContext | null = null
 let productTimer: ReturnType<typeof setTimeout> | null = null
-// 检索序号：丢弃过期响应（用户连续输入时只认最后一次）
+let productBlurTimer: ReturnType<typeof setTimeout> | null = null
+// 检索序号：丢弃过期响应（用户连续输入时只认最后一次；收起面板时也让在途响应失效）
 let productSearchSeq = 0
 
 /** 子表里产品库某角色对应的列名（如 spec → product_spec） */
@@ -296,45 +301,91 @@ function productColumnName(columns: FormSchemaColumn[], role: 'spec' | 'manufact
   return columns.find(c => c.product_role === role)?.name ?? null
 }
 
-/** 用候选回填同行的规格/生产企业（候选里为空的值不覆盖用户已填内容） */
+/** 候选是否缺规格或生产企业（缺了就没有可回填的内容） */
+function isCandidateIncomplete(candidate: ProductCandidate) {
+  return !candidate.spec || !candidate.manufacturer
+}
+
+/**
+ * 用候选回填同行：名称归一为候选全名，规格/生产企业按候选写入（候选为空时不覆盖用户已填内容）。
+ *
+ * @returns 候选三要素是否齐全
+ */
 function fillProductRow(ctx: ProductCellContext, candidate: ProductCandidate) {
+  ctx.row[ctx.nameKey] = candidate.name
   const specKey = productColumnName(ctx.columns, 'spec')
   const manufacturerKey = productColumnName(ctx.columns, 'manufacturer')
   if (specKey && candidate.spec)
     ctx.row[specKey] = candidate.spec
   if (manufacturerKey && candidate.manufacturer)
     ctx.row[manufacturerKey] = candidate.manufacturer
+  return !isCandidateIncomplete(candidate)
 }
 
-/** 检索产品库：single 命中直接回填，多命中交给用户选择 */
-async function searchProductLibrary(ctx: ProductCellContext, keyword: string, autoFill: boolean) {
+/** 该行是否正在展开候选 */
+function isProductSuggestionOpen(row: Record<string, any>) {
+  return productSuggestion.value?.row === row
+}
+
+/** 该行的候选列表（未展开时为空数组） */
+function productSuggestionItems(row: Record<string, any>) {
+  return isProductSuggestionOpen(row) ? (productSuggestion.value?.items ?? []) : []
+}
+
+/** 收起候选：作废在途检索，避免旧响应把面板重新打开 */
+function closeProductSuggestion() {
+  productSearchSeq += 1
+  productSearchingRow.value = null
+  productSuggestion.value = null
+  productTarget = null
+}
+
+/** 展开候选（清掉挂着定时关闭的失焦任务） */
+function openProductSuggestion(ctx: ProductCellContext, keyword: string, items: ProductCandidate[]) {
+  if (productBlurTimer) {
+    clearTimeout(productBlurTimer)
+    productBlurTimer = null
+  }
+  productTarget = ctx
+  productSuggestion.value = { row: ctx.row, keyword, items }
+}
+
+/** 行内提示文案：说明本次回填结果 / 检索中 / 默认引导 */
+function productHint(row: Record<string, any>) {
+  if (productFill.value?.row === row)
+    return productFill.value.incomplete ? '该产品信息不完整，请补充规格与生产企业' : '已从产品库填充产品名称、规格与生产企业'
+  return productSearchingRow.value === row ? '正在查询产品库…' : '输入产品名称可自动带出规格与生产企业'
+}
+
+/** 行内提示是否处于「信息不完整」的警示态 */
+function isProductHintWarning(row: Record<string, any>) {
+  return productFill.value?.row === row && productFill.value.incomplete
+}
+
+/** 检索产品库：结果按行内下拉展示，名称全等的候选优先 */
+async function searchProductLibrary(ctx: ProductCellContext, keyword: string) {
   const kw = (keyword ?? '').trim()
   if (!kw) {
-    productCandidates.value = []
+    closeProductSuggestion()
     return
   }
   const seq = ++productSearchSeq
   productSearchingRow.value = ctx.row
+  // 重新联想先清掉上一次的回填提示，避免名称改了还挂着「已填充」
+  productFill.value = null
   try {
     const list = await MarketAPI.searchProducts(kw)
     if (seq !== productSearchSeq)
       return
-    const matched = (list ?? []).filter(item => item.name === kw)
-    const candidates = matched.length ? matched : (list ?? [])
-    if (!candidates.length) {
-      productMatchedRow.value = null
+    // 名称全等的候选优先：同名多厂商/多规格时让用户在这些里选，而不是混进模糊命中的别的产品
+    const exact = (list ?? []).filter(item => item.name === kw)
+    const items = exact.length ? exact : (list ?? [])
+    if (!items.length) {
+      if (productSuggestion.value?.row === ctx.row)
+        closeProductSuggestion()
       return
     }
-    if (autoFill && candidates.length === 1) {
-      fillProductRow(ctx, candidates[0]!)
-      productMatchedRow.value = ctx.row
-      toast.success('已从产品库填充规格与生产企业')
-      return
-    }
-    productMatchedRow.value = null
-    productTarget = ctx
-    productCandidates.value = candidates
-    productPickerVisible.value = true
+    openProductSuggestion(ctx, kw, items)
   }
   catch {
     // 检索失败不打扰用户，继续手填即可
@@ -345,42 +396,82 @@ async function searchProductLibrary(ctx: ProductCellContext, keyword: string, au
   }
 }
 
-/** 产品名称输入：重置 500ms 防抖后检索 */
+/** 产品名称输入：防抖后重新检索，边输入边刷新候选 */
 function onProductNameInput(ctx: ProductCellContext) {
   if (productTimer)
     clearTimeout(productTimer)
+  if (productBlurTimer) {
+    clearTimeout(productBlurTimer)
+    productBlurTimer = null
+  }
+  const kw = String(ctx.row[ctx.nameKey] ?? '').trim()
+  if (!kw) {
+    productFill.value = null
+    closeProductSuggestion()
+    return
+  }
   productTimer = setTimeout(() => {
     productTimer = null
-    void searchProductLibrary(ctx, String(ctx.row[ctx.nameKey] ?? ''), true)
+    void searchProductLibrary(ctx, kw)
   }, PRODUCT_SEARCH_DEBOUNCE)
 }
 
-/** 产品名称失焦：立刻检索（与停顿检索合并为同一入口） */
-function onProductNameBlur(ctx: ProductCellContext, value: any) {
+/** 产品名称聚焦：已有同关键词候选时直接展开，否则重新检索 */
+function onProductNameFocus(ctx: ProductCellContext) {
+  if (productBlurTimer) {
+    clearTimeout(productBlurTimer)
+    productBlurTimer = null
+  }
+  const kw = String(ctx.row[ctx.nameKey] ?? '').trim()
+  if (!kw)
+    return
+  if (productSuggestion.value?.row === ctx.row && productSuggestion.value.keyword === kw)
+    return
+  void searchProductLibrary(ctx, kw)
+}
+
+/** 产品名称失焦：延迟收起，给点候选的 click 留出时间 */
+function onProductNameBlur(ctx: ProductCellContext) {
   if (productTimer) {
     clearTimeout(productTimer)
     productTimer = null
   }
-  void searchProductLibrary(ctx, String(value ?? ''), true)
+  if (productBlurTimer)
+    clearTimeout(productBlurTimer)
+  productBlurTimer = setTimeout(() => {
+    productBlurTimer = null
+    if (productSuggestion.value?.row === ctx.row)
+      closeProductSuggestion()
+  }, PRODUCT_BLUR_CLOSE_DELAY)
 }
 
-/** 产品名称列旁的「库」按钮：立即检索并总是列出候选（便于同名多厂商时手动挑） */
-function onProductNameSearchTap(ctx: ProductCellContext, value: any) {
+/** 产品名称列旁的「查产品库」：跳过防抖立即检索并展开候选 */
+function onProductNameSearchTap(ctx: ProductCellContext) {
   if (productTimer) {
     clearTimeout(productTimer)
     productTimer = null
   }
-  void searchProductLibrary(ctx, String(value ?? ''), false)
+  if (productBlurTimer) {
+    clearTimeout(productBlurTimer)
+    productBlurTimer = null
+  }
+  void searchProductLibrary(ctx, String(ctx.row[ctx.nameKey] ?? ''))
 }
 
-/** 弹窗选中候选：回填并关闭 */
+/** 选中候选：三要素一起回填并收起 */
 function onProductCandidatePick(candidate: ProductCandidate) {
-  if (productTarget)
-    fillProductRow(productTarget, candidate)
-  productPickerVisible.value = false
-  productCandidates.value = []
-  productTarget = null
-  toast.success('已填充规格与生产企业')
+  const target = productTarget
+  if (!target) {
+    closeProductSuggestion()
+    return
+  }
+  const complete = fillProductRow(target, candidate)
+  productFill.value = { row: target.row, incomplete: !complete }
+  closeProductSuggestion()
+  if (complete)
+    toast.success('已填充产品名称、规格与生产企业')
+  else
+    toast.warning('已填充产品名称，该产品缺少规格或生产企业，请补充')
 }
 
 /** 当前正在上传的目标（防止重复上传） */
@@ -845,26 +936,57 @@ onLoad((query) => {
                       :placeholder="col.placeholder || `请输入${col.label}`"
                     />
                     <!-- 产品名称列：输入即联想产品库，命中后回填规格与生产企业 -->
+                    <!-- 产品名称列：输入即联想产品库，候选行内下拉，点选回填名称/规格/生产企业 -->
                     <view v-else-if="isProductNameColumn(col)">
-                      <wd-input
-                        v-model="row[col.name]"
-                        :placeholder="col.placeholder || `请输入${col.label}（可联想产品库）`"
-                        @input="onProductNameInput(productCell(row, field.columns ?? [], col.name))"
-                        @blur="onProductNameBlur(productCell(row, field.columns ?? [], col.name), row[col.name])"
-                      />
+                      <view class="relative">
+                        <wd-input
+                          v-model="row[col.name]"
+                          :placeholder="col.placeholder || `请输入${col.label}（可联想产品库）`"
+                          @input="onProductNameInput(productCell(row, field.columns ?? [], col.name))"
+                          @focus="onProductNameFocus(productCell(row, field.columns ?? [], col.name))"
+                          @blur="onProductNameBlur(productCell(row, field.columns ?? [], col.name))"
+                        />
+                        <!-- 行内候选：贴着输入框展开，不遮挡其余字段 -->
+                        <view
+                          v-if="isProductSuggestionOpen(row)"
+                          class="wot-bg-filled-oppo absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-2"
+                          style="border: 1rpx solid var(--wot-border-main); box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.16)"
+                        >
+                          <view
+                            class="flex items-center justify-between px-3 py-1.5 text-2.5"
+                            style="color: var(--wot-text-auxiliary); border-bottom: 1rpx solid var(--wot-border-main)"
+                          >
+                            <text>产品库 · {{ productSuggestionItems(row).length }} 条匹配</text>
+                            <text style="color: var(--wot-primary-6)" @click="closeProductSuggestion()">
+                              收起
+                            </text>
+                          </view>
+                          <view
+                            v-for="item in productSuggestionItems(row)"
+                            :key="item.id"
+                            class="px-3 py-2"
+                            style="border-bottom: 1rpx solid var(--wot-border-main)"
+                            @click="onProductCandidatePick(item)"
+                          >
+                            <view class="text-3 font-medium" style="color: var(--wot-text-main)">
+                              {{ item.name }}
+                            </view>
+                            <view class="mt-0.5 text-2.5" style="color: var(--wot-text-auxiliary)">
+                              规格：{{ item.spec || '—' }} · 生产企业：{{ item.manufacturer || '—' }}
+                            </view>
+                            <view v-if="isCandidateIncomplete(item)" class="mt-0.5 text-2.5" style="color: var(--wot-warning-6)">
+                              信息不完整，选中只回填名称
+                            </view>
+                          </view>
+                        </view>
+                      </view>
                       <view class="mt-1 flex items-center justify-between text-2.5">
-                        <text style="color: var(--wot-text-auxiliary)">
-                          {{
-                            productMatchedRow === row
-                              ? '已从产品库填充规格与生产企业'
-                              : productSearchingRow === row
-                                ? '正在查询产品库…'
-                                : '输入产品名称可自动带出规格与生产企业'
-                          }}
+                        <text :style="{ color: isProductHintWarning(row) ? 'var(--wot-warning-6)' : 'var(--wot-text-auxiliary)' }">
+                          {{ productHint(row) }}
                         </text>
                         <text
                           style="color: var(--wot-primary-6)"
-                          @click="onProductNameSearchTap(productCell(row, field.columns ?? [], col.name), row[col.name])"
+                          @click="onProductNameSearchTap(productCell(row, field.columns ?? [], col.name))"
                         >
                           查产品库
                         </text>
@@ -1004,42 +1126,6 @@ onLoad((query) => {
           title="选择区域"
           @confirm="onRegionConfirm"
         />
-        <!-- 产品库候选：同名多厂商/多规格时由用户选择 -->
-        <wd-popup
-          v-model="productPickerVisible"
-          position="bottom"
-          round
-          custom-style="max-height: 70vh; overflow-y: auto;"
-          @close="productPickerVisible = false"
-        >
-          <view class="px-4 py-3">
-            <view class="mb-2 flex items-center justify-between">
-              <text class="text-3.5 font-semibold" style="color: var(--wot-text-main)">
-                选择产品（{{ productCandidates.length }} 条匹配）
-              </text>
-              <text class="text-2.5" style="color: var(--wot-text-auxiliary)" @click="productPickerVisible = false">
-                取消
-              </text>
-            </view>
-            <view
-              v-for="item in productCandidates"
-              :key="item.id"
-              class="mb-2 rounded-2 p-3"
-              style="border: 1rpx solid var(--wot-border-main)"
-              @click="onProductCandidatePick(item)"
-            >
-              <view class="text-3 font-medium" style="color: var(--wot-text-main)">
-                {{ item.name }}
-              </view>
-              <view class="mt-1 text-2.5" style="color: var(--wot-text-auxiliary)">
-                规格：{{ item.spec || '—' }} · 生产企业：{{ item.manufacturer || '—' }}
-              </view>
-            </view>
-            <view v-if="!productCandidates.length" class="py-6 text-center text-2.5" style="color: var(--wot-text-auxiliary)">
-              没有匹配的产品，按手填内容提交即可（系统会自动入库待运营审核）
-            </view>
-          </view>
-        </wd-popup>
       </view>
 
       <view class="mt-5">

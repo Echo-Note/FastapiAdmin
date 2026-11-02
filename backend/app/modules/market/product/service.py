@@ -72,7 +72,8 @@ def iter_submitted_products(
 
     ``form_data`` 是按分节嵌套的字典，多行子表的值是 ``list[dict]``；本函数遍历所有行，
     取出产品名称为非空的三元组（已 strip）。非产品的行（如竞品调研的 ``competitor_*`` 列、
-    会议活动的单值字段）不会命中。
+    会议活动的单值字段）不会命中。名称有值但规格与生产企业都为空的组合不返回：它没有任何
+    可回填的内容，入库只会污染候选列表。只缺其中一项的行照常返回。
 
     :param form_data: 提交的采集表单数据
     :param columns: 角色 → 列名映射，默认取 ``DEFAULT_PRODUCT_COLUMNS``
@@ -90,12 +91,11 @@ def iter_submitted_products(
         if isinstance(node, dict):
             raw_name = node.get(name_key)
             if isinstance(raw_name, str) and raw_name.strip():
-                triple = (
-                    raw_name.strip(),
-                    str(node.get(spec_key) or "").strip(),
-                    str(node.get(manufacturer_key) or "").strip(),
-                )
-                if triple not in seen:
+                spec = str(node.get(spec_key) or "").strip()
+                manufacturer = str(node.get(manufacturer_key) or "").strip()
+                # 名称-only（规格与生产企业都为空）没有可回填的内容，不入产品库
+                triple = (raw_name.strip(), spec, manufacturer)
+                if (spec or manufacturer) and triple not in seen:
                     seen.add(triple)
                     found.append(triple)
             for value in node.values():
@@ -244,7 +244,8 @@ class ProductService:
         """把成果里库里没有的产品自动入库为待审记录，返回新建条数。
 
         已存在同一判重键（名称+规格+生产企业）则跳过——包括已 ``rejected`` 的，
-        不让同一份脏数据在每次提交时反复重生。产品入库失败不阻断成果提交，只记日志。
+        不让同一份脏数据在每次提交时反复重生。名称-only（规格与企业都空）的行不入库：
+        候选里没有可回填的内容，只会污染产品库。产品入库失败不阻断成果提交，只记日志。
 
         :param form_data: 成果提交数据
         :param form_schema: 该三级任务的 ``form_schema``（用于识别 ``product_role`` 列）
