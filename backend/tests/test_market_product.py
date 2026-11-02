@@ -237,3 +237,45 @@ class TestProductAutoIngest:
             params={"page_no": 1, "page_size": 50, "name": product[0]},
         ).json()["data"]["items"]
         assert len(rows) == 1
+
+    def test_name_only_row_not_ingested(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """名称有值但规格、生产企业都为空的行不入库，避免产品库被名称-only 脏记录污染。"""
+        user_headers = _login(test_client, "user", "123456")
+        assignment_id = self._claim_assignment(test_client, auth_headers, user_headers)
+
+        product_name = "名称only测试药"
+        submitted = self._submit(test_client, user_headers, assignment_id, (product_name, "", ""))
+        assert submitted.json()["success"] is True, submitted.text
+
+        rows = test_client.get(
+            "/market/products/list",
+            headers=auth_headers,
+            params={"page_no": 1, "page_size": 50, "name": product_name},
+        ).json()["data"]["items"]
+        assert rows == []
+
+        own = test_client.get("/market/mini/products/search", headers=user_headers, params={"keyword": product_name})
+        assert own.json()["data"] == []
+
+
+class TestProductRowExtraction:
+    """从成果 form_data 提取产品三要素：只缺一项仍保留，名称-only 组合跳过。"""
+
+    def test_skips_name_only_rows(self) -> None:
+        from app.modules.market.product.service import iter_submitted_products
+
+        form_data: dict[str, Any] = {
+            "inventory_check": {
+                "inventory_check": [
+                    {"product_name": "只有名称", "product_spec": "", "manufacturer": ""},
+                    {"product_name": "只有规格", "product_spec": "10mg", "manufacturer": ""},
+                    {"product_name": "只有企业", "product_spec": "", "manufacturer": "甲厂"},
+                    {"product_name": "  ", "product_spec": "1g", "manufacturer": "乙厂"},
+                ]
+            }
+        }
+
+        assert iter_submitted_products(form_data) == [
+            ("只有规格", "10mg", ""),
+            ("只有企业", "", "甲厂"),
+        ]
