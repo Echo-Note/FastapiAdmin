@@ -6,7 +6,6 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { taskDisplayName } from '@/constants'
@@ -16,9 +15,12 @@ definePage({
   name: 'market-task-hall',
   type: 'home',
   layout: 'tabbar',
-  style: { navigationBarTitleText: '任务大厅', enablePullDownRefresh: true },
+  style: {
+    navigationStyle: 'custom',
+    navigationBarTitleText: '任务大厅',
+    enablePullDownRefresh: true,
+  },
 })
-useI18nNavTitle('hall.title')
 
 const { t } = useI18n()
 const router = useRouter()
@@ -152,7 +154,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="tabbar-wraper">
+  <view class="tabbar-wraper custom-nav">
     <!-- 平台公告：C 端唯一的运营触达渠道，只展示最新一条 -->
     <view v-if="notice" class="mx-3 mt-3" @click="goNotices">
       <wd-notice-bar

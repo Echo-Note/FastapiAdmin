@@ -1,3 +1,9 @@
+/* 自定义导航（navigationStyle: custom）的 Tab 页：
+   顶部留出状态栏高度 + 44px 导航区，页面渐变直接铺到顶端，不再有原生白条 */
+.custom-nav {
+  padding-top: calc(var(--status-bar-height, 0px) + 88rpx);
+}
+
 .page-wraper {
   min-height: calc(100vh - var(--window-top));
   box-sizing: border-box;

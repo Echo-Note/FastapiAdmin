@@ -4,7 +4,6 @@ import { onLoad, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
-import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useMarketListPage } from '@/composables/useMarketListPage'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
@@ -16,9 +15,12 @@ import { CommonUtil } from '@/utils/common'
 definePage({
   name: 'market-work-desk',
   layout: 'tabbar',
-  style: { navigationBarTitleText: '工作台', enablePullDownRefresh: true },
+  style: {
+    navigationStyle: 'custom',
+    navigationBarTitleText: '工作台',
+    enablePullDownRefresh: true,
+  },
 })
-useI18nNavTitle('workDesk.title')
 
 const { t } = useI18n()
 const router = useRouter()
@@ -349,7 +351,7 @@ onPullDownRefresh(async () => {
 </script>
 
 <template>
-  <view class="tabbar-wraper work-desk-page">
+  <view class="tabbar-wraper work-desk-page custom-nav">
     <!-- 本周进度带：回答「这周该交的活交了没」，没有到期任务就不画进度条 -->
     <view class="wdesk-hero mx-3 mt-3">
       <view class="wdesk-hero__row">

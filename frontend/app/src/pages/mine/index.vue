@@ -7,7 +7,6 @@ import { MarketAPI } from '@/api/module_market'
 import UserAPI from '@/api/module_system/user'
 import { useAccess } from '@/composables/useAccess'
 import { useGlobalDialog } from '@/composables/useGlobalDialog'
-import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { MINE_ENTRIES, NAV_TONE_STYLE } from '@/constants/nav'
@@ -16,9 +15,11 @@ import { useUserStore } from '@/store/userStore'
 definePage({
   name: 'mine',
   layout: 'tabbar',
-  style: { navigationBarTitleText: '我的' },
+  style: {
+    navigationStyle: 'custom',
+    navigationBarTitleText: '我的',
+  },
 })
-useI18nNavTitle('mine.navTitle')
 
 const { t } = useI18n()
 const router = useRouter()
@@ -174,7 +175,7 @@ async function handleSubmitPassword() {
 </script>
 
 <template>
-  <view class="tabbar-wraper py-3">
+  <view class="tabbar-wraper custom-nav py-3">
     <!-- 身份行：头像 / 昵称 / 脱敏手机号 + 设置入口，不再用整块渐变 -->
     <view class="identity mx-3 mt-3">
       <wd-avatar

@@ -20,6 +20,7 @@
       "name": "market-task-hall",
       "layout": "tabbar",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "任务大厅",
         "enablePullDownRefresh": true
       }
@@ -30,6 +31,7 @@
       "name": "home",
       "layout": "tabbar",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "首页",
         "enablePullDownRefresh": true
       }
@@ -57,6 +59,7 @@
       "name": "mine",
       "layout": "tabbar",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "我的"
       }
     },
@@ -100,6 +103,7 @@
       "name": "market-work-desk",
       "layout": "tabbar",
       "style": {
+        "navigationStyle": "custom",
         "navigationBarTitleText": "工作台",
         "enablePullDownRefresh": true
       }
