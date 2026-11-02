@@ -91,6 +91,10 @@ export default defineManifestConfig({
   'h5': {
     darkmode: true,
     themeLocation: 'theme.json',
+    // 宽屏预览时把 rpx 基准钉在手机宽度，避免 1200px 窗口下字号/间距被放大 1.6 倍
+    rpxCalcMaxDeviceWidth: 750,
+    rpxCalcBaseDeviceWidth: 375,
+    rpxCalcIncludeWidth: 750,
   },
   'uniStatistics': {
     enable: false,
