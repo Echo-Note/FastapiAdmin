@@ -6,7 +6,6 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
@@ -17,9 +16,12 @@ definePage({
   name: 'home',
   type: 'home',
   layout: 'tabbar',
-  style: { navigationBarTitleText: '首页', enablePullDownRefresh: true },
+  style: {
+    navigationStyle: 'custom',
+    navigationBarTitleText: '首页',
+    enablePullDownRefresh: true,
+  },
 })
-useI18nNavTitle('home.title')
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -173,7 +175,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="tabbar-wraper">
+  <view class="tabbar-wraper custom-nav">
     <SkeletonPage v-if="loading" :rows="4" class="mt-3" />
 
     <template v-else>
