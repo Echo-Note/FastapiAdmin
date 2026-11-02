@@ -550,6 +550,6 @@
     "shareTitle": "工作台 · 我的任务与成果",
     "todayToDo": "今天要处理",
     "weekProgress": "本周按时完成",
-    "weekEmpty": "本周暂无到期任务"
+    "weekNone": "暂无"
   }
 }
