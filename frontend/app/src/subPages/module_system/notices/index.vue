@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { NoticeAPI } from '@/api/module_system/notice'
 import { useAccess } from '@/composables/useAccess'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
-import { useNoticeDismiss } from '@/composables/useNoticeDismiss'
+import { useNoticeDismiss, useNoticeOpen } from '@/composables/useNoticeDismiss'
 
 definePage({ name: 'work-notices', style: { navigationBarTitleText: '通知公告', enablePullDownRefresh: true } })
 useI18nNavTitle('notices.title')
@@ -16,6 +16,7 @@ const toast = useToast()
 const dialog = useGlobalDialog()
 const { isSuperuser } = useAccess()
 const { dismiss } = useNoticeDismiss()
+const { consumeOpen } = useNoticeOpen()
 /** 从首页/任务大厅点条幅进来时带的公告 id，加载完后直接打开它的详情 */
 const pendingDetailId = ref<number>()
 
@@ -55,8 +56,20 @@ const filteredList = computed(() => {
 const isFilteredOut = computed(() => list.value.length > 0 && filteredList.value.length === 0)
 
 /** 正文按换行切段渲染为纯文本，不走 v-html */
+/** 后台公告内容是富文本，这里只做纯文本渲染：去掉标签、按换行分段（不走 v-html，避免 XSS） */
+function stripHtml(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+}
+
 const detailParagraphs = computed(() =>
-  (detail.value?.notice_content ?? '')
+  stripHtml(detail.value?.notice_content ?? '')
     .split(/\n+/)
     .map(p => p.trim())
     .filter(Boolean),
@@ -161,9 +174,9 @@ function handleDelete(item: NoticeItem) {
 }
 
 onLoad((query) => {
-  pendingDetailId.value = query?.id ? Number(query.id) : undefined
+  // 优先用一次性信号（首页/任务大厅点条幅），其次兼容 URL 上的 ?id
+  pendingDetailId.value = consumeOpen() ?? (query?.id ? Number(query.id) : undefined)
   loadList().then(() => {
-    // 深链进来：列表加载完成后直接弹出该公告详情
     if (pendingDetailId.value == null)
       return
     const target = list.value.find(item => item.id === pendingDetailId.value)
