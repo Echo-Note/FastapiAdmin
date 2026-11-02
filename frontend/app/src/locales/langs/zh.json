@@ -50,12 +50,18 @@
     "subscribeTitle": "开启消息通知",
     "subscribeContent": "您已关闭消息通知，是否前往设置开启？",
     "subscribeGoSetting": "去设置",
-    "tab": { "home": "首页", "work": "工作台", "mine": "我的" },
+    "tab": {
+      "taskHall": "任务大厅",
+      "myTask": "我的任务",
+      "mine": "我的"
+    },
     "nav": {
       "notices": "通知公告",
       "tickets": "工单管理",
       "aiChat": "AI 助手",
-      "aiModels": "AI 模型"
+      "aiModels": "AI 模型",
+      "feedback": "意见反馈",
+      "dashboard": "运营仪表盘"
     },
     "status": {
       "enabled": "启用",
@@ -79,7 +85,8 @@
       "bug": "缺陷",
       "optimize": "优化",
       "other": "其他"
-    }
+    },
+    "retry": "重试"
   },
   "login": {
     "navTitle": "登录",
@@ -163,15 +170,19 @@
   },
   "mine": {
     "navTitle": "我的",
-    "changePassword": "修改密码",
+    "shareTitle": "{name} 正在用这个平台接单",
+    "monthPayable": "本月应发",
+    "allowanceBalance": "津贴余额",
+    "payoutLimit": "发放额度",
+    "earningsDetail": "收益明细",
+    "earningsFailed": "收益加载失败，点击重试",
+    "allFeatures": "全部功能",
+    "allFeaturesTip": "运营与开发功能（仅超管可见）",
+    "mobileUnbound": "未绑定手机号",
+    "executor": "执行用户",
     "logout": "退出登录",
-    "logoutMsg": "确认退出登录吗？",
-    "logoutConfirm": "退出",
-    "pendingTickets": "待处理工单",
-    "processingTickets": "处理中工单",
-    "doneTickets": "已完成工单",
-    "shareTitle": "{name} 邀请你加入 FastapiAdmin",
-    "roleFallback": "超级管理员 · 技术部"
+    "logoutMsg": "确定要退出登录吗？",
+    "logoutConfirm": "退出登录"
   },
   "profile": {
     "navTitle": "个人资料",
@@ -233,7 +244,9 @@
     "contentPlaceholder": "请输入内容",
     "type": "公告类型",
     "notice": "通知",
-    "announce": "公告"
+    "announce": "公告",
+    "detail": "公告详情",
+    "readOnlyTip": "公告由运营发布，这里只看不改"
   },
   "chat": {
     "title": "AI 助手",
@@ -355,14 +368,16 @@
     "latestNotice": "最新公告"
   },
   "work": {
-    "navTitle": "工作台",
-    "shareTitle": "FastapiAdmin 工作台 - 通知公告 / 工单管理 / AI 助手",
+    "navTitle": "全部功能",
+    "shareTitle": "全部功能",
     "businessCenter": "业务中心",
     "devTools": "开发者工具",
     "nameFallback": "FastapiAdmin",
     "roleFallback": "超级管理员",
-    "searchPlaceholder": "搜索模块功能",
-    "emptyTip": "未找到相关模块，换个关键词试试"
+    "searchPlaceholder": "搜索功能",
+    "emptyTip": "没有匹配的功能",
+    "opsTools": "运营工具",
+    "superuserOnly": "以下功能仅超管可见"
   },
   "theme": {
     "colors": {
@@ -405,5 +420,89 @@
     "noLimit": "不限",
     "saveDraft": "存草稿",
     "submit": "正式提交"
+  },
+  "hall": {
+    "title": "任务大厅",
+    "shareTitle": "任务大厅 · 一起接单",
+    "searchPlaceholder": "搜索任务名称 / 编号",
+    "filterAll": "全部",
+    "filterPeriodic": "周期性",
+    "filterQuota": "定额",
+    "count": "{count} 个可接",
+    "remain": "剩 {count} 份",
+    "deadlinePassed": "已截止",
+    "deadlineToday": "今天截止",
+    "deadlineDays": "剩 {days} 天",
+    "emptySearch": "没有匹配的任务，换个关键词试试",
+    "view": "查看",
+    "truncated": "仅展示前 {count} 个任务",
+    "unnamed": "未命名任务"
+  },
+  "taskDetail": {
+    "title": "任务详情",
+    "shareTitle": "任务详情",
+    "execStandard": "执行标准",
+    "execStandardEmpty": "运营未填写执行标准，接单前可先联系运营确认",
+    "formFields": "需要填写（{count} 项）",
+    "formFieldsEmpty": "本任务无需填写采集内容，接单后按运营要求线下提交",
+    "priceRule": "计价口径",
+    "unitLabel": "计价单位",
+    "maxEarn": "最多可得",
+    "claimNow": "立即接单",
+    "claimTitle": "接单确认",
+    "claimConfirm": "确认接取「{name}」？接单后在「我的任务」提交成果。",
+    "notFound": "任务不存在或已下架"
+  },
+  "myTask": {
+    "title": "我的任务",
+    "shareTitle": "我的任务",
+    "tabTask": "任务",
+    "tabResult": "成果",
+    "statusAll": "全部",
+    "statusPending": "待接收",
+    "statusActive": "进行中",
+    "statusSubmitted": "已提交",
+    "statusReviewed": "已审核",
+    "resultAll": "全部",
+    "resultPending": "待审核",
+    "resultApproved": "已通过",
+    "resultRejected": "已驳回",
+    "resultDraft": "草稿",
+    "rejectReason": "驳回原因",
+    "rejectedCount": "{count} 份被驳回，需修改重提",
+    "accept": "接收",
+    "submit": "提交成果",
+    "resubmit": "修改重提",
+    "emptyTask": "这里还没有任务，去任务大厅看看",
+    "emptyResult": "还没有提交过成果",
+    "emptyRejected": "没有被驳回的成果",
+    "institution": "对象机构",
+    "submittedAt": "提交于 {time}",
+    "version": "第 {version} 次提交",
+    "statusSettled": "已完成",
+    "acceptedAt": "接收于 {time}"
+  },
+  "feedback": {
+    "title": "意见反馈",
+    "typeLabel": "类型",
+    "typeSuggestion": "建议",
+    "typeBug": "问题反馈",
+    "typeOptimize": "体验优化",
+    "typeOther": "其他",
+    "contentLabel": "反馈内容",
+    "contentPlaceholder": "哪里不好用？你希望怎么改？",
+    "contentRequired": "请填写反馈内容",
+    "contentTooLong": "反馈内容最多 2000 字",
+    "imagesLabel": "图片（选填，最多 3 张）",
+    "submit": "提交反馈",
+    "submitSuccess": "已收到你的反馈，我们会尽快处理",
+    "mine": "我的反馈",
+    "empty": "还没有提交过反馈",
+    "reply": "官方回复",
+    "statusPending": "待处理",
+    "statusProcessing": "处理中",
+    "statusDone": "已完成",
+    "statusClosed": "已关闭",
+    "submittedAt": "提交于 {time}"
   }
 }

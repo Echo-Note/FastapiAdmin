@@ -29,6 +29,9 @@ const showFieldPicker = ref(false)
 const fieldPickerColumns = computed(() => [(activeField.value?.options ?? []).map(o => ({ value: o.value, label: o.label }))])
 
 const submitting = ref(false)
+/** 编辑模式：带 submission_id 进入（驳回重提/草稿修改），走 updateSubmission 而非新建 */
+const submissionId = ref<number>()
+const loadingSubmission = ref(false)
 
 function isRequired(field: FormSchemaField) {
   return field.required === true
@@ -182,6 +185,29 @@ function validate(): boolean {
   return true
 }
 
+/** 驳回重提/草稿修改：把已提交的成果回填到现有表单字段上 */
+async function loadSubmission(id: number) {
+  // 先标记编辑模式：即使回填失败，后续提交也必须走 update，不能另建一份成果
+  submissionId.value = id
+  loadingSubmission.value = true
+  try {
+    const detail = await MarketAPI.getMySubmission(id)
+    if (detail.assignment_id)
+      assignmentId.value = detail.assignment_id
+    institutionId.value = detail.institution_id ?? undefined
+    region.value = detail.region ?? ''
+    archiveNo.value = detail.archive_no ?? ''
+    // 用成果里的 form_data 整体覆盖：query 未带 form_schema 时也不会把已采集数据清空
+    Object.assign(formData, detail.form_data ?? {})
+  }
+  catch {
+    toast.error(t('common.loadFailed'))
+  }
+  finally {
+    loadingSubmission.value = false
+  }
+}
+
 function buildPayload(status: 'DRAFT' | 'PENDING') {
   return {
     assignment_id: assignmentId.value,
@@ -194,11 +220,14 @@ function buildPayload(status: 'DRAFT' | 'PENDING') {
 }
 
 async function handleSubmit(status: 'DRAFT' | 'PENDING') {
-  if (!validate())
+  if (loadingSubmission.value || !validate())
     return
   submitting.value = true
   try {
-    await MarketAPI.createSubmission(buildPayload(status))
+    if (submissionId.value)
+      await MarketAPI.updateSubmission(submissionId.value, buildPayload(status))
+    else
+      await MarketAPI.createSubmission(buildPayload(status))
     toast.success(t('common.saveSuccess'))
     setTimeout(() => uni.navigateBack(), 500)
   }
@@ -225,6 +254,9 @@ onLoad((query) => {
   for (const field of formSchema.value) {
     formData[field.name] = field.type === 'number' ? undefined : ''
   }
+  const editId = Number(query?.submission_id)
+  if (Number.isFinite(editId) && editId > 0)
+    loadSubmission(editId)
   loadInstitutions()
 })
 </script>
@@ -270,14 +302,18 @@ onLoad((query) => {
                   mode="aspectFill"
                   class="h-40 w-40 rounded-2 object-cover"
                 />
-                <view v-else class="flex h-24 items-center justify-center rounded-2 bg-gray-50 text-sm text-gray-400">
+                <view v-else class="h-24 flex items-center justify-center rounded-2 bg-gray-50 text-sm text-gray-400">
                   {{ uploadingField === field.name ? '上传中…' : '点击上传图片' }}
                 </view>
               </view>
               <view v-else-if="field.type === 'file'" class="flex-1" @click="chooseAndUploadFile(field)">
-                <view class="flex h-12 items-center justify-between rounded-2 bg-gray-50 px-3 text-sm">
-                  <text class="text-gray-600">{{ formData[field.name] ? '已上传，点击重新上传' : '点击上传文件' }}</text>
-                  <text class="text-gray-400">{{ uploadingField === field.name ? '上传中…' : '' }}</text>
+                <view class="h-12 flex items-center justify-between rounded-2 bg-gray-50 px-3 text-sm">
+                  <text class="text-gray-600">
+                    {{ formData[field.name] ? '已上传，点击重新上传' : '点击上传文件' }}
+                  </text>
+                  <text class="text-gray-400">
+                    {{ uploadingField === field.name ? '上传中…' : '' }}
+                  </text>
                 </view>
               </view>
               <wd-input
@@ -293,10 +329,11 @@ onLoad((query) => {
       </view>
 
       <view class="mt-4 flex gap-3">
-        <wd-button block variant="plain" :loading="submitting" @click="handleSubmit('DRAFT')">
+        <!-- 编辑模式下没有「存草稿」语义：update 接口只接受字段修改，驳回件一律重新进入待审核 -->
+        <wd-button v-if="!submissionId" block variant="plain" :loading="submitting" @click="handleSubmit('DRAFT')">
           {{ t('market.saveDraft') }}
         </wd-button>
-        <wd-button block type="primary" :loading="submitting" @click="handleSubmit('PENDING')">
+        <wd-button block type="primary" :loading="submitting || loadingSubmission" @click="handleSubmit('PENDING')">
           {{ t('market.submit') }}
         </wd-button>
       </view>

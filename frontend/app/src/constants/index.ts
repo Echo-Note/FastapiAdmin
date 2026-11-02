@@ -1,6 +1,12 @@
 /**
- * 常量统一导出
+ * 导航常量
  */
+
+/** C 端默认落地页（任务大厅）——登录后、分享兜底、退出登录后都回到这里 */
+export const HOME_ROUTE = '/pages/market/task-hall/index'
+
+/** C 端默认落地页路由名 */
+export const HOME_ROUTE_NAME = 'market-task-hall'
 
 // 存储相关常量
 export * from './storage.constant'

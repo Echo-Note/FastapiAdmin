@@ -9,6 +9,12 @@ import { Storage } from '@/utils/storage'
  * - 水印内容为当前登录用户名（username 优先，回退 name）
  * - 响应式：登录用户 / 设置页开关变更后自动更新（layout 常驻不重挂载，经 uni.$on 同步）
  */
+/**
+ * 水印外观：整屏铺满用户名，用于截图溯源，但它压在所有内容之上，
+ * 透明度偏高会明显干扰 C 端阅读任务与金额，所以取一个「看得见但不抢眼」的强度。
+ */
+const WATERMARK_APPEARANCE = { width: 150, height: 160, opacity: 0.18 } as const
+
 export function useWatermark() {
   const userStore = useUserStore()
   const themeStore = useThemeStore()
@@ -30,5 +36,12 @@ export function useWatermark() {
     uni.$off('updateWatermarkSwitch', onSwitchChange)
   })
 
-  return { enabled, content, color }
+  return {
+    enabled,
+    content,
+    color,
+    width: WATERMARK_APPEARANCE.width,
+    height: WATERMARK_APPEARANCE.height,
+    opacity: WATERMARK_APPEARANCE.opacity,
+  }
 }

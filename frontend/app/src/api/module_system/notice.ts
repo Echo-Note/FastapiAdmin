@@ -28,8 +28,17 @@ export const NoticeAPI = {
   batchStatus(data: BatchSetStatus): Promise<void> {
     return http.Patch(`${SYSTEM_BASE}/notice/status/batch`, data)
   },
-  getAvailable(): Promise<NoticeItem[]> {
-    return http.Get(`${SYSTEM_BASE}/notice/available`)
+  /**
+   * 已发布公告（`status=1`，倒序）
+   *
+   * 须知：这是**公开内容**接口，后端已绕过数据权限（否则非超管因为 `created_id` 过滤会一条都看不到）。
+   * `limit` 缺省 10；C 端公告页传 50，避免公告多了只看得到最旧的几条。
+   */
+  getAvailable(limit?: number): Promise<NoticeItem[]> {
+    const params: Record<string, any> = {}
+    if (limit)
+      params.limit = limit
+    return http.Get(`${SYSTEM_BASE}/notice/available`, params)
   },
 }
 

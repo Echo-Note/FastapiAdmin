@@ -21,7 +21,7 @@ export interface TaskItem {
   id?: number
   task_no?: string
   task_type_id?: number
-  task_type?: { id?: number, name?: string, unit?: string, form_schema?: FormSchemaField[] } | null
+  task_type?: { id?: number, name?: string, unit?: string, exec_standard?: string | null, form_schema?: FormSchemaField[] } | null
   task_kind?: string
   period?: string
   exec_time_start?: string | null
@@ -59,6 +59,26 @@ export interface AssignmentItem {
       form_schema?: FormSchemaField[]
     } | null
   } | null
+}
+
+/** 我的收益汇总（后端 /market/mini/summary） */
+export interface EarningsSummary {
+  period?: string
+  month_payable?: number
+  settlement_count?: number
+  allowance_balance?: number
+  payout_limit?: number
+}
+
+/** 我的待办计数（后端 /market/mini/task-stats） */
+export interface TaskStats {
+  pending?: number
+  accepted?: number
+  submitting?: number
+  submitted?: number
+  reviewed?: number
+  settled?: number
+  rejected_submissions?: number
 }
 
 /** 动态表单字段定义（来自任务类型模板的 form_schema） */
@@ -118,6 +138,18 @@ export const MarketAPI = {
     return http.Get<MarketPageResult<TaskItem>>(`${MARKET_BASE}/mini/tasks`, params)
   },
 
+  /**
+   * 任务大厅任务详情（C 端）
+   *
+   * 不能用 `/market/tasks/detail/{id}`：该接口要求 `module_market:task:query` 权限码，
+   * C 端用户调用必然 403。mini 详情接口的可见范围与大厅列表一致。
+   */
+  getTaskDetail(taskId: number) {
+    const method = http.Get<TaskItem>(`${MARKET_BASE}/mini/tasks/${taskId}`)
+    method.config.cacheFor = 0
+    return method
+  },
+
   /** 大厅接单：公开任务由用户自行接单 */
   claimTask(taskId: number): Promise<AssignmentItem> {
     return http.Post(`${MARKET_BASE}/mini/tasks/${taskId}/claim`)
@@ -143,9 +175,33 @@ export const MarketAPI = {
     return http.Put(`${MARKET_BASE}/mini/submissions/${id}`, data)
   },
 
+  /** 我的成果详情（驳回后修改重提回填原表单；只能看自己的成果） */
+  getMySubmission(id: number) {
+    const method = http.Get<SubmissionItem>(`${MARKET_BASE}/mini/submissions/${id}`)
+    method.config.cacheFor = 0
+    return method
+  },
+
   /** 我的成果列表 */
   getMySubmissions(params?: Record<string, any>) {
     return http.Get<MarketPageResult<SubmissionItem>>(`${MARKET_BASE}/mini/submissions`, params)
+  },
+
+  /** 我的收益汇总（「我的」页收益卡：本月应发 / 津贴余额 / 发放额度） */
+  getMySummary(period?: string) {
+    const params: Record<string, any> = {}
+    if (period)
+      params.period = period
+    const method = http.Get<EarningsSummary>(`${MARKET_BASE}/mini/summary`, params)
+    method.config.cacheFor = 0
+    return method
+  },
+
+  /** 我的待办计数（Tab 角标：分派状态计数 + 被驳回成果数） */
+  getMyTaskStats() {
+    const method = http.Get<TaskStats>(`${MARKET_BASE}/mini/task-stats`)
+    method.config.cacheFor = 0
+    return method
   },
 
   /** 我的发放额度/津贴 */
