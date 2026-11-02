@@ -7,7 +7,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useNoticeOpen } from '@/composables/useNoticeOpen'
+import { useRouteIntent } from '@/composables/useRouteIntent'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
@@ -28,7 +28,7 @@ definePage({
 const { t, locale } = useI18n()
 const router = useRouter()
 const workDeskFilter = useWorkDeskFilter()
-const { requestOpen } = useNoticeOpen()
+const routeIntent = useRouteIntent()
 
 useShare(() => ({ title: t('home.shareTitle'), path: '/pages/home/index' }))
 useTabbarActive('pages/home/index', 'home')
@@ -58,7 +58,7 @@ async function openNoticeDetail() {
     await NoticeAPI.markRead([id])
   }
   catch { /* 已读记录失败不打断阅读 */ }
-  requestOpen(id)
+  routeIntent.set('work-notices', { id: String(id) })
   router.push({ name: 'work-notices' })
 }
 const loading = ref(true)
@@ -124,6 +124,14 @@ const dateText = computed(() => {
 function amountText(item: AssignmentItem) {
   const price = item.task?.item?.config?.price ?? item.task?.template?.config?.price
   return price == null ? t('taskDetail.priceTbd') : `¥${CommonUtil.formatMoney(price)}`
+}
+
+/** 任务详情：走一次性意图传 id（query 在运行时不可靠） */
+function goTaskDetail(id?: number) {
+  if (id == null)
+    return
+  routeIntent.set('market-task-detail', { id: String(id) })
+  router.push({ name: 'market-task-detail' })
 }
 
 function taskPriceText(task: TaskItem) {
@@ -210,8 +218,10 @@ function goTask(item: AssignmentItem) {
     router.pushTab({ name: 'market-work-desk' })
     return
   }
-  if (item.id)
-    router.push({ name: 'market-submission-form', query: { assignment_id: String(item.id) } })
+  if (item.id) {
+    routeIntent.set('market-submission-form', { assignment_id: String(item.id) })
+    router.push({ name: 'market-submission-form' })
+  }
 }
 
 onLoad(() => {
@@ -423,7 +433,7 @@ onPullDownRefresh(() => {
             :key="task.id"
             class="queue"
             hover-class="queue--pressed"
-            @click="router.push({ name: 'market-task-detail', query: { id: String(task.id) } })"
+            @click="goTaskDetail(task.id)"
           >
             <view class="queue__mark" />
             <view class="min-w-0 flex-1">

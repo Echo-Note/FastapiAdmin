@@ -6,7 +6,6 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useNoticeOpen } from '@/composables/useNoticeOpen'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { taskDisplayName } from '@/constants'
@@ -25,6 +24,7 @@ definePage({
 
 const { t } = useI18n()
 const router = useRouter()
+const routeIntent = useRouteIntent()
 
 useShare(() => ({ title: t('hall.shareTitle'), path: '/pages/market/task-hall/index' }))
 useTabbarActive('pages/market/task-hall/index', 'market-task-hall')
@@ -39,7 +39,6 @@ const failed = ref(false)
 const keyword = ref('')
 const projectFilter = ref('')
 const notice = ref<NoticeItem | null>(null)
-const { requestOpen } = useNoticeOpen()
 
 /** 我读过的公告 id（后端已读表） */
 const readIds = ref<Set<number>>(new Set())
@@ -146,7 +145,9 @@ async function loadTasks() {
 function goDetail(task: TaskItem) {
   if (!task.id)
     return
-  router.push({ name: 'market-task-detail', query: { id: String(task.id) } })
+  // query 不可靠（见 useRouteIntent 注释），用一次性意图传 id
+  routeIntent.set('market-task-detail', { id: String(task.id) })
+  router.push({ name: 'market-task-detail' })
 }
 
 /** 点条幅 = 读它：先标已读（条幅因此收起），再跳到该公告详情 */
@@ -159,7 +160,7 @@ async function openNoticeDetail() {
     await NoticeAPI.markRead([id])
   }
   catch { /* 已读记录失败不打断阅读 */ }
-  requestOpen(id)
+  routeIntent.set('work-notices', { id: String(id) })
   router.push({ name: 'work-notices' })
 }
 
