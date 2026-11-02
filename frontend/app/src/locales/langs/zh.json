@@ -546,7 +546,11 @@
     "goHall": "去任务大厅接单",
     "weekTitle": "本周按时完成",
     "weekNone": "本周暂无到期任务",
-    "latestTasks": "最新任务"
+    "latestTasks": "最新任务",
+    "resultPending": "待审核",
+    "resultApproved": "已通过",
+    "resultRejected": "被驳回",
+    "noNotice": "暂无公告"
   },
   "workDesk": {
     "title": "工作台",
