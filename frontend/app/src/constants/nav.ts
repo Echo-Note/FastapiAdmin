@@ -39,8 +39,8 @@ export interface NavGroup {
 /** 底部 TabBar（所有角色一致，顺序即展示顺序；首页为默认落地页） */
 export const TABBAR_ITEMS: NavEntry[] = [
   { name: 'home', titleKey: 'common.tab.home', icon: 'home', tone: 'primary', visibleTo: 'all' },
-  { name: 'market-work-desk', titleKey: 'common.tab.workDesk', icon: 'ordered-list', tone: 'green', visibleTo: 'all' },
   { name: 'market-task-hall', titleKey: 'common.tab.taskHall', icon: 'store', tone: 'primary', visibleTo: 'all' },
+  { name: 'market-work-desk', titleKey: 'common.tab.workDesk', icon: 'ordered-list', tone: 'green', visibleTo: 'all' },
   { name: 'mine', titleKey: 'common.tab.mine', icon: 'user', tone: 'primary', visibleTo: 'all' },
 ]
 

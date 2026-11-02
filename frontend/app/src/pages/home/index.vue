@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { AssignmentItem, MyTaskStats, PayoutSummary } from '@/api/module_market'
+import type { AssignmentItem, MyTaskStats, MyWeekProgress, PayoutSummary, TaskItem } from '@/api/module_market'
 import type { NoticeItem } from '@/api/module_system/notice'
+import type { WorkDeskFilter } from '@/composables/useWorkDeskFilter'
 import { onLoad, onPullDownRefresh, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -34,6 +35,9 @@ const stats = ref<MyTaskStats>({})
 const payout = ref<PayoutSummary | null>(null)
 /** 待办预览：按截止日期最近的几条 */
 const upcoming = ref<AssignmentItem[]>([])
+/** 最新上架任务：给「顺手再接一单」留个入口 */
+const latestTasks = ref<TaskItem[]>([])
+const week = ref<MyWeekProgress | null>(null)
 const notice = ref<NoticeItem | null>(null)
 const loading = ref(true)
 const failed = ref(false)
@@ -44,6 +48,18 @@ const todoCount = computed(
 )
 
 const hasWeekWork = computed(() => todoCount.value > 0)
+
+/** 成果概览三个数字 */
+const resultCells = computed(() => [
+  { key: 'RESULT_PENDING' as const, label: t('home.resultPending'), count: stats.value.submissions_pending ?? 0 },
+  { key: 'RESULT_APPROVED' as const, label: t('home.resultApproved'), count: stats.value.submissions_approved ?? 0 },
+  { key: 'RESULT_REJECTED' as const, label: t('home.resultRejected'), count: stats.value.rejected_submissions ?? 0 },
+])
+
+/** 本周按时完成：本周没有到期任务时不画进度条 */
+const weekDue = computed(() => week.value?.due ?? 0)
+const weekDone = computed(() => week.value?.done ?? 0)
+const weekPercent = computed(() => (weekDue.value > 0 ? Math.min(100, Math.round((weekDone.value / weekDue.value) * 100)) : 0))
 
 /** 收益：本月应发 / 额度进度；额度为 0 时不画进度条，避免除零与假仪表盘 */
 const payable = computed(() => Number(payout.value?.payable ?? 0))
@@ -84,6 +100,11 @@ function amountText(item: AssignmentItem) {
   return price == null ? t('taskDetail.priceTbd') : `¥${CommonUtil.formatMoney(price)}`
 }
 
+function taskPriceText(task: TaskItem) {
+  const price = task.item?.config?.price ?? task.template?.config?.price
+  return price == null ? t('taskDetail.priceTbd') : `¥${CommonUtil.formatMoney(price)}`
+}
+
 function daysLeft(period?: string) {
   if (!period)
     return null
@@ -107,11 +128,13 @@ function deadlineChip(period?: string) {
 async function loadAll() {
   loading.value = true
   failed.value = false
-  const [statsRes, payoutRes, upcomingRes, noticeRes] = await Promise.allSettled([
+  const [statsRes, payoutRes, upcomingRes, noticeRes, weekRes, latestRes] = await Promise.allSettled([
     MarketAPI.getMyTaskStats(),
     MarketAPI.getMyPayout(currentPeriod()),
     MarketAPI.getMyAssignments({ page_no: 1, page_size: 3, status: 'ACCEPTED' }),
     NoticeAPI.getAvailable(1),
+    MarketAPI.getMyWeekProgress(),
+    MarketAPI.getTaskHall({ page_no: 1, page_size: 3 }),
   ])
 
   if (statsRes.status === 'fulfilled')
@@ -132,12 +155,18 @@ async function loadAll() {
   if (noticeRes.status === 'fulfilled')
     notice.value = noticeRes.value?.[0] ?? null
 
+  if (weekRes.status === 'fulfilled')
+    week.value = weekRes.value
+
+  if (latestRes.status === 'fulfilled')
+    latestTasks.value = (latestRes.value.items ?? []).slice(0, 3)
+
   loading.value = false
   uni.stopPullDownRefresh()
 }
 
 /** 点「待接收/待提交/被驳回」跳到工作台并直接定位到对应筛选 */
-function goDesk(filter: 'PENDING' | 'ACCEPTED' | 'REJECTED') {
+function goDesk(filter: WorkDeskFilter) {
   workDeskFilter.request(filter)
   router.pushTab({ name: 'market-work-desk' })
 }
@@ -175,12 +204,12 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="tabbar-wraper custom-nav">
+  <view class="tabbar-wraper">
     <SkeletonPage v-if="loading" :rows="4" class="mt-3" />
 
     <template v-else>
       <!-- 头部 Hero：今天是几号、有几件事要交，三个数字可直接点进对应队列 -->
-      <view class="hero mx-3 mt-3">
+      <view class="hero">
         <view class="hero__date">
           {{ dateText }}
         </view>
@@ -267,6 +296,44 @@ onPullDownRefresh(() => {
         </view>
       </view>
 
+      <!-- 本周进度：本周到期多少、交了多少 -->
+      <view class="week mx-3 mt-3">
+        <view class="week__row">
+          <text class="week__label">
+            {{ t('home.weekTitle') }}
+          </text>
+          <text v-if="weekDue > 0" class="week__value">
+            {{ weekDone }} <text class="week__sub">
+              / {{ weekDue }}
+            </text>
+          </text>
+          <text v-else class="week__value week__value--muted">
+            {{ t('home.weekNone') }}
+          </text>
+        </view>
+        <view v-if="weekDue > 0" class="week__track">
+          <view class="week__fill" :style="{ width: `${weekPercent}%` }" />
+        </view>
+      </view>
+
+      <!-- 我的成果：三个数字，点进去看对应状态 -->
+      <view class="results mx-3 mt-3">
+        <view
+          v-for="cell in resultCells"
+          :key="cell.key"
+          class="results__cell"
+          hover-class="results__cell--pressed"
+          @click="goDesk(cell.key)"
+        >
+          <text class="results__num" :class="{ 'results__num--alert': cell.key === 'RESULT_REJECTED' && cell.count > 0 }">
+            {{ cell.count }}
+          </text>
+          <text class="results__label">
+            {{ cell.label }}
+          </text>
+        </view>
+      </view>
+
       <!-- 接下来要交的 -->
       <view class="sect mx-3 mt-4">
         <text class="sect__title">
@@ -320,6 +387,49 @@ onPullDownRefresh(() => {
         </view>
       </view>
 
+      <!-- 最新任务：顺手再接一单 -->
+      <template v-if="latestTasks.length > 0">
+        <view class="sect mx-3 mt-4">
+          <text class="sect__title">
+            {{ t('home.latestTasks') }}
+          </text>
+          <text class="sect__more" @click="router.pushTab({ name: 'market-task-hall' })">
+            {{ t('home.viewAll') }} ›
+          </text>
+        </view>
+        <view class="mx-3 mt-1 flex flex-col gap-2">
+          <view
+            v-for="task in latestTasks"
+            :key="task.id"
+            class="queue"
+            hover-class="queue--pressed"
+            @click="router.push({ name: 'market-task-detail', query: { id: String(task.id) } })"
+          >
+            <view class="queue__mark" />
+            <view class="min-w-0 flex-1">
+              <view class="queue__name">
+                {{ taskDisplayName(task) }}
+              </view>
+              <view class="queue__meta">
+                <text>{{ task.project?.name }}</text>
+                <text class="queue__dot">
+                  ·
+                </text>
+                <text>{{ deadlineChip(task.period).text }}</text>
+              </view>
+            </view>
+            <view class="queue__side">
+              <text class="queue__price">
+                {{ taskPriceText(task) }}
+              </text>
+              <text class="queue__action">
+                {{ t('hall.view') }}
+              </text>
+            </view>
+          </view>
+        </view>
+      </template>
+
       <!-- 数据没取到时的兜底：不给假数字，明确可重试 -->
       <view v-if="failed" class="mx-3 mt-3">
         <view class="card empty" hover-class="card--pressed" @click="loadAll">
@@ -342,8 +452,9 @@ onPullDownRefresh(() => {
 .hero {
   position: relative;
   overflow: hidden;
-  padding: 32rpx 32rpx 28rpx;
-  border-radius: 24rpx;
+  /* 自定义导航：hero 自己当头部，顶部让出状态栏 + 胶囊按钮区 */
+  padding: calc(var(--status-bar-height, 0px) + 96rpx) 32rpx 30rpx;
+  border-radius: 0 0 28rpx 28rpx;
   background: linear-gradient(135deg, var(--wot-primary-6), var(--wot-primary-4));
   box-shadow: 0 12rpx 32rpx rgba(28, 100, 253, 0.24);
 

@@ -154,7 +154,7 @@ onPullDownRefresh(() => {
 </script>
 
 <template>
-  <view class="tabbar-wraper custom-nav">
+  <view class="tabbar-wraper">
     <!-- 平台公告：C 端唯一的运营触达渠道，只展示最新一条 -->
     <view v-if="notice" class="mx-3 mt-3" @click="goNotices">
       <wd-notice-bar
@@ -166,8 +166,15 @@ onPullDownRefresh(() => {
       />
     </view>
 
+    <!-- 头部：标题 + 搜索，直接顶到状态栏，不留空白带 -->
+    <view class="hall-head">
+      <view class="hall-head__title">
+        {{ t('hall.title') }}
+      </view>
+    </view>
+
     <!-- 搜索 + 项目筛选 -->
-    <view class="mx-3 mt-3">
+    <view class="mx-3">
       <wd-search
         v-model="keyword"
         :placeholder="t('hall.searchPlaceholder')"
@@ -329,6 +336,17 @@ onPullDownRefresh(() => {
     font-size: 24rpx;
     font-weight: 500;
     color: var(--wot-primary-6);
+  }
+}
+
+/* 头部标题：自定义导航下由页面自己顶住状态栏 */
+.hall-head {
+  padding: calc(var(--status-bar-height, 0px) + 96rpx) 24rpx 12rpx;
+
+  &__title {
+    font-size: 40rpx;
+    font-weight: 700;
+    color: var(--wot-text-main);
   }
 }
 

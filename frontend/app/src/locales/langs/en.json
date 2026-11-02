@@ -543,7 +543,14 @@
     "nextTitle": "Next up",
     "viewAll": "All",
     "emptyTasks": "No open task on hand",
-    "goHall": "Grab one in Task Hall"
+    "goHall": "Grab one in Task Hall",
+    "resultPending": "In review",
+    "resultApproved": "Approved",
+    "resultRejected": "Rejected",
+    "weekTitle": "Done on time this week",
+    "weekNone": "Nothing due this week",
+    "latestTasks": "New tasks",
+    "resultsTitle": "My results"
   },
   "workDesk": {
     "title": "Workbench",

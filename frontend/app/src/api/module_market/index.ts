@@ -203,6 +203,8 @@ export interface MyTaskStats {
   reviewed?: number
   settled?: number
   rejected_submissions?: number
+  submissions_pending?: number
+  submissions_approved?: number
 }
 
 /** 我的发放/津贴（对齐后端 mini/payout 返回） */

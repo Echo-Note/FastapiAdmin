@@ -954,20 +954,24 @@ class AssignmentService:
         for status, count in (await self.db.execute(status_stmt)).all():
             counts[status] = int(count)
 
-        rejected = await self.db.scalar(
-            select(func.count(SubmissionModel.id)).where(
-                SubmissionModel.user_id == self.auth.user.id,
-                SubmissionModel.status == SubmissionStatus.REJECTED.value,
-                SubmissionModel.is_deleted.is_(False),
-            )
+        submission_stmt = (
+            select(SubmissionModel.status, func.count(SubmissionModel.id))
+            .where(SubmissionModel.user_id == self.auth.user.id, SubmissionModel.is_deleted.is_(False))
+            .group_by(SubmissionModel.status)
         )
+        submission_counts: dict[str, int] = {}
+        for status, count in (await self.db.execute(submission_stmt)).all():
+            submission_counts[status] = int(count)
+
         return MyAssignmentStatsOutSchema(
             pending=counts.get(AssignmentStatus.PENDING.value, 0),
             accepted=counts.get(AssignmentStatus.ACCEPTED.value, 0),
             submitted=counts.get(AssignmentStatus.SUBMITTED.value, 0),
             reviewed=counts.get(AssignmentStatus.REVIEWED.value, 0),
             settled=counts.get(AssignmentStatus.SETTLED.value, 0),
-            rejected_submissions=int(rejected or 0),
+            rejected_submissions=submission_counts.get(SubmissionStatus.REJECTED.value, 0),
+            submissions_pending=submission_counts.get(SubmissionStatus.PENDING.value, 0),
+            submissions_approved=submission_counts.get(SubmissionStatus.APPROVED.value, 0),
         )
 
     async def my_week_progress(self) -> MyWeekProgressOutSchema:

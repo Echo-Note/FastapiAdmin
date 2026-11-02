@@ -234,19 +234,22 @@ async function switchLayer(next: Layer) {
     await loadResults('first')
 }
 
-/** 应用首页点进来的筛选：被驳回在成果层，其余在任务层 */
-async function applyPendingFilter(filter: 'PENDING' | 'ACCEPTED' | 'REJECTED') {
-  if (filter === 'REJECTED') {
+/** 应用首页点进来的筛选：任务层三个状态 + 成果层三个状态 */
+async function applyPendingFilter(filter: string) {
+  if (filter.startsWith('RESULT_')) {
     layer.value = 'result'
-    resultTabIndex.value = REJECTED_TAB
-    resultStatus.value = 'REJECTED'
+    const index = RESULT_TABS.findIndex(tab => tab.value === filter.replace('RESULT_', ''))
+    const safeIndex = index >= 0 ? index : 0
+    resultTabIndex.value = safeIndex
+    resultStatus.value = RESULT_TABS[safeIndex]?.value
     await loadResults('first')
     return
   }
   layer.value = 'task'
-  const index = filter === 'PENDING' ? 1 : 2
-  taskTabIndex.value = index
-  taskStatus.value = TASK_TABS[index]?.value
+  const index = TASK_TABS.findIndex(tab => tab.value === filter)
+  const safeIndex = index >= 0 ? index : DEFAULT_TASK_TAB
+  taskTabIndex.value = safeIndex
+  taskStatus.value = TASK_TABS[safeIndex]?.value
   await loadTasks('first')
 }
 
@@ -351,9 +354,9 @@ onPullDownRefresh(async () => {
 </script>
 
 <template>
-  <view class="tabbar-wraper work-desk-page custom-nav">
+  <view class="tabbar-wraper work-desk-page">
     <!-- 本周进度带：回答「这周该交的活交了没」，没有到期任务就不画进度条 -->
-    <view class="wdesk-hero mx-3 mt-3">
+    <view class="wdesk-hero">
       <view class="wdesk-hero__row">
         <view class="wdesk-hero__cell">
           <text class="wdesk-hero__label">
@@ -655,8 +658,10 @@ onPullDownRefresh(async () => {
 .wdesk-hero {
   position: relative;
   overflow: hidden;
-  padding: 30rpx 32rpx 26rpx;
-  border-radius: 24rpx;
+  /* 自定义导航：hero 自己当头部，顶部让出状态栏 + 胶囊按钮区，不留空白带 */
+  padding: calc(var(--status-bar-height, 0px) + 96rpx) 32rpx 30rpx;
+  margin-top: 0;
+  border-radius: 0 0 28rpx 28rpx;
   background: linear-gradient(135deg, var(--wot-primary-6), var(--wot-primary-4));
   box-shadow: 0 12rpx 32rpx rgba(28, 100, 253, 0.22);
 
@@ -728,6 +733,11 @@ onPullDownRefresh(async () => {
     border-radius: 9999rpx;
     background: #fff;
   }
+}
+
+/* wd-tabs 自带白色底，整行会变成一条横带；这里让它落在页面渐变上 */
+.work-desk-page :deep(.wd-tabs) {
+  background: transparent;
 }
 
 /* 队列行：左侧状态条表示「要我动手」的程度，右侧是状态、截止与唯一主操作 */

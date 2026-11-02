@@ -211,6 +211,8 @@ class MyAssignmentStatsOutSchema(BaseModel):
     reviewed: int = Field(default=0, description="已审核数")
     settled: int = Field(default=0, description="已结算数")
     rejected_submissions: int = Field(default=0, description="被驳回成果数(需修改重提)")
+    submissions_pending: int = Field(default=0, description="待审核成果数")
+    submissions_approved: int = Field(default=0, description="已通过成果数")
 
 
 class MyWeekProgressOutSchema(BaseModel):
