@@ -342,23 +342,18 @@ onPullDownRefresh(async () => {
           <text class="week__label">
             {{ t('workDesk.weekProgress') }}
           </text>
-          <text class="week__num week__num--ok">
-            <template v-if="weekDue > 0">
-              {{ weekDone }} <text class="week__num-sub">
-                / {{ weekDue }}
-              </text>
-            </template>
-            <template v-else>
-              —
-            </template>
+          <text v-if="weekDue > 0" class="week__num week__num--ok">
+            {{ weekDone }} <text class="week__num-sub">
+              / {{ weekDue }}
+            </text>
+          </text>
+          <text v-else class="week__num week__num--muted">
+            {{ t('workDesk.weekNone') }}
           </text>
         </view>
       </view>
       <view v-if="weekDue > 0" class="week__track">
         <view class="week__fill" :style="{ width: `${weekPercent}%` }" />
-      </view>
-      <view v-else class="week__hint">
-        {{ t('workDesk.weekEmpty') }}
       </view>
     </view>
 
@@ -670,6 +665,18 @@ onPullDownRefresh(async () => {
       color: var(--wot-success-main);
     }
 
+    &--muted {
+      font-size: 28rpx;
+      font-weight: 500;
+      color: var(--wot-text-placeholder);
+    }
+
+    &--muted {
+      font-size: 28rpx;
+      font-weight: 500;
+      color: var(--wot-text-placeholder);
+    }
+
     &-sub {
       font-size: 24rpx;
       font-weight: 500;
@@ -689,12 +696,6 @@ onPullDownRefresh(async () => {
     height: 100%;
     border-radius: 9999rpx;
     background: var(--wot-success-main);
-  }
-
-  &__hint {
-    margin-top: 16rpx;
-    font-size: 22rpx;
-    color: var(--wot-text-auxiliary);
   }
 }
 

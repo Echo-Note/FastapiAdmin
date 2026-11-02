@@ -550,6 +550,6 @@
     "shareTitle": "Workbench · my tasks and results",
     "todayToDo": "To handle today",
     "weekProgress": "Done on time this week",
-    "weekEmpty": "Nothing due this week"
+    "weekNone": "N/A"
   }
 }
