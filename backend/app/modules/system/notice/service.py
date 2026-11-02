@@ -12,8 +12,11 @@ from .model import NoticeModel
 from .schema import NoticeCreateSchema, NoticeOutSchema, NoticeQueryParam, NoticeUpdateSchema
 from .stream import notice_stream_manager
 
-# 公告状态：0 草稿 / 1 已发布 / 2 已归档（与模型注释一致）
-NOTICE_STATUS_PUBLISHED = 1
+# 公告状态：以**管理端实际用法**为准 —— 0 启用 / 1 停用（2 归档预留）。
+# 模型注释里的「0 草稿 / 1 已发布 / 2 已归档」是历史遗留写法，管理端公告页
+# 的下拉与单选项一直是「启用=0 / 停用=1」，运营「发送」出来的公告就是 status=0；
+# 若按注释过滤 status=1，C 端会一条都收不到（已实际复现）。
+NOTICE_STATUS_ENABLED = 0
 
 
 async def _broadcast_notice_update() -> None:
@@ -98,8 +101,9 @@ class NoticeService:
         """已发布公告列表（C 端只读公告页 / 首页展示用）
 
         两个关键点：
-        1. 口径以模型注释为准（`0:草稿 1:已发布 2:已归档`），只暴露 `status=1`；
-           此前过滤的是 `status=0`，等于把草稿推给了 C 端。
+        1. **口径以管理端用法为准**：公告状态在管理端是「0 启用 / 1 停用」（2 归档预留），
+           运营「发送」出来的公告就是 `status=0`。按模型注释里的「0 草稿 / 1 已发布」过滤，
+           会让 C 端一条都收不到（已实际复现）。
         2. **绕过 CRUD 的数据权限**：公告是面向所有人的公开内容，而 `CRUDBase` 会给非超管
            叠加 `created_id = 当前用户` 的数据范围条件——C 端用户据此查询会一条都看不到。
            公开内容必须显式直查，而不是靠用户身份兜底。
@@ -107,7 +111,7 @@ class NoticeService:
         stmt = (
             select(NoticeModel)
             .where(
-                NoticeModel.status == NOTICE_STATUS_PUBLISHED,
+                NoticeModel.status == NOTICE_STATUS_ENABLED,
                 NoticeModel.is_deleted == false(),
             )
             .order_by(NoticeModel.id.desc())
