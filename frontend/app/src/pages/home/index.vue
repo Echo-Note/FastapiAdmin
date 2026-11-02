@@ -154,13 +154,14 @@ function deadlineChip(period?: string) {
 async function loadAll() {
   loading.value = true
   failed.value = false
-  const [statsRes, payoutRes, upcomingRes, noticeRes, weekRes, latestRes] = await Promise.allSettled([
+  const [statsRes, payoutRes, upcomingRes, noticeRes, weekRes, latestRes, readIdsRes] = await Promise.allSettled([
     MarketAPI.getMyTaskStats(),
     MarketAPI.getMyPayout(currentPeriod()),
     MarketAPI.getMyAssignments({ page_no: 1, page_size: 3, status: 'ACCEPTED' }),
     NoticeAPI.getAvailable(1),
     MarketAPI.getMyWeekProgress(),
     MarketAPI.getTaskHall({ page_no: 1, page_size: 3 }),
+    NoticeAPI.getReadIds(),
   ])
 
   if (statsRes.status === 'fulfilled')
@@ -186,6 +187,9 @@ async function loadAll() {
 
   if (latestRes.status === 'fulfilled')
     latestTasks.value = (latestRes.value.items ?? []).slice(0, 3)
+
+  if (readIdsRes.status === 'fulfilled')
+    readIds.value = new Set(readIdsRes.value ?? [])
 
   loading.value = false
   uni.stopPullDownRefresh()
