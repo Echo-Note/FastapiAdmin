@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { NoticeAPI } from '@/api/module_system/notice'
 import { useAccess } from '@/composables/useAccess'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
+import { useNoticeDismiss } from '@/composables/useNoticeDismiss'
 
 definePage({ name: 'work-notices', style: { navigationBarTitleText: '通知公告', enablePullDownRefresh: true } })
 useI18nNavTitle('notices.title')
@@ -14,6 +15,9 @@ const { t } = useI18n()
 const toast = useToast()
 const dialog = useGlobalDialog()
 const { isSuperuser } = useAccess()
+const { dismiss } = useNoticeDismiss()
+/** 从首页/任务大厅点条幅进来时带的公告 id，加载完后直接打开它的详情 */
+const pendingDetailId = ref<number>()
 
 const list = ref<NoticeItem[]>([])
 const loading = ref(false)
@@ -89,6 +93,8 @@ async function loadList() {
 function openDetail(item: NoticeItem) {
   detail.value = item
   showDetail.value = true
+  // 看过就收起首页/任务大厅的条幅（同一条公告不再打扰）
+  dismiss(item.id)
 }
 
 function resetForm() {
@@ -154,7 +160,18 @@ function handleDelete(item: NoticeItem) {
   })
 }
 
-onLoad(() => loadList())
+onLoad((query) => {
+  pendingDetailId.value = query?.id ? Number(query.id) : undefined
+  loadList().then(() => {
+    // 深链进来：列表加载完成后直接弹出该公告详情
+    if (pendingDetailId.value == null)
+      return
+    const target = list.value.find(item => item.id === pendingDetailId.value)
+    if (target)
+      openDetail(target)
+    pendingDetailId.value = undefined
+  })
+})
 onPullDownRefresh(() => loadList())
 </script>
 
@@ -235,10 +252,9 @@ onPullDownRefresh(() => loadList())
     <!-- 新建：仅超管 -->
     <wd-fab v-if="isSuperuser" position="right-bottom" :expandable="false" :gap="{ bottom: 40 }" @click="openCreate" />
 
-    <!-- 公告详情（只读） -->
-    <wd-popup v-model="showDetail" position="bottom" round custom-style="max-height: 80vh; overflow-y: auto;" @close="showDetail = false">
+    <!-- 公告详情（只读）：居中弹窗，不是底部抽屉 -->
+    <wd-popup v-model="showDetail" position="center" custom-style="width: 82%; border-radius: 24rpx; overflow: hidden;" @close="showDetail = false">
       <view class="notice-detail">
-        <wd-navbar :title="t('notices.detail')" left-arrow @click-left="showDetail = false" />
         <view class="notice-detail__head">
           <view class="notice-detail__title">
             {{ detail?.notice_title }}
@@ -252,13 +268,18 @@ onPullDownRefresh(() => loadList())
             </text>
           </view>
         </view>
-        <view class="notice-detail__body">
+        <scroll-view scroll-y class="notice-detail__body">
           <text v-for="(paragraph, index) in detailParagraphs" :key="index" class="notice-detail__paragraph">
             {{ paragraph }}
           </text>
           <text v-if="detailParagraphs.length === 0" class="notice-detail__paragraph notice-detail__paragraph--empty">
             {{ t('notices.empty') }}
           </text>
+        </scroll-view>
+        <view class="notice-detail__footer">
+          <wd-button type="primary" size="small" round custom-class="notice-detail__btn" @click="showDetail = false">
+            {{ t('common.confirm') }}
+          </wd-button>
         </view>
       </view>
     </wd-popup>
@@ -415,11 +436,15 @@ onPullDownRefresh(() => loadList())
   }
 }
 
+/* 居中弹窗里的公告详情：头/正文/底部三段，正文自己滚动 */
 .notice-detail {
-  padding: 0 28rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  padding: 0 28rpx;
 
   &__head {
-    padding: 24rpx 0 20rpx;
+    padding: 32rpx 0 20rpx;
     border-bottom: 1rpx solid var(--wot-border-light);
   }
 
@@ -431,13 +456,25 @@ onPullDownRefresh(() => loadList())
   }
 
   &__body {
+    flex: 1;
+    min-height: 0;
+    max-height: 46vh;
+    padding: 24rpx 0;
+  }
+
+  &__footer {
     display: flex;
-    flex-direction: column;
-    gap: 16rpx;
-    padding-top: 24rpx;
+    justify-content: center;
+    padding: 8rpx 0 28rpx;
+  }
+
+  &__btn {
+    min-width: 220rpx;
   }
 
   &__paragraph {
+    display: block;
+    margin-bottom: 16rpx;
     font-size: 28rpx;
     line-height: 1.75;
     color: var(--wot-text-secondary);

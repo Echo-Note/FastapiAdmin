@@ -7,6 +7,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
+import { useNoticeDismiss } from '@/composables/useNoticeDismiss'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
@@ -27,6 +28,7 @@ definePage({
 const { t, locale } = useI18n()
 const router = useRouter()
 const workDeskFilter = useWorkDeskFilter()
+const { isDismissed, dismiss } = useNoticeDismiss()
 
 useShare(() => ({ title: t('home.shareTitle'), path: '/pages/home/index' }))
 useTabbarActive('pages/home/index', 'home')
@@ -39,6 +41,16 @@ const upcoming = ref<AssignmentItem[]>([])
 const latestTasks = ref<TaskItem[]>([])
 const week = ref<MyWeekProgress | null>(null)
 const notice = ref<NoticeItem | null>(null)
+/** 条幅只在「最新公告还没看过」时出现；看过（或手动关闭）后收起 */
+const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
+
+/** 点条幅 = 读它：收起条幅并跳到该公告详情 */
+function openNoticeDetail() {
+  if (!notice.value?.id)
+    return
+  dismiss(notice.value.id)
+  router.push({ name: 'work-notices', query: { id: String(notice.value.id) } })
+}
 const loading = ref(true)
 const failed = ref(false)
 
@@ -228,21 +240,20 @@ onPullDownRefresh(() => {
           </template>
         </view>
 
-        <!-- 公告：Hero 里放滚动公告，替代原来的三个数字 -->
-        <view class="hero__notice">
+        <!-- 公告：未读时滚动展示，点开即已读并收起 -->
+        <view v-if="showNoticeBar" class="hero__notice">
           <wd-notice-bar
-            v-if="notice"
-            :text="notice.notice_title || ''"
+            :text="notice?.notice_title || ''"
             prefix="notification"
             scrollable
             color="#FFFFFF"
             background-color="rgba(255, 255, 255, 0.16)"
             custom-class="hero-notice"
-            @click="goto('work-notices')"
+            @click="openNoticeDetail"
           />
-          <view v-else class="hero__notice-empty">
-            {{ t('home.noNotice') }}
-          </view>
+        </view>
+        <view v-else-if="!notice" class="hero__notice-empty">
+          {{ t('home.noNotice') }}
         </view>
 
         <!-- 待接收是「等你接的单」，与「要交的」分开说，不混成一个数字 -->
@@ -490,6 +501,8 @@ onPullDownRefresh(() => {
   &__notice {
     position: relative;
     margin-top: 24rpx;
+    border-radius: 16rpx;
+    overflow: hidden;
   }
 
   &__notice-empty {
