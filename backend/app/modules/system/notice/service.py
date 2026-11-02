@@ -1,4 +1,6 @@
-from sqlalchemy import false, select
+from datetime import UTC, datetime
+
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -8,7 +10,7 @@ from app.core.logger import logger
 from app.utils.common_util import search_to_dict
 
 from .crud import NoticeCRUD
-from .model import NoticeModel
+from .model import NoticeModel, NoticeReadModel
 from .schema import NoticeCreateSchema, NoticeOutSchema, NoticeQueryParam, NoticeUpdateSchema
 from .stream import notice_stream_manager
 
@@ -124,6 +126,40 @@ class NoticeService:
         )
         rows = (await self.db.execute(stmt)).scalars().all()
         return [NoticeOutSchema.model_validate(row) for row in rows]
+
+    def _enabled_condition(self):
+        """C 端可见公告的统一条件：启用(0) 且未删除"""
+        return (NoticeModel.status == NOTICE_STATUS_ENABLED, NoticeModel.is_deleted == false())
+
+    async def unread_count(self, user_id: int) -> int:
+        """当前用户的未读公告数 = 启用公告总数 − 我读过的（只算仍然启用的）"""
+        read_ids = select(NoticeReadModel.notice_id).where(NoticeReadModel.user_id == user_id)
+        stmt = select(func.count(NoticeModel.id)).where(*self._enabled_condition(), NoticeModel.id.not_in(read_ids))
+        return int((await self.db.scalar(stmt)) or 0)
+
+    async def read_ids(self, user_id: int) -> list[int]:
+        """当前用户已读的公告 id 列表（供列表页标未读圆点）"""
+        rows = await self.db.scalars(select(NoticeReadModel.notice_id).where(NoticeReadModel.user_id == user_id))
+        return [int(x) for x in rows.all()]
+
+    async def mark_read(self, user_id: int, notice_ids: list[int] | None = None) -> int:
+        """标记已读（传 None 表示全部启用公告），返回剩余未读数。
+
+        只记录仍然存在的启用公告；重复标记靠唯一约束兜底，已存在就跳过。
+        """
+        stmt = select(NoticeModel.id).where(*self._enabled_condition())
+        if notice_ids:
+            stmt = stmt.where(NoticeModel.id.in_(notice_ids))
+        target_ids = [int(x) for x in (await self.db.scalars(stmt)).all()]
+        if target_ids:
+            existing = set(await self.read_ids(user_id))
+            now = datetime.now(UTC)
+            for notice_id in target_ids:
+                if notice_id in existing:
+                    continue
+                self.db.add(NoticeReadModel(user_id=user_id, notice_id=notice_id, read_at=now))
+            await self.db.flush()
+        return await self.unread_count(user_id)
 
     async def create(self, data: NoticeCreateSchema) -> NoticeOutSchema:
         """创建公告

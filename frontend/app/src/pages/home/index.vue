@@ -7,7 +7,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useNoticeDismiss, useNoticeOpen } from '@/composables/useNoticeDismiss'
+import { useNoticeOpen } from '@/composables/useNoticeOpen'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
@@ -28,7 +28,6 @@ definePage({
 const { t, locale } = useI18n()
 const router = useRouter()
 const workDeskFilter = useWorkDeskFilter()
-const { isDismissed, dismiss } = useNoticeDismiss()
 const { requestOpen } = useNoticeOpen()
 
 useShare(() => ({ title: t('home.shareTitle'), path: '/pages/home/index' }))
@@ -42,18 +41,24 @@ const upcoming = ref<AssignmentItem[]>([])
 const latestTasks = ref<TaskItem[]>([])
 const week = ref<MyWeekProgress | null>(null)
 const notice = ref<NoticeItem | null>(null)
-/** 条幅只在「最新公告还没看过」时出现；看过（或手动关闭）后收起 */
-const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
+/** 我读过的公告 id（后端已读表）：条幅与列表都用它判断已读/未读 */
+const readIds = ref<Set<number>>(new Set())
+const showNoticeBar = computed(() => !!notice.value && notice.value.id != null && !readIds.value.has(notice.value.id))
 
 /** 标题短于容器时别滚动：滚动会把十几个字的标题滚出可视区，条幅看起来像空的 */
 const noticeScrollable = computed(() => (notice.value?.notice_title ?? '').length > 16)
 
-/** 点条幅 = 读它：收起条幅并跳到该公告详情 */
-function openNoticeDetail() {
+/** 点条幅 = 读它：先标已读（条幅因此收起），再跳到该公告详情 */
+async function openNoticeDetail() {
   if (!notice.value?.id)
     return
-  dismiss(notice.value.id)
-  requestOpen(notice.value.id)
+  const id = notice.value.id
+  readIds.value = new Set([...readIds.value, id])
+  try {
+    await NoticeAPI.markRead([id])
+  }
+  catch { /* 已读记录失败不打断阅读 */ }
+  requestOpen(id)
   router.push({ name: 'work-notices' })
 }
 const loading = ref(true)

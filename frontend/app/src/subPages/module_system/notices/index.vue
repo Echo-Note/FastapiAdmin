@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { NoticeAPI } from '@/api/module_system/notice'
 import { useAccess } from '@/composables/useAccess'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
-import { useNoticeDismiss, useNoticeOpen } from '@/composables/useNoticeDismiss'
+import { useNoticeOpen } from '@/composables/useNoticeOpen'
 
 definePage({ name: 'work-notices', style: { navigationBarTitleText: '通知公告', enablePullDownRefresh: true } })
 useI18nNavTitle('notices.title')
@@ -15,10 +15,42 @@ const { t } = useI18n()
 const toast = useToast()
 const dialog = useGlobalDialog()
 const { isSuperuser } = useAccess()
-const { dismiss } = useNoticeDismiss()
 const { consumeOpen } = useNoticeOpen()
-/** 从首页/任务大厅点条幅进来时带的公告 id，加载完后直接打开它的详情 */
+/** 从首页/任务大厅点条幅进来时的公告 id，加载完后直接打开它的详情 */
 const pendingDetailId = ref<number>()
+/** 我已读的公告 id（后端已读表）：列表据此展示“未读 / 已读” */
+const readIds = ref<Set<number>>(new Set())
+const unreadCount = ref(0)
+
+function isUnread(item: NoticeItem) {
+  return item.id != null && !readIds.value.has(item.id)
+}
+
+/** 拉已读状态：失败时按“全部未读”展示，不影响阅读 */
+async function loadReadState() {
+  try {
+    const [ids, unread] = await Promise.all([NoticeAPI.getReadIds(), NoticeAPI.getUnreadCount()])
+    readIds.value = new Set(ids ?? [])
+    unreadCount.value = unread?.unread ?? 0
+  }
+  catch {
+    readIds.value = new Set()
+    unreadCount.value = 0
+  }
+}
+
+/** 标记一条为已读：先本地变更让标签立刻更新，再落库 */
+async function markOneRead(id?: number | null) {
+  if (id == null || readIds.value.has(id))
+    return
+  readIds.value = new Set([...readIds.value, id])
+  unreadCount.value = Math.max(0, unreadCount.value - 1)
+  try {
+    const res = await NoticeAPI.markRead([id])
+    unreadCount.value = res?.unread ?? unreadCount.value
+  }
+  catch { /* 已读记录失败不打断浏览 */ }
+}
 
 const list = ref<NoticeItem[]>([])
 const loading = ref(false)
@@ -87,6 +119,21 @@ function timeText(item: NoticeItem) {
   return (item.created_time ?? '').slice(0, 16)
 }
 
+/** 全部已读 */
+async function markAllRead() {
+  if (unreadCount.value === 0)
+    return
+  try {
+    const res = await NoticeAPI.markRead()
+    unreadCount.value = res?.unread ?? 0
+    readIds.value = new Set(list.value.map(item => item.id).filter((id): id is number => id != null))
+    toast.success(t('notices.markAllReadSuccess'))
+  }
+  catch {
+    toast.error(t('common.operationFailed'))
+  }
+}
+
 async function loadList() {
   loading.value = true
   failed.value = false
@@ -106,8 +153,8 @@ async function loadList() {
 function openDetail(item: NoticeItem) {
   detail.value = item
   showDetail.value = true
-  // 看过就收起首页/任务大厅的条幅（同一条公告不再打扰）
-  dismiss(item.id)
+  // 看过即已读：首页/任务大厅的条幅随之收起
+  markOneRead(item.id)
 }
 
 function resetForm() {
@@ -176,6 +223,7 @@ function handleDelete(item: NoticeItem) {
 onLoad((query) => {
   // 优先用一次性信号（首页/任务大厅点条幅），其次兼容 URL 上的 ?id
   pendingDetailId.value = consumeOpen() ?? (query?.id ? Number(query.id) : undefined)
+  loadReadState()
   loadList().then(() => {
     if (pendingDetailId.value == null)
       return
@@ -202,9 +250,17 @@ onPullDownRefresh(() => loadList())
         <text class="notice-head__tip">
           {{ t('notices.readOnlyTip') }}
         </text>
-        <text class="notice-head__count">
-          {{ t('notices.count', { count: filteredList.length }) }}
-        </text>
+        <view class="flex items-center gap-3">
+          <text v-if="unreadCount > 0" class="notice-head__unread">
+            {{ t('notices.unreadCount', { count: unreadCount }) }}
+          </text>
+          <text class="notice-head__count">
+            {{ t('notices.count', { count: filteredList.length }) }}
+          </text>
+          <text v-if="unreadCount > 0" class="notice-head__action" @click="markAllRead">
+            {{ t('notices.markAllRead') }}
+          </text>
+        </view>
       </view>
     </view>
 
@@ -242,6 +298,9 @@ onPullDownRefresh(() => loadList())
           <view class="notice-card__meta">
             <text class="notice-chip" :class="typeClass(item.notice_type)">
               {{ typeLabel(item.notice_type) }}
+            </text>
+            <text v-if="isUnread(item)" class="notice-unread">
+              {{ t('notices.unread') }}
             </text>
             <text class="notice-card__time">
               {{ timeText(item) }}
@@ -450,6 +509,26 @@ onPullDownRefresh(() => loadList())
 }
 
 /* 居中弹窗里的公告详情：头/正文/底部三段，正文自己滚动 */
+/* 未读标签：列表里直接可辨，不依赖颜色深浅去猜 */
+.notice-head__unread {
+  font-size: 22rpx;
+  color: var(--wot-danger-main);
+}
+
+.notice-head__action {
+  font-size: 22rpx;
+  color: var(--wot-primary-6);
+}
+
+.notice-unread {
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: var(--wot-danger-main);
+  background: var(--wot-danger-surface);
+}
+
 .notice-detail {
   display: flex;
   flex-direction: column;

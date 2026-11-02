@@ -47,3 +47,41 @@ class TestNoticeAvailable:
         resp = test_client.get("/system/notice/available", params={"limit": 1}, headers=user_h)
         assert resp.json()["success"] is True
         assert len(resp.json()["data"]) == 1
+
+
+class TestNoticeReadState:
+    def test_unread_count_and_mark_read(self, test_client: TestClient, auth_headers: dict) -> None:
+        """未读数 = 启用公告数 − 我读过的；按条标记 / 全部标记都要生效。"""
+        _create_notice(test_client, auth_headers, "已读-A", 0)
+        _create_notice(test_client, auth_headers, "已读-B", 0)
+        user_h = _login_c_end_user(test_client)
+
+        listed = test_client.get("/system/notice/available", params={"limit": 50}, headers=user_h).json()["data"]
+        total_enabled = len(listed)
+        assert total_enabled >= 2
+
+        unread = test_client.get("/system/notice/unread-count", headers=user_h).json()["data"]["unread"]
+        assert unread == total_enabled
+
+        # 只标一条 → 未读减 1
+        first_id = listed[0]["id"]
+        resp = test_client.post("/system/notice/read", json={"notice_ids": [first_id]}, headers=user_h)
+        assert resp.json()["data"]["unread"] == unread - 1
+        read_ids = test_client.get("/system/notice/read-ids", headers=user_h).json()["data"]
+        assert first_id in read_ids
+
+        # 重复标记同一条不会再多减
+        again = test_client.post("/system/notice/read", json={"notice_ids": [first_id]}, headers=user_h)
+        assert again.json()["data"]["unread"] == unread - 1
+
+        # 全部标记 → 0
+        all_read = test_client.post("/system/notice/read", json={}, headers=user_h)
+        assert all_read.json()["data"]["unread"] == 0
+
+    def test_stopped_notice_not_counted(self, test_client: TestClient, auth_headers: dict) -> None:
+        """停用(1)的公告不计入未读：C 端本来也看不到它。"""
+        user_h = _login_c_end_user(test_client)
+        before = test_client.get("/system/notice/unread-count", headers=user_h).json()["data"]["unread"]
+        _create_notice(test_client, auth_headers, "停用公告-未读", 1)
+        after = test_client.get("/system/notice/unread-count", headers=user_h).json()["data"]["unread"]
+        assert after == before
