@@ -59,20 +59,16 @@
 
 /* H5 / 桌面预览限宽：小程序是按 375pt 设计的，宽屏下若不限宽，
    卡片会被拉成通栏白条、圆角与间距全部失真（H5 预览时最刺眼的就是这一点）。
-   仅 H5 生效，小程序端不受影响。 */
+   只限宽「页面内容」，渐变背景仍由布局根节点铺满，避免左右出现色差边框。 */
 @media screen and (min-width: 600px) {
-  uni-page-body {
-    background: var(--drop-bg);
-  }
-
-  .page-wraper,
-  .tabbar-wraper {
+  .page-wraper > .page-wraper,
+  .page-wraper > .tabbar-wraper {
     max-width: 560px;
     margin-left: auto;
     margin-right: auto;
   }
 
-  /* 底部导航与页面同宽居中，否则宽屏下会横贯整屏 */
+  /* 底部导航与内容同宽居中，否则宽屏下横贯整屏 */
   .wd-tabbar.is-fixed {
     right: 0;
     left: 0;
