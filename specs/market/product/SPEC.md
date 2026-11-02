@@ -51,7 +51,7 @@ parent: market-domain
 
 - 挂接点：`SubmissionService.create`（新提交）与 `update`（驳回重提）在成果落库后调用 `ProductService.ingest_from_form_data(form_data, form_schema)`。
 - 列名解析：优先用 `form_schema` 里的 `product_role`（`resolve_product_columns`），老数据没有该标记时回退约定列名 `product_name` / `product_spec` / `manufacturer`。
-- 行提取：`iter_submitted_products` 递归遍历 `form_data`（分节 dict → 子表 list[dict]），取「产品名称非空」的行，同一次提交内三元组去重。
+- 行提取：`iter_submitted_products` 递归遍历 `form_data`（分节 dict → 子表 list[dict]），取「产品名称非空」的行，同一次提交内三元组去重；**名称有值但规格与生产企业都为空的组合跳过**——没有可回填的内容，入库只会污染候选列表（只缺其中一项照常入库）。
 - 幂等：判重键已存在则跳过——**包括已 `rejected` 的**，不让同一份脏数据每次提交都重生一条待审记录。
 - 失败隔离：每条入库包在 `begin_nested()` savepoint 内，碰撞唯一约束只跳过该条，绝不会因为产品入库失败而回滚成果本身。
 - 产品待审不影响成果审核：两条流程互不阻塞。
@@ -74,7 +74,10 @@ C 端：`GET /market/mini/products/search?keyword=&limit=`（默认 20，上限 
 ## 前端
 
 - 运营端：`views/module_market/product/index.vue` + `api/module_market/product.ts`，菜单「市场管理 → 产品库」（`/market/product`，`MarketProduct`）。审核是单条与批量共用同一弹窗，行操作按状态收敛（已通过不给「通过」、已驳回不给「驳回」）。
-- C 端：`subPages/module_market/submission-form/index.vue` 里 `product_role=name` 的列停顿 500ms 或失焦后检索 → 命中 1 条直接回填同行的 `spec` / `manufacturer`，命中多条弹半屏列表选择，行内另给「查产品库」强制列候选；未命中保留手填。
+- C 端：`subPages/module_market/submission-form/index.vue` 里 `product_role=name` 的列停顿 500ms 或失焦后检索：**有匹配就弹半屏候选列表（命中 1 条也弹）**，行内另给「查产品库」强制列候选；未命中保留手填。
+  - **自动回填**：仅当候选名称与输入完全相等且唯一时自动回填名称/规格/生产企业，模糊命中只列候选、由用户手动选，避免把正在输入的片段改写掉。
+  - **选中回填**：名称归一为候选全名，规格/生产企业按候选写入同行；候选缺其中任一项时只回填名称（空值不覆盖用户已填内容），行内提示「信息不完整」并高亮，不再谎报「已填充规格与生产企业」。
+  - **关闭语义**：用户取消候选后，同一行同一关键词的失焦检索不再重弹；重新输入或点「查产品库」恢复；关闭/选中会作废在途检索，避免旧响应把弹窗重新打开。
 
 ## 已知取舍
 
@@ -82,3 +85,5 @@ C 端：`GET /market/mini/products/search?keyword=&limit=`（默认 20，上限 
 - 存量环境不会自动获得「产品库」菜单：`initialize.py` 的种子导入只在表为空时执行，已初始化的库需在「菜单管理」补一次（或直接插入 `sys_menu`）。
 - 产品与项目/厂商没有关联字段：一期只做三要素字典，避免过早引入厂商主数据。
 - 判重键撞上了软删除的记录时仍会报「产品已存在」——与基座其它 `unique=True` 的 `code` 列表行为一致。
+- 产品名称联想**不做**行内下拉浮层，沿用半屏候选列表（与「查产品库」同一个 `wd-popup`）。
+- 历史遗留的「名称-only」待审记录不清理、不合并：检索仍可能返回这类候选，选中后只回填名称并提示信息不完整。
