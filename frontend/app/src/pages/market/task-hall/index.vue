@@ -44,6 +44,9 @@ const { isDismissed, dismiss } = useNoticeDismiss()
 /** 条幅只在最新公告没看过时出现 */
 const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
 
+/** 标题短于容器时别滚动：滚动会把十几个字的标题滚出可视区，条幅看起来像空的 */
+const noticeScrollable = computed(() => (notice.value?.notice_title ?? '').length > 16)
+
 /** 项目筛选选项：直接由已加载的任务派生，避免为筛选项再发一次请求 */
 const projectOptions = computed(() => {
   const names = new Set<string>()
@@ -177,6 +180,7 @@ onPullDownRefresh(() => {
         :text="notice?.notice_title || ''"
         prefix="notification"
         type="info"
+        :scrollable="noticeScrollable"
         custom-class="hall-notice"
       />
     </view>
