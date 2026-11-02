@@ -171,6 +171,7 @@ onPullDownRefresh(() => {
         :placeholder="t('hall.searchPlaceholder')"
         variant="light"
         hide-cancel
+        custom-class="hall-search"
       />
       <scroll-view scroll-x class="mt-2 whitespace-nowrap" :show-scrollbar="false">
         <view class="flex items-center gap-2">
@@ -327,6 +328,18 @@ onPullDownRefresh(() => {
     font-weight: 500;
     color: var(--wot-primary-6);
   }
+}
+
+/* wd-search 的 light 变体自带整块浅底（宽屏下会变成一条白色横带），
+   这里把它还原成透明容器 + 白色胶囊，让头部只留一个视觉块 */
+:deep(.hall-search) {
+  padding: 0;
+  background: transparent;
+}
+
+:deep(.hall-search .wd-search__block) {
+  background: var(--wot-filled-oppo);
+  box-shadow: 0 4rpx 16rpx rgba(28, 100, 253, 0.08);
 }
 
 /* 项目筛选 chip：横向滚动，项目多时不挤压 */

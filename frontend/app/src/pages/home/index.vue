@@ -9,6 +9,7 @@ import { NoticeAPI } from '@/api/module_system/notice'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
+import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
 import { taskDisplayName } from '@/constants'
 import { CommonUtil } from '@/utils/common'
 
@@ -22,6 +23,7 @@ useI18nNavTitle('home.title')
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const workDeskFilter = useWorkDeskFilter()
 
 useShare(() => ({ title: t('home.shareTitle'), path: '/pages/home/index' }))
 useTabbarActive('pages/home/index', 'home')
@@ -132,6 +134,12 @@ async function loadAll() {
   uni.stopPullDownRefresh()
 }
 
+/** 点「待接收/待提交/被驳回」跳到工作台并直接定位到对应筛选 */
+function goDesk(filter: 'PENDING' | 'ACCEPTED' | 'REJECTED') {
+  workDeskFilter.request(filter)
+  router.pushTab({ name: 'market-work-desk' })
+}
+
 function goto(name: string) {
   router.push({ name })
 }
@@ -169,56 +177,66 @@ onPullDownRefresh(() => {
     <SkeletonPage v-if="loading" :rows="4" class="mt-3" />
 
     <template v-else>
-      <!-- 今日工作单：首页唯一带装饰的元素，其余一律平铺 -->
-      <view class="slip mx-3 mt-3">
-        <view class="slip__bar" />
-        <view class="slip__body">
-          <view class="slip__date">
-            {{ dateText }}
+      <!-- 头部 Hero：今天是几号、有几件事要交，三个数字可直接点进对应队列 -->
+      <view class="hero mx-3 mt-3">
+        <view class="hero__date">
+          {{ dateText }}
+        </view>
+        <view class="hero__say">
+          <template v-if="hasWeekWork">
+            {{ t('home.todoHeadPrefix') }} <text class="hero__count">
+              {{ todoCount }}
+            </text> {{ t('home.todoHeadSuffix') }}
+          </template>
+          <template v-else>
+            {{ t('home.todoEmpty') }}
+          </template>
+        </view>
+
+        <view class="hero__cells">
+          <view class="hero__cell" hover-class="hero__cell--pressed" @click="goDesk('PENDING')">
+            <text class="hero__num">
+              {{ stats.pending ?? 0 }}
+            </text>
+            <text class="hero__label">
+              {{ t('home.pending') }}
+            </text>
           </view>
-          <view class="slip__say">
-            <template v-if="hasWeekWork">
-              {{ t('home.todoHeadPrefix') }} <text class="slip__em">
-                {{ todoCount }}
-              </text> {{ t('home.todoHeadSuffix') }}
-            </template>
-            <template v-else>
-              {{ t('home.todoEmpty') }}
-            </template>
+          <view class="hero__cell" hover-class="hero__cell--pressed" @click="goDesk('ACCEPTED')">
+            <text class="hero__num">
+              {{ stats.accepted ?? 0 }}
+            </text>
+            <text class="hero__label">
+              {{ t('home.active') }}
+            </text>
           </view>
-          <view class="slip__grid">
-            <view class="slip__cell">
-              <text class="slip__num">
-                {{ stats.pending ?? 0 }}
-              </text>
-              <text class="slip__label">
-                {{ t('home.pending') }}
-              </text>
-            </view>
-            <view class="slip__cell">
-              <text class="slip__num">
-                {{ stats.accepted ?? 0 }}
-              </text>
-              <text class="slip__label">
-                {{ t('home.active') }}
-              </text>
-            </view>
-            <view class="slip__cell">
-              <text class="slip__num slip__num--alert">
-                {{ stats.rejected_submissions ?? 0 }}
-              </text>
-              <text class="slip__label">
-                {{ t('home.rejected') }}
-              </text>
-            </view>
-          </view>
-          <view v-if="latestDeadline" class="slip__deadline">
-            <text>{{ t('home.latestDeadline') }}</text>
-            <text class="slip__deadline-date">
-              {{ latestDeadline }}
+          <view class="hero__cell" hover-class="hero__cell--pressed" @click="goDesk('REJECTED')">
+            <text class="hero__num" :class="{ 'hero__num--alert': (stats.rejected_submissions ?? 0) > 0 }">
+              {{ stats.rejected_submissions ?? 0 }}
+            </text>
+            <text class="hero__label">
+              {{ t('home.rejected') }}
             </text>
           </view>
         </view>
+
+        <view v-if="latestDeadline" class="hero__deadline">
+          <text>{{ t('home.latestDeadline') }}</text>
+          <text class="hero__deadline-date">
+            {{ latestDeadline }}
+          </text>
+        </view>
+      </view>
+
+      <!-- 公告：横向滚动条，和原版首页一致 -->
+      <view v-if="notice" class="mx-3 mt-3" @click="goto('work-notices')">
+        <wd-notice-bar
+          :text="notice.notice_title || ''"
+          prefix="notification"
+          closable
+          type="info"
+          custom-class="home-notice"
+        />
       </view>
 
       <!-- 收益 -->
@@ -300,17 +318,6 @@ onPullDownRefresh(() => {
         </view>
       </view>
 
-      <!-- 公告 -->
-      <view v-if="notice" class="card row mx-3 mt-3" hover-class="card--pressed" @click="goto('work-notices')">
-        <wd-icon name="notification" size="16px" color="var(--wot-primary-6)" />
-        <text class="notice">
-          {{ notice.notice_title }}
-        </text>
-        <text class="card__link">
-          ›
-        </text>
-      </view>
-
       <!-- 数据没取到时的兜底：不给假数字，明确可重试 -->
       <view v-if="failed" class="mx-3 mt-3">
         <view class="card empty" hover-class="card--pressed" @click="loadAll">
@@ -329,81 +336,102 @@ onPullDownRefresh(() => {
 </template>
 
 <style lang="scss" scoped>
-/* 今日工作单：唯一允许有装饰的元素（顶部色条 + 虚线分隔） */
-.slip {
-  border-radius: 20rpx;
+/* 头部 Hero：品牌渐变 + 白色文字，是首页唯一「有重量」的视觉块 */
+.hero {
+  position: relative;
   overflow: hidden;
-  background: var(--wot-filled-oppo);
+  padding: 32rpx 32rpx 28rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, var(--wot-primary-6), var(--wot-primary-4));
+  box-shadow: 0 12rpx 32rpx rgba(28, 100, 253, 0.24);
 
-  &__bar {
-    height: 6rpx;
-    background: var(--wot-primary-6);
-  }
-
-  &__body {
-    padding: 26rpx 28rpx 22rpx;
+  /* 右上角浅色光圈，避免大面积纯色显得平 */
+  &::after {
+    content: '';
+    position: absolute;
+    right: -80rpx;
+    top: -100rpx;
+    width: 320rpx;
+    height: 320rpx;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
   }
 
   &__date {
+    position: relative;
     font-size: 22rpx;
-    color: var(--wot-text-auxiliary);
+    color: rgba(255, 255, 255, 0.82);
     letter-spacing: 0.5rpx;
   }
 
   &__say {
-    margin-top: 8rpx;
-    font-size: 34rpx;
+    position: relative;
+    margin-top: 10rpx;
+    font-size: 36rpx;
     font-weight: 600;
     line-height: 1.35;
-    color: var(--wot-text-main);
+    color: #fff;
   }
 
-  &__em {
-    color: var(--wot-primary-6);
+  &__count {
+    font-size: 44rpx;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
-  &__grid {
+  &__cells {
+    position: relative;
     display: flex;
-    margin-top: 24rpx;
-    padding-top: 20rpx;
-    border-top: 1rpx dashed var(--wot-border-light);
+    margin-top: 26rpx;
   }
 
   &__cell {
     flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2rpx;
+    padding: 8rpx 0;
+    border-radius: 12rpx;
+
+    &--pressed {
+      background: rgba(255, 255, 255, 0.12);
+    }
   }
 
   &__num {
-    display: block;
-    font-size: 44rpx;
+    font-size: 46rpx;
     font-weight: 700;
     line-height: 1.1;
-    color: var(--wot-text-main);
+    color: #fff;
     font-variant-numeric: tabular-nums;
 
+    /* 被驳回在暗色渐变上不能用红字，改用暖黄点出来 */
     &--alert {
-      color: var(--wot-danger-main);
+      color: #ffe08a;
     }
   }
 
   &__label {
     font-size: 22rpx;
-    color: var(--wot-text-auxiliary);
+    color: rgba(255, 255, 255, 0.8);
   }
 
   &__deadline {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 20rpx;
+    margin-top: 22rpx;
+    padding-top: 18rpx;
+    border-top: 1rpx solid rgba(255, 255, 255, 0.22);
     font-size: 22rpx;
-    color: var(--wot-text-secondary);
+    color: rgba(255, 255, 255, 0.82);
   }
 
   &__deadline-date {
-    font-size: 24rpx;
+    font-size: 26rpx;
     font-weight: 600;
-    color: var(--wot-text-main);
+    color: #fff;
     font-variant-numeric: tabular-nums;
   }
 }

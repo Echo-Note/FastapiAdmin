@@ -9,6 +9,7 @@ import { useMarketListPage } from '@/composables/useMarketListPage'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useTaskStats } from '@/composables/useTaskStats'
+import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
 import { taskDisplayName } from '@/constants'
 import { CommonUtil } from '@/utils/common'
 
@@ -22,6 +23,7 @@ useI18nNavTitle('workDesk.title')
 const { t } = useI18n()
 const router = useRouter()
 const { loadTaskStats } = useTaskStats()
+const workDeskFilter = useWorkDeskFilter()
 
 useShare(() => ({ title: t('workDesk.shareTitle'), path: '/pages/market/work-desk/index' }))
 useTabbarActive('pages/market/work-desk/index', 'market-work-desk')
@@ -230,6 +232,22 @@ async function switchLayer(next: Layer) {
     await loadResults('first')
 }
 
+/** 应用首页点进来的筛选：被驳回在成果层，其余在任务层 */
+async function applyPendingFilter(filter: 'PENDING' | 'ACCEPTED' | 'REJECTED') {
+  if (filter === 'REJECTED') {
+    layer.value = 'result'
+    resultTabIndex.value = REJECTED_TAB
+    resultStatus.value = 'REJECTED'
+    await loadResults('first')
+    return
+  }
+  layer.value = 'task'
+  const index = filter === 'PENDING' ? 1 : 2
+  taskTabIndex.value = index
+  taskStatus.value = TASK_TABS[index]?.value
+  await loadTasks('first')
+}
+
 async function onTaskTabChange(e: { index: number }) {
   taskStatus.value = TASK_TABS[e.index]?.value
   await loadTasks('first')
@@ -291,18 +309,23 @@ function resultEmptyTip() {
 }
 
 onLoad(() => {
-  loadStats()
-  loadTasks('first')
+  // 首屏加载统一交给 onShow：那里要先消费「从首页点进来」的筛选信号
 })
 
-/** 首次 onShow 由 onLoad 负责，之后每次回到本页才刷新，避免重复请求 */
 let shownOnce = false
 onShow(() => {
-  if (!shownOnce) {
+  loadStats()
+  const filter = workDeskFilter.consume()
+  if (filter) {
     shownOnce = true
+    applyPendingFilter(filter)
     return
   }
-  loadStats()
+  if (!shownOnce) {
+    shownOnce = true
+    loadTasks('first')
+    return
+  }
   if (layer.value === 'task')
     loadTasks('first')
   else
@@ -328,18 +351,18 @@ onPullDownRefresh(async () => {
 <template>
   <view class="tabbar-wraper work-desk-page">
     <!-- 本周进度带：回答「这周该交的活交了没」，没有到期任务就不画进度条 -->
-    <view class="week mx-3 mt-3">
-      <view class="week__row">
-        <view class="week__cell">
-          <text class="week__label">
+    <view class="wdesk-hero mx-3 mt-3">
+      <view class="wdesk-hero__row">
+        <view class="wdesk-hero__cell">
+          <text class="wdesk-hero__label">
             {{ t('workDesk.todayToDo') }}
           </text>
-          <text class="week__num">
+          <text class="wdesk-hero__num">
             {{ todayCount }}
           </text>
         </view>
-        <view class="week__cell week__cell--right">
-          <text class="week__label">
+        <view class="wdesk-hero__cell wdesk-hero__cell--right">
+          <text class="wdesk-hero__label">
             {{ t('workDesk.weekProgress') }}
           </text>
           <text v-if="weekDue > 0" class="week__num week__num--ok">
@@ -352,8 +375,8 @@ onPullDownRefresh(async () => {
           </text>
         </view>
       </view>
-      <view v-if="weekDue > 0" class="week__track">
-        <view class="week__fill" :style="{ width: `${weekPercent}%` }" />
+      <view v-if="weekDue > 0" class="wdesk-hero__track">
+        <view class="wdesk-hero__fill" :style="{ width: `${weekPercent}%` }" />
       </view>
     </view>
 
@@ -626,13 +649,28 @@ onPullDownRefresh(async () => {
   }
 }
 
-/* 本周进度带：两个数字 + 一条进度；没有到期任务时只给一句说明 */
-.week {
-  padding: 26rpx 28rpx;
-  border-radius: 20rpx;
-  background: var(--wot-filled-oppo);
+/* 工作台头部：与首页同一套品牌渐变，避免「白卡 + 白底」堆成一片 */
+.wdesk-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 30rpx 32rpx 26rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, var(--wot-primary-6), var(--wot-primary-4));
+  box-shadow: 0 12rpx 32rpx rgba(28, 100, 253, 0.22);
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -80rpx;
+    top: -110rpx;
+    width: 300rpx;
+    height: 300rpx;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+  }
 
   &__row {
+    position: relative;
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
@@ -651,51 +689,42 @@ onPullDownRefresh(async () => {
 
   &__label {
     font-size: 22rpx;
-    color: var(--wot-text-auxiliary);
+    color: rgba(255, 255, 255, 0.8);
   }
 
   &__num {
-    font-size: 44rpx;
+    font-size: 48rpx;
     font-weight: 700;
     line-height: 1.1;
-    color: var(--wot-text-main);
+    color: #fff;
     font-variant-numeric: tabular-nums;
 
-    &--ok {
-      color: var(--wot-success-main);
-    }
-
     &--muted {
       font-size: 28rpx;
       font-weight: 500;
-      color: var(--wot-text-placeholder);
-    }
-
-    &--muted {
-      font-size: 28rpx;
-      font-weight: 500;
-      color: var(--wot-text-placeholder);
-    }
-
-    &-sub {
-      font-size: 24rpx;
-      font-weight: 500;
-      color: var(--wot-text-auxiliary);
+      color: rgba(255, 255, 255, 0.72);
     }
   }
 
+  &__sub {
+    font-size: 24rpx;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
   &__track {
+    position: relative;
     height: 8rpx;
-    margin-top: 20rpx;
+    margin-top: 22rpx;
     border-radius: 9999rpx;
-    background: var(--wot-filled-content);
+    background: rgba(255, 255, 255, 0.24);
     overflow: hidden;
   }
 
   &__fill {
     height: 100%;
     border-radius: 9999rpx;
-    background: var(--wot-success-main);
+    background: #fff;
   }
 }
 
