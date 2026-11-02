@@ -21,6 +21,7 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.base_schema import AuthSchema, PageResultSchema
 from app.core.exceptions import CustomException
@@ -44,6 +45,8 @@ from .model import AllowanceDetailModel, SettlementModel
 from .schema import (
     AllowanceDetailOutSchema,
     AllowanceOutSchema,
+    MyPayoutOutSchema,
+    MyPayoutSettlementOutSchema,
     PayoutConfigCreateSchema,
     PayoutConfigOutSchema,
     PayoutConfigQueryParam,
@@ -472,26 +475,70 @@ class PayoutService:
             raise CustomException(msg="删除失败，删除对象不能为空")
         await PayoutConfigCRUD(self.auth, self.db).delete(ids=ids)
 
-    async def my_payout(self, user_id: int, period: str) -> dict:
-        """查询我的发放情况：本月应发、发放额度、津贴余额、津贴明细。
+    async def my_payout(self, user_id: int, period: str) -> MyPayoutOutSchema:
+        """查询我在某周期的收益：应发 / 实发 / 额度 / 期初滚存 / 期末滚存 / 该期结算单。
 
-        `payable` 是 C 端「我的」页收益卡的主数字（这个月能拿多少）；它由结算单按周期
-        汇总而来（`period_payable`），不是把明细行加起来——明细存的是期末余额，求和会重复计滚存。
+        口径是**该周期**的结算单与津贴账本，而不是全量历史——C 端「我的收益」页切换月份只改
+        ``period``，数字与明细都必须跟着换：
+
+        - 应发 / 实发 = 该期结算单的 ``payable_amount`` / ``paid_amount`` 之和。这里不重跑封顶
+          公式：公式是归集时的写路径（``apply``），读路径照抄账本才不会有第二套口径。
+        - 期初滚存 = 早于该期最近一条账本行的 ``amount``（:meth:`prior_balance`）。
+        - 期末滚存优先取该期账本快照；**没有快照说明该期还没归集结算**，滚存没发生变化，所以
+          等于期初。不按 ``max(0, 待发 - 额度)`` 现算——那会把本期压根没发的钱算成「已发」，
+          与同屏的实发 0 自相矛盾。
+
+        明细是该期每条结算单（含任务来源），不是津贴账本行：用户要回答的是「这笔钱是哪个任务
+        挣的」，账本行只记期末累计余额。
         """
-        allowance = await AllowanceCRUD(self.auth, self.db).get(user_id=user_id)
-        config = await PayoutConfigCRUD(self.auth, self.db).get(user_id=user_id, period=period)
-        details = await AllowanceDetailCRUD(self.auth, self.db).get_list(
-            search={"user_id": user_id}, order_by=[{"id": "asc"}]
+        period_detail = await AllowanceDetailCRUD(self.auth, self.db).get(user_id=user_id, from_period=period)
+        prev_balance = await self.prior_balance(user_id, period)
+        settlements = await self._period_settlements(user_id, period)
+        paid = sum((_money(row.paid_amount) for row in settlements), _ZERO)
+        return MyPayoutOutSchema(
+            user_id=user_id,
+            period=period,
+            payable=await self.period_payable(user_id, period),
+            paid=_money(paid),
+            payout_limit=await self.limit_of(user_id, period),
+            prev_balance=prev_balance,
+            allowance_balance=_money(period_detail.amount) if period_detail else prev_balance,
+            settlements=[self._settlement_row(row) for row in settlements],
         )
-        payable = await self.period_payable(user_id, period)
-        return {
-            "user_id": user_id,
-            "period": period,
-            "payable": float(payable),
-            "payout_limit": float(config.payout_limit) if config and config.enabled else float(DEFAULT_PAYOUT_LIMIT),
-            "allowance_balance": float(allowance.balance) if allowance else 0.0,
-            "allowance_items": [AllowanceDetailOutSchema.model_validate(d).model_dump(mode="json") for d in details],
-        }
+
+    async def _period_settlements(self, user_id: int, period: str) -> list[SettlementModel]:
+        """该用户该周期的结算单（带任务与明细快照），C 端收益明细的数据源。"""
+        sql = (
+            select(SettlementModel)
+            .where(
+                SettlementModel.user_id == user_id,
+                SettlementModel.period == period,
+                SettlementModel.is_deleted.is_(False),
+            )
+            .options(selectinload(SettlementModel.task), selectinload(SettlementModel.items))
+            .order_by(SettlementModel.id.asc())
+        )
+        return list((await self.db.scalars(sql)).all())
+
+    @staticmethod
+    def _settlement_row(settlement: SettlementModel) -> MyPayoutSettlementOutSchema:
+        """把一条结算单摊成 C 端收益明细的一行：任务来源 + 计价快照 + 应发/实发。"""
+        task = settlement.task
+        item = settlement.items[0] if settlement.items else None
+        return MyPayoutSettlementOutSchema(
+            id=settlement.id,
+            task_id=settlement.task_id,
+            task_no=task.task_no if task else "",
+            task_name=task.name if task else f"任务#{settlement.task_id}",
+            category_name=item.category_name if item else None,
+            template_name=item.template_name if item else None,
+            unit=item.unit if item else None,
+            price=_money(item.price) if item else None,
+            qty=settlement.qty,
+            payable=_money(settlement.payable_amount),
+            paid=_money(settlement.paid_amount),
+            pay_status=settlement.pay_status,
+        )
 
 
 class AllowanceService:

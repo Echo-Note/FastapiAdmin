@@ -23,6 +23,7 @@ from app.modules.common.file.service import FileService
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
 from .member.dependencies import require_market_member
+from .payout.schema import MyPayoutOutSchema
 from .payout.service import PayoutService
 from .product.schema import ProductSearchItemSchema, ProductSearchQueryParam
 from .product.service import ProductService
@@ -163,7 +164,7 @@ async def mini_my_submissions_controller(
     return SuccessResponse(data=result, msg="获取我的成果成功")
 
 
-@MiniRouter.get("/payout", summary="我的发放/津贴", response_model=ResponseSchema[dict])
+@MiniRouter.get("/payout", summary="我的发放/津贴", response_model=ResponseSchema[MyPayoutOutSchema])
 async def mini_my_payout_controller(
     auth: Annotated[AuthSchema, Security(require_market_member)],
     db: Annotated[AsyncSession, Depends(db_getter)],

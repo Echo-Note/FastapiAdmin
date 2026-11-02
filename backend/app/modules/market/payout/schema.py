@@ -126,3 +126,39 @@ class AllowanceDetailOutSchema(BaseSchema):
     amount: Decimal = Field(description="未发放金额")
     status: str = Field(description="状态(待发/已发)")
     paid_at: str | None = Field(default=None, description="发放时间(二期)")
+
+
+class MyPayoutSettlementOutSchema(BaseModel):
+    """C 端收益明细的一行：该周期的一条结算单 + 这笔钱由哪个任务产生。"""
+
+    id: int = Field(description="结算单ID")
+    task_id: int = Field(description="任务ID")
+    task_no: str = Field(description="任务编号(如 TK-001)")
+    task_name: str = Field(description="任务名(C端显示名，即收益来源)")
+    category_name: str | None = Field(default=None, description="一级任务分类名(来自结算明细快照)")
+    template_name: str | None = Field(default=None, description="二级任务名(来自结算明细快照)")
+    unit: str | None = Field(default=None, description="计价单位")
+    price: Decimal | None = Field(default=None, description="单价")
+    qty: int = Field(description="归集成果数量")
+    payable: Decimal = Field(description="应发金额")
+    paid: Decimal = Field(description="实发金额(受当月发放额度封顶; 未归集时为 0)")
+    pay_status: str | None = Field(default=None, description="支付状态(SCHEDULED=已算出待打款)")
+
+
+class MyPayoutOutSchema(BaseModel):
+    """C 端「我的收益」按月视图：切月即换一套数字。
+
+    口径与 ``PayoutService.my_payout`` 一致——应发/实发/期末滚存都取**该周期**的结算单与
+    津贴账本，不从全量历史里挑；页面顶部切月只改 ``period``，其余由后端按周期给出。
+    """
+
+    user_id: int = Field(description="C端用户ID")
+    period: str = Field(description="周期(如 2026-10)")
+    payable: Decimal = Field(description="当月应发合计(该周期结算单 payable 之和)")
+    paid: Decimal = Field(description="当月实发合计(该周期结算单 paid 之和)")
+    payout_limit: Decimal = Field(description="当月发放额度")
+    prev_balance: Decimal = Field(description="期初津贴余额(上期期末未发放额)")
+    allowance_balance: Decimal = Field(description="期末津贴余额(该期未结算时等于期初)")
+    settlements: list[MyPayoutSettlementOutSchema] = Field(
+        default_factory=list, description="该周期结算单(收益来源，按结算单ID升序)"
+    )
