@@ -533,13 +533,10 @@
   "home": {
     "title": "Home",
     "shareTitle": "Task Hall · Grab a task",
-    "todoHeadPrefix": "Today you have",
-    "todoHeadSuffix": "things due",
     "todoEmpty": "Nothing due today",
     "pending": "To accept",
     "active": "To submit",
     "rejected": "Rejected",
-    "latestDeadline": "Latest deadline",
     "nextTitle": "Next up",
     "viewAll": "All",
     "emptyTasks": "No open task on hand",
@@ -550,7 +547,11 @@
     "resultPending": "In review",
     "resultApproved": "Approved",
     "resultRejected": "Rejected",
-    "noNotice": "No notice yet"
+    "noNotice": "No notice yet",
+    "dueHeadPrefix": "",
+    "dueHeadSuffix": "to submit",
+    "pendingHint": "{count} tasks waiting to be accepted",
+    "nearestDeadline": "Nearest deadline"
   },
   "workDesk": {
     "title": "Workbench",

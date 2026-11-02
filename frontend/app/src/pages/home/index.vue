@@ -42,12 +42,12 @@ const notice = ref<NoticeItem | null>(null)
 const loading = ref(true)
 const failed = ref(false)
 
-/** 首页所有的「今天要做的事」都来自这一个数字，与 TabBar 角标同口径 */
-const todoCount = computed(
-  () => (stats.value.pending ?? 0) + (stats.value.accepted ?? 0) + (stats.value.rejected_submissions ?? 0),
-)
+/** 「要交」= 已接收待提交 + 被驳回需要重提；待接收还没接，不能算成要交 */
+const dueCount = computed(() => (stats.value.accepted ?? 0) + (stats.value.rejected_submissions ?? 0))
+const hasDue = computed(() => dueCount.value > 0)
 
-const hasWeekWork = computed(() => todoCount.value > 0)
+/** 还没接的单：单独提示，点进去是工作台的「待接收」 */
+const pendingCount = computed(() => stats.value.pending ?? 0)
 
 /** 成果概览三个数字：待审核 / 已通过 / 被驳回 */
 const resultCells = computed(() => [
@@ -69,12 +69,16 @@ const quotaPercent = computed(() =>
   payoutLimit.value > 0 ? Math.min(100, Math.round((payable.value / payoutLimit.value) * 100)) : 0,
 )
 
-/** 最晚截止：只取预览里的最小值，不额外请求 */
-const latestDeadline = computed(() => {
-  const dates = upcoming.value.map(item => item.task?.period).filter(Boolean) as string[]
-  if (!dates.length)
-    return ''
-  return dates.sort()[0]!.slice(0, 10)
+/** 最近截止：取待交任务里最早的那条，并把任务名一起说出来 */
+const nearestDeadline = computed(() => {
+  const withDate = upcoming.value.filter(item => item.task?.period)
+  if (!withDate.length)
+    return null
+  const first = [...withDate].sort((a, b) => String(a.task?.period).localeCompare(String(b.task?.period)))[0]
+  return {
+    name: taskDisplayName(first.task),
+    date: String(first.task?.period).slice(0, 10),
+  }
 })
 
 function currentPeriod() {
@@ -214,10 +218,10 @@ onPullDownRefresh(() => {
           {{ dateText }}
         </view>
         <view class="hero__say">
-          <template v-if="hasWeekWork">
-            {{ t('home.todoHeadPrefix') }} <text class="hero__count">
-              {{ todoCount }}
-            </text> {{ t('home.todoHeadSuffix') }}
+          <template v-if="hasDue">
+            {{ t('home.dueHeadPrefix') }} <text class="hero__count">
+              {{ dueCount }}
+            </text> {{ t('home.dueHeadSuffix') }}
           </template>
           <template v-else>
             {{ t('home.todoEmpty') }}
@@ -241,10 +245,22 @@ onPullDownRefresh(() => {
           </view>
         </view>
 
-        <view v-if="latestDeadline" class="hero__deadline">
-          <text>{{ t('home.latestDeadline') }}</text>
-          <text class="hero__deadline-date">
-            {{ latestDeadline }}
+        <!-- 待接收是「等你接的单」，与「要交的」分开说，不混成一个数字 -->
+        <view v-if="pendingCount > 0" class="hero__hint" hover-class="hero__hint--pressed" @click="goDesk('PENDING')">
+          <text class="hero__hint-text">
+            {{ t('home.pendingHint', { count: pendingCount }) }}
+          </text>
+          <text class="hero__hint-arrow">
+            ›
+          </text>
+        </view>
+
+        <view v-if="nearestDeadline" class="hero__deadline">
+          <text class="hero__deadline-label">
+            {{ t('home.nearestDeadline') }}
+          </text>
+          <text class="hero__deadline-task">
+            {{ nearestDeadline.name }} · {{ nearestDeadline.date }}
           </text>
         </view>
       </view>
@@ -481,20 +497,53 @@ onPullDownRefresh(() => {
     color: rgba(255, 255, 255, 0.78);
   }
 
-  &__deadline {
+  /* 待接收提示：可点，去工作台「待接收」 */
+  &__hint {
     position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 22rpx;
-    padding-top: 18rpx;
-    border-top: 1rpx solid rgba(255, 255, 255, 0.22);
-    font-size: 22rpx;
-    color: rgba(255, 255, 255, 0.82);
+    padding: 14rpx 20rpx;
+    border-radius: 12rpx;
+    background: rgba(255, 255, 255, 0.16);
+
+    &--pressed {
+      opacity: 0.8;
+    }
   }
 
-  &__deadline-date {
+  &__hint-text {
+    font-size: 24rpx;
+    color: #fff;
+  }
+
+  &__hint-arrow {
     font-size: 26rpx;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  &__deadline {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16rpx;
+    margin-top: 18rpx;
+    font-size: 22rpx;
+    color: rgba(255, 255, 255, 0.78);
+  }
+
+  &__deadline-label {
+    flex-shrink: 0;
+  }
+
+  &__deadline-task {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 24rpx;
     font-weight: 600;
     color: #fff;
     font-variant-numeric: tabular-nums;
