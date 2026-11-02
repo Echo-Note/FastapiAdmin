@@ -4,6 +4,7 @@
 认证使用 get_current_user（登录用户），不要求运营端 RBAC 权限码。
 """
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, Path, Query, Security
@@ -16,10 +17,11 @@ from app.core.base_schema import AuthSchema, PageResultSchema, PaginationQueryPa
 from app.core.dependencies import db_getter, get_current_user, redis_getter
 from app.core.router_class import OperationLogRoute
 
-from .assignment.schema import AssignmentOutSchema, AssignmentQueryParam
+from .assignment.schema import AssignmentOutSchema, AssignmentQueryParam, MyAssignmentStatsOutSchema
 from .assignment.service import AssignmentService
 from .institution.schema import InstitutionOutSchema
 from .institution.service import InstitutionService
+from .payout.schema import MyEarningsSummaryOutSchema
 from .payout.service import PayoutService
 from .submission.schema import SubmissionCreateSchema, SubmissionOutSchema, SubmissionQueryParam, SubmissionUpdateSchema
 from .submission.service import SubmissionService
@@ -139,3 +141,25 @@ async def mini_institution_list_controller(
         items=page_items,
     )
     return SuccessResponse(data=result, msg="获取机构列表成功")
+
+
+@MiniRouter.get("/summary", summary="我的收益汇总", response_model=ResponseSchema[MyEarningsSummaryOutSchema])
+async def mini_my_summary_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    period: Annotated[str | None, Query(description="周期(如 2026-10)，缺省为当月")] = None,
+) -> JSONResponse:
+    """我的收益汇总：本月应发 + 津贴余额 + 本月发放额度（C 端「我的」页收益卡）。"""
+    bill_period = period or datetime.now(UTC).strftime("%Y-%m")
+    result = await PayoutService(auth, db).my_summary(user_id=auth.user.id, period=bill_period)
+    return SuccessResponse(data=result, msg="获取我的收益汇总成功")
+
+
+@MiniRouter.get("/task-stats", summary="我的待办计数", response_model=ResponseSchema[MyAssignmentStatsOutSchema])
+async def mini_my_task_stats_controller(
+    auth: Annotated[AuthSchema, Security(get_current_user)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """我的任务待办计数：分派状态分组 + 被驳回成果数（C 端 Tab 角标）。"""
+    result = await AssignmentService(auth, db).my_stats()
+    return SuccessResponse(data=result, msg="获取我的待办计数成功")

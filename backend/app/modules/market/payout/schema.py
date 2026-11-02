@@ -16,6 +16,19 @@ class PayoutConfigOutSchema(BaseSchema, UserBySchema):
     enabled: bool = Field(default=True, description="是否启用")
 
 
+class MyEarningsSummaryOutSchema(BaseModel):
+    """C 端「我的收益」汇总（我的页顶部收益卡）
+
+    只回答三个问题：这个月我能拿多少、卡在额度上的有多少、这个月的额度上限是多少。
+    """
+
+    period: str = Field(description="统计周期(如 2026-10)")
+    month_payable: float = Field(description="本月应发金额(本月周期任务归属的结算单金额合计)")
+    settlement_count: int = Field(default=0, description="本月结算单数量")
+    allowance_balance: float = Field(default=0, description="个人任务津贴余额(超出额度未发、顺延下月)")
+    payout_limit: float = Field(description="本月发放额度上限")
+
+
 class PayoutConfigCreateSchema(BaseModel):
     """创建发放额度配置"""
 

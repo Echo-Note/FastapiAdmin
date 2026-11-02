@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from redis.asyncio.client import Redis
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.enums import RedisInitKeyConfig
@@ -10,10 +11,12 @@ from app.core.redis_crud import RedisCURD
 from app.modules.system.user.crud import UserCRUD
 from app.utils.common_util import search_to_dict
 
-from ..enums import AssignmentSource, AssignmentStatus, AssignMode, TaskKind, TaskStatus
+from ..enums import AssignmentSource, AssignmentStatus, AssignMode, SubmissionStatus, TaskKind, TaskStatus
+from ..submission.model import SubmissionModel
 from ..task.crud import TaskCRUD
 from .crud import AssignmentCRUD
-from .schema import AssignmentCreateSchema, AssignmentOutSchema, AssignmentQueryParam
+from .model import AssignmentModel
+from .schema import AssignmentCreateSchema, AssignmentOutSchema, AssignmentQueryParam, MyAssignmentStatsOutSchema
 
 # task 为 TaskOutSchema（含 task_type 等 UserBySchema 嵌套），须完整预加载各层审计关系，
 # 避免 detail()/page()/accept() 序列化时在异步环境下触发懒加载 MissingGreenlet
@@ -159,6 +162,38 @@ class AssignmentService:
         if task.status == TaskStatus.PUBLISHED.value:
             await TaskCRUD(self.auth, self.db).update(id=task_id, data={"status": TaskStatus.IN_PROGRESS.value})
         return await self.detail(id=assignment.id)
+
+    async def my_stats(self) -> MyAssignmentStatsOutSchema:
+        """我的任务待办计数（C 端 Tab 角标）：分派状态分组 + 被驳回成果数。
+
+        角标只需要数字，所以不拉列表：一次 group by 拿到各状态计数，
+        再单独数一次被驳回成果（驳回不在分派状态上体现，但在 C 端是必须返工的待办）。
+        """
+        status_stmt = (
+            select(AssignmentModel.status, func.count(AssignmentModel.id))
+            .where(AssignmentModel.user_id == self.auth.user.id, AssignmentModel.is_deleted == false())
+            .group_by(AssignmentModel.status)
+        )
+        counts = {status.value: 0 for status in AssignmentStatus}
+        for status, count in (await self.db.execute(status_stmt)).all():
+            counts[status] = int(count)
+
+        rejected_stmt = select(func.count(SubmissionModel.id)).where(
+            SubmissionModel.user_id == self.auth.user.id,
+            SubmissionModel.status == SubmissionStatus.REJECTED.value,
+            SubmissionModel.is_deleted == false(),
+        )
+        rejected = (await self.db.execute(rejected_stmt)).scalar_one()
+
+        return MyAssignmentStatsOutSchema(
+            pending=counts[AssignmentStatus.PENDING.value],
+            accepted=counts[AssignmentStatus.ACCEPTED.value],
+            submitting=counts[AssignmentStatus.SUBMITTING.value],
+            submitted=counts[AssignmentStatus.SUBMITTED.value],
+            reviewed=counts[AssignmentStatus.REVIEWED.value],
+            settled=counts[AssignmentStatus.SETTLED.value],
+            rejected_submissions=int(rejected or 0),
+        )
 
     async def my_assignments(
         self,

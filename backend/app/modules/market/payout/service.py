@@ -2,16 +2,20 @@
 
 from decimal import Decimal
 
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.base_schema import AuthSchema, PageResultSchema
 from app.utils.common_util import search_to_dict
 
 from ..enums import AllowanceStatus
+from ..settlement.model import SettlementModel
+from ..task.model import TaskModel
 from .crud import AllowanceCRUD, AllowanceDetailCRUD, PayoutConfigCRUD
 from .model import AllowanceModel
 from .schema import (
     AllowanceDetailOutSchema,
+    MyEarningsSummaryOutSchema,
     PayoutConfigCreateSchema,
     PayoutConfigOutSchema,
     PayoutConfigUpdateSchema,
@@ -111,6 +115,37 @@ class PayoutService:
         return paid, carryover_new
 
     # ── 查询 ───────────────────────────────────────────────────────────
+
+    async def my_summary(self, user_id: int, period: str) -> MyEarningsSummaryOutSchema:
+        """我的收益汇总（C 端「我的」页收益卡）：本月应发 + 津贴余额 + 本月发放额度。
+
+        `market_settlement` 自身没有 period 字段，周期在 `market_task.period` 上，
+        因此「本月应发」= join task 后按周期过滤的结算单 `payable_amount` 合计。
+        一期的应发即应得（没有支付环节），所以这里不区分结算单状态。
+        """
+        summary_stmt = (
+            select(
+                func.coalesce(func.sum(SettlementModel.payable_amount), 0),
+                func.count(SettlementModel.id),
+            )
+            .join(TaskModel, TaskModel.id == SettlementModel.task_id)
+            .where(
+                SettlementModel.user_id == user_id,
+                TaskModel.period == period,
+                SettlementModel.is_deleted == false(),
+            )
+        )
+        payable_sum, settlement_count = (await self.db.execute(summary_stmt)).one()
+
+        allowance = await AllowanceCRUD(self.auth, self.db).get(user_id=user_id)
+        config = await PayoutConfigCRUD(self.auth, self.db).get(user_id=user_id, period=period)
+        return MyEarningsSummaryOutSchema(
+            period=period,
+            month_payable=float(payable_sum or 0),
+            settlement_count=int(settlement_count or 0),
+            allowance_balance=float(allowance.balance) if allowance else 0.0,
+            payout_limit=float(config.payout_limit) if config and config.enabled else float(DEFAULT_PAYOUT_LIMIT),
+        )
 
     async def my_payout(self, user_id: int, period: str) -> dict:
         """查询我的发放情况：发放额度、津贴余额、津贴明细。"""

@@ -442,3 +442,71 @@ class TestOpenTaskClaim:
         hall = test_client.get("/market/mini/tasks", params={"page_no": 1, "page_size": 100}, headers=user2_h)
         task_nos = [t["task_no"] for t in hall.json()["data"]["items"]]
         assert "FLOW-TASK-17" not in task_nos
+
+
+class TestMiniEarningsSummary:
+    """C 端「我的」页收益卡：本月应发 / 津贴余额 / 发放额度。"""
+
+    PERIOD = "2027-03"  # 独立周期，避免与其它用例的结算金额相互污染
+
+    def test_summary_counts_month_payable(self, test_client: TestClient, auth_headers: dict) -> None:
+        uid = _get_user_id(test_client, auth_headers)
+        user_h = _login_user(test_client)
+
+        ttid = _create_task_type(test_client, auth_headers, "sum_tt_1")
+        tid = _create_published_task(test_client, auth_headers, "SUM-TASK-1", ttid, self.PERIOD, exec_qty=10, task_kind="quota")
+        aid = _assign_and_accept(test_client, auth_headers, user_h, tid, uid)
+        _submit_and_approve(test_client, auth_headers, user_h, aid, "汇总医院A")
+
+        test_client.post(f"/market/tasks/complete/{tid}", headers=auth_headers)
+        assert test_client.post(f"/market/tasks/settle/{tid}", headers=auth_headers).json()["success"] is True
+
+        resp = test_client.get("/market/mini/summary", params={"period": self.PERIOD}, headers=user_h)
+        assert resp.json()["success"] is True
+        data = resp.json()["data"]
+        assert data["period"] == self.PERIOD
+        assert data["month_payable"] == 3000.0
+        assert data["settlement_count"] == 1
+        # 应发未超默认额度（20000），津贴无滚存
+        assert data["allowance_balance"] == 0.0
+        assert data["payout_limit"] == 20000.0
+
+    def test_summary_other_period_is_empty(self, test_client: TestClient, auth_headers: dict) -> None:
+        """结算单周期由任务决定，切到没有结算单的周期应为 0（而不是带上别的月份）。"""
+        user_h = _login_user(test_client)
+        resp = test_client.get("/market/mini/summary", params={"period": "2099-12"}, headers=user_h)
+        assert resp.json()["success"] is True
+        assert resp.json()["data"]["month_payable"] == 0.0
+        assert resp.json()["data"]["settlement_count"] == 0
+
+
+class TestMiniTaskStats:
+    """C 端 Tab 角标：分派状态计数 + 被驳回成果数。"""
+
+    PERIOD = "2027-04"
+
+    def test_stats_counts_assignment_and_rejected(self, test_client: TestClient, auth_headers: dict) -> None:
+        # 统计是「全库该用户」口径，必须用独立用户，否则会累计前序用例的成果计数
+        user_h, uid = _create_and_login_user(test_client, auth_headers, "stats_user1")
+
+        ttid = _create_task_type(test_client, auth_headers, "stats_tt_1")
+        tid = _create_published_task(test_client, auth_headers, "STATS-TASK-1", ttid, self.PERIOD, exec_qty=10, task_kind="quota")
+        aid = _assign_and_accept(test_client, auth_headers, user_h, tid, uid)
+
+        iid = _create_institution(test_client, auth_headers, "驳回医院A")
+        sub = test_client.post(
+            "/market/mini/submissions",
+            json={"assignment_id": aid, "institution_id": iid, "form_data": {"hospital_name": "驳回医院A"}, "status": "PENDING"},
+            headers=user_h,
+        )
+        sid = sub.json()["data"]["id"]
+        test_client.post(f"/market/submissions/review/{sid}", json={"action": "reject", "comment": "照片不清晰"}, headers=auth_headers)
+
+        resp = test_client.get("/market/mini/task-stats", headers=user_h)
+        assert resp.json()["success"] is True
+        data = resp.json()["data"]
+        # 首次提交后分派状态流转为 SUBMITTED；成果被驳回 → rejected_submissions 计数
+        assert data["submitted"] == 1
+        assert data["reviewed"] == 0
+        assert data["rejected_submissions"] == 1
+        assert data["settled"] == 0

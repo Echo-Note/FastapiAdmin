@@ -26,6 +26,21 @@ class AssignmentCreateSchema(BaseModel):
     user_ids: list[int] = Field(min_length=1, description="C端用户ID列表")
 
 
+class MyAssignmentStatsOutSchema(BaseModel):
+    """C 端「我的任务」待办计数（Tab 角标）
+
+    按分派状态分组计数，另附被驳回成果数——驳回是 C 端唯一需要立即返工的状态。
+    """
+
+    pending: int = Field(default=0, description="待接收数")
+    accepted: int = Field(default=0, description="已接收数")
+    submitting: int = Field(default=0, description="进行中数")
+    submitted: int = Field(default=0, description="已提交数")
+    reviewed: int = Field(default=0, description="已审核数")
+    settled: int = Field(default=0, description="已结算数")
+    rejected_submissions: int = Field(default=0, description="被驳回成果数(需修改重提)")
+
+
 class AssignmentQueryParam(BaseQueryParam, UserByQueryParam):
     """任务分派查询参数"""
 
