@@ -533,13 +533,10 @@
   "home": {
     "title": "首页",
     "shareTitle": "任务大厅 · 一起接单",
-    "todoHeadPrefix": "今天有",
-    "todoHeadSuffix": "件事要交",
     "todoEmpty": "今天没有要交的事",
     "pending": "待接收",
     "active": "待提交",
     "rejected": "被驳回",
-    "latestDeadline": "最晚截止",
     "nextTitle": "接下来要交的",
     "viewAll": "全部",
     "emptyTasks": "手上没有待办任务",
@@ -550,7 +547,11 @@
     "resultPending": "待审核",
     "resultApproved": "已通过",
     "resultRejected": "被驳回",
-    "noNotice": "暂无公告"
+    "noNotice": "暂无公告",
+    "dueHeadPrefix": "还有",
+    "dueHeadSuffix": "件要交",
+    "pendingHint": "另有 {count} 个待接收任务",
+    "nearestDeadline": "最近截止"
   },
   "workDesk": {
     "title": "工作台",
