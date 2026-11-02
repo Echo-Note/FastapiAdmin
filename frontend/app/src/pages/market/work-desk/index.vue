@@ -170,6 +170,51 @@ function priceOf(item: AssignmentItem) {
   return item.task?.item?.config?.price ?? item.task?.template?.config?.price ?? null
 }
 
+/** 所属链路：项目 · 分类 · 模板 */
+function pathText(item: AssignmentItem) {
+  const task = item.task
+  return [task?.project?.name, task?.template?.category?.name, task?.template?.name].filter(Boolean).join(' · ')
+}
+
+/** 剩余天数：截止日 → 「剩 N 天 / 今天截止 / 已截止」 */
+function remainText(item: AssignmentItem) {
+  const period = item.task?.period
+  if (!period)
+    return ''
+  const end = new Date(String(period).replace(/-/g, '/')).getTime()
+  if (Number.isNaN(end))
+    return ''
+  const days = Math.ceil((end - Date.now()) / 86_400_000)
+  if (days < 0)
+    return t('hall.deadlinePassed')
+  if (days === 0)
+    return t('hall.deadlineToday')
+  return t('hall.deadlineDays', { days })
+}
+
+/** 成果进度角标：只显示有意义的（待审 / 驳回），全部通过时给个通过数 */
+function progressChips(item: AssignmentItem) {
+  const stats = item.submission_stats
+  if (!stats)
+    return []
+  const chips: { key: string, text: string, tone: 'warn' | 'danger' | 'ok' }[] = []
+  if ((stats.pending ?? 0) > 0)
+    chips.push({ key: 'pending', text: t('workDesk.progressPending', { count: stats.pending }), tone: 'warn' })
+  if ((stats.rejected ?? 0) > 0)
+    chips.push({ key: 'rejected', text: t('workDesk.progressRejected', { count: stats.rejected }), tone: 'danger' })
+  if ((stats.approved ?? 0) > 0 && chips.length === 0)
+    chips.push({ key: 'approved', text: t('workDesk.progressApproved', { count: stats.approved }), tone: 'ok' })
+  return chips
+}
+
+/** 整卡点击：带着分派 id 进详情（详情页用 tag 标「我的任务」，不单开分派页面） */
+function goDetail(item: AssignmentItem) {
+  if (item.task?.id == null)
+    return
+  routeIntent.set('market-task-detail', { id: String(item.task.id), assignment_id: String(item.id ?? '') })
+  router.push({ name: 'market-task-detail' })
+}
+
 function amountText(item: AssignmentItem) {
   const price = priceOf(item)
   return price == null ? t('taskDetail.priceTbd') : `¥${CommonUtil.formatMoney(price)}`
@@ -462,11 +507,20 @@ onPullDownRefresh(async () => {
       </view>
 
       <view v-else class="mx-3 mt-3 flex flex-col gap-3">
-        <view v-for="item in taskList" :key="item.id" class="queue">
+        <view
+          v-for="item in taskList"
+          :key="item.id"
+          class="queue"
+          hover-class="queue--pressed"
+          @click="goDetail(item)"
+        >
           <view class="queue__mark" :class="`queue__mark--${markTone(item.status)}`" />
           <view class="min-w-0 flex-1">
             <view class="queue__name">
               {{ taskDisplayName(item.task) }}
+            </view>
+            <view v-if="pathText(item)" class="queue__path">
+              {{ pathText(item) }}
             </view>
             <view class="queue__meta">
               <text>{{ item.task?.task_no }}</text>
@@ -476,6 +530,22 @@ onPullDownRefresh(async () => {
               <text>{{ amountText(item) }}</text>
               <text v-if="unitText(item)" class="queue__dot">
                 {{ unitText(item) }}
+              </text>
+              <text v-if="remainText(item)" class="queue__dot">
+                ·
+              </text>
+              <text v-if="remainText(item)">
+                {{ remainText(item) }}
+              </text>
+            </view>
+            <view v-if="progressChips(item).length > 0" class="mt-1 flex flex-wrap gap-1.5">
+              <text
+                v-for="chip in progressChips(item)"
+                :key="chip.key"
+                class="progress-chip"
+                :class="`progress-chip--${chip.tone}`"
+              >
+                {{ chip.text }}
               </text>
             </view>
           </view>
@@ -800,6 +870,19 @@ onPullDownRefresh(async () => {
     font-variant-numeric: tabular-nums;
   }
 
+  &--pressed {
+    opacity: 0.75;
+  }
+
+  &__path {
+    margin-top: 6rpx;
+    font-size: 22rpx;
+    color: var(--wot-text-auxiliary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   &__dot {
     color: var(--wot-text-disabled);
   }
@@ -816,6 +899,29 @@ onPullDownRefresh(async () => {
     font-size: 20rpx;
     color: var(--wot-text-auxiliary);
     font-variant-numeric: tabular-nums;
+  }
+}
+
+/* 成果进度角标：待审 / 驳回 / 通过 */
+.progress-chip {
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+
+  &--warn {
+    color: var(--wot-warning-main);
+    background: var(--wot-warning-surface);
+  }
+
+  &--danger {
+    color: var(--wot-danger-main);
+    background: var(--wot-danger-surface);
+  }
+
+  &--ok {
+    color: var(--wot-success-main);
+    background: var(--wot-success-surface);
   }
 }
 
@@ -868,6 +974,29 @@ onPullDownRefresh(async () => {
   &__unit {
     font-size: 22rpx;
     color: var(--wot-text-auxiliary);
+  }
+}
+
+/* 成果进度角标：待审 / 驳回 / 通过 */
+.progress-chip {
+  padding: 2rpx 12rpx;
+  border-radius: 6rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+
+  &--warn {
+    color: var(--wot-warning-main);
+    background: var(--wot-warning-surface);
+  }
+
+  &--danger {
+    color: var(--wot-danger-main);
+    background: var(--wot-danger-surface);
+  }
+
+  &--ok {
+    color: var(--wot-success-main);
+    background: var(--wot-success-surface);
   }
 }
 
