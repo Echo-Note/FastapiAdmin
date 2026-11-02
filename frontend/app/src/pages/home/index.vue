@@ -7,7 +7,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useNoticeDismiss } from '@/composables/useNoticeDismiss'
+import { useNoticeDismiss, useNoticeOpen } from '@/composables/useNoticeDismiss'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { useWorkDeskFilter } from '@/composables/useWorkDeskFilter'
@@ -29,6 +29,7 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const workDeskFilter = useWorkDeskFilter()
 const { isDismissed, dismiss } = useNoticeDismiss()
+const { requestOpen } = useNoticeOpen()
 
 useShare(() => ({ title: t('home.shareTitle'), path: '/pages/home/index' }))
 useTabbarActive('pages/home/index', 'home')
@@ -52,7 +53,8 @@ function openNoticeDetail() {
   if (!notice.value?.id)
     return
   dismiss(notice.value.id)
-  router.push({ name: 'work-notices', query: { id: String(notice.value.id) } })
+  requestOpen(notice.value.id)
+  router.push({ name: 'work-notices' })
 }
 const loading = ref(true)
 const failed = ref(false)

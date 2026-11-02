@@ -6,7 +6,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { MarketAPI } from '@/api/module_market'
 import { NoticeAPI } from '@/api/module_system/notice'
-import { useNoticeDismiss } from '@/composables/useNoticeDismiss'
+import { useNoticeDismiss, useNoticeOpen } from '@/composables/useNoticeDismiss'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
 import { taskDisplayName } from '@/constants'
@@ -40,6 +40,7 @@ const keyword = ref('')
 const projectFilter = ref('')
 const notice = ref<NoticeItem | null>(null)
 const { isDismissed, dismiss } = useNoticeDismiss()
+const { requestOpen } = useNoticeOpen()
 
 /** 条幅只在最新公告没看过时出现 */
 const showNoticeBar = computed(() => !!notice.value && !isDismissed(notice.value.id))
@@ -151,7 +152,8 @@ function openNoticeDetail() {
   if (!notice.value?.id)
     return
   dismiss(notice.value.id)
-  router.push({ name: 'work-notices', query: { id: String(notice.value.id) } })
+  requestOpen(notice.value.id)
+  router.push({ name: 'work-notices' })
 }
 
 onLoad(() => {
