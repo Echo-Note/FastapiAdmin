@@ -34,11 +34,14 @@ export const NoticeAPI = {
    * 须知：这是**公开内容**接口，后端已绕过数据权限（否则非超管因为 `created_id` 过滤会一条都看不到）。
    * `limit` 缺省 10；C 端公告页传 50，避免公告多了只看得到最旧的几条。
    */
-  getAvailable(limit?: number): Promise<NoticeItem[]> {
+  getAvailable(limit?: number) {
     const params: Record<string, any> = {}
     if (limit)
       params.limit = limit
-    return http.Get(`${SYSTEM_BASE}/notice/available`, params)
+    const method = http.Get<NoticeItem[]>(`${SYSTEM_BASE}/notice/available`, params)
+    // alova 的 GET 默认缓存 5 分钟：运营刚发的公告会看不到，公告必须实时
+    method.config.cacheFor = 0
+    return method
   },
 }
 
