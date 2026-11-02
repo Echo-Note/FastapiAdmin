@@ -49,6 +49,7 @@ from .schema import (
     CatalogUsageSchema,
     MiniAssignmentGroupSchema,
     MiniTaskGroupSchema,
+    MyAssignmentStatsOutSchema,
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
@@ -938,6 +939,36 @@ class AssignmentService:
             raise CustomException(msg="删除失败，删除对象不能为空")
         await AssignmentCRUD(self.auth, self.db).delete(ids=ids)
 
+    async def my_stats(self) -> MyAssignmentStatsOutSchema:
+        """我的待办计数（C 端角标）：分派状态分组 + 被驳回成果数。
+
+        角标只需数字，所以不拉列表：一次 group by 拿各状态计数，再单独数一次被驳回成果。
+        """
+        status_stmt = (
+            select(AssignmentModel.status, func.count(AssignmentModel.id))
+            .where(AssignmentModel.user_id == self.auth.user.id, AssignmentModel.is_deleted.is_(False))
+            .group_by(AssignmentModel.status)
+        )
+        counts: dict[str, int] = {}
+        for status, count in (await self.db.execute(status_stmt)).all():
+            counts[status] = int(count)
+
+        rejected = await self.db.scalar(
+            select(func.count(SubmissionModel.id)).where(
+                SubmissionModel.user_id == self.auth.user.id,
+                SubmissionModel.status == SubmissionStatus.REJECTED.value,
+                SubmissionModel.is_deleted.is_(False),
+            )
+        )
+        return MyAssignmentStatsOutSchema(
+            pending=counts.get(AssignmentStatus.PENDING.value, 0),
+            accepted=counts.get(AssignmentStatus.ACCEPTED.value, 0),
+            submitted=counts.get(AssignmentStatus.SUBMITTED.value, 0),
+            reviewed=counts.get(AssignmentStatus.REVIEWED.value, 0),
+            settled=counts.get(AssignmentStatus.SETTLED.value, 0),
+            rejected_submissions=int(rejected or 0),
+        )
+
     async def my_assignments(
         self, page_no: int, page_size: int, search: AssignmentQueryParam | None = None
     ) -> PageResultSchema[AssignmentOutSchema]:
@@ -1236,6 +1267,18 @@ class SubmissionService:
         if not ids:
             raise CustomException(msg="删除失败，删除对象不能为空")
         await SubmissionCRUD(self.auth, self.db).delete(ids=ids)
+
+    async def my_detail(self, id: int) -> SubmissionOutSchema:
+        """我的成果详情（C 端）：驳回后修改重提要回填原表单。
+
+        越权按「不存在」处理，不向调用方泄露他人成果是否存在。
+        """
+        submission = await SubmissionCRUD(self.auth, self.db).get_or_404(
+            id=id, msg="成果不存在", preload=_SUBMISSION_PRELOAD
+        )
+        if submission.user_id != self.auth.user.id:
+            raise CustomException(msg="成果不存在")
+        return await self.detail(id=id)
 
     async def my_submissions(
         self, page_no: int, page_size: int, search: SubmissionQueryParam | None = None

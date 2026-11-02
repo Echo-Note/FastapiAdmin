@@ -1,23 +1,17 @@
-<script lang="ts" setup>
+<script setup lang="ts">
+import type { PayoutSummary } from '@/api/module_market'
 import type { PasswordChangeForm } from '@/api/module_system/user'
+import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { MarketAPI } from '@/api/module_market'
 import UserAPI from '@/api/module_system/user'
+import { useAccess } from '@/composables/useAccess'
 import { useGlobalDialog } from '@/composables/useGlobalDialog'
 import { useI18nNavTitle } from '@/composables/useI18nNavTitle'
 import { useShare } from '@/composables/useShare'
 import { useTabbarActive } from '@/composables/useTabbarActive'
-import { useTicketStats } from '@/composables/useTicketStats'
+import { MINE_ENTRIES, NAV_TONE_STYLE } from '@/constants/nav'
 import { useUserStore } from '@/store/userStore'
-
-const { t } = useI18n()
-
-const userStore = useUserStore()
-const userInfo = computed(() => userStore.userInfo)
-
-useShare(() => ({
-  title: t('mine.shareTitle', { name: userInfo.value?.name || t('common.admin') }),
-  path: '/pages/index/index',
-}))
 
 definePage({
   name: 'mine',
@@ -26,10 +20,75 @@ definePage({
 })
 useI18nNavTitle('mine.navTitle')
 
+const { t } = useI18n()
 const router = useRouter()
+const toast = useToast()
+
+const userStore = useUserStore()
+const userInfo = computed(() => userStore.userInfo)
+
+useShare(() => ({
+  title: t('mine.shareTitle', { name: userInfo.value?.name || t('common.admin') }),
+  path: '/pages/market/task-hall/index',
+}))
+
+const { isSuperuser, visibleEntries } = useAccess()
+const entries = computed(() => visibleEntries(MINE_ENTRIES))
 
 function navigateTo(name: string) {
   router.push({ name })
+}
+
+/** 手机号脱敏：中间四位隐去，未绑定时展示明确文案 */
+const mobileText = computed(() => {
+  const mobile = (userInfo.value?.mobile || '').trim()
+  if (!mobile)
+    return t('mine.mobileUnbound')
+  return mobile.length >= 7 ? `${mobile.slice(0, 3)}****${mobile.slice(-4)}` : mobile
+})
+
+/** 收益汇总：本月应发 / 津贴余额 / 发放额度（同一个 mini/payout 接口，避免为卡片单独开接口） */
+const summary = ref<PayoutSummary | null>(null)
+const earningsLoading = ref(false)
+const earningsFailed = ref(false)
+
+const monthPayableText = computed(() => Number(summary.value?.payable ?? 0).toFixed(2))
+const allowanceText = computed(() => Number(summary.value?.allowance_balance ?? 0).toFixed(2))
+const payoutLimitText = computed(() => Number(summary.value?.payout_limit ?? 0).toFixed(2))
+const periodText = computed(() => summary.value?.period || '')
+
+/** 收益卡展示当月：后端 payout 需要显式周期，缺省用本机当月 */
+function currentPeriod() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+async function loadSummary() {
+  earningsLoading.value = true
+  earningsFailed.value = false
+  try {
+    summary.value = await MarketAPI.getMyPayout(currentPeriod())
+  }
+  catch {
+    summary.value = null
+    earningsFailed.value = true
+  }
+  finally {
+    earningsLoading.value = false
+  }
+}
+
+useTabbarActive('pages/mine/index', 'mine', loadSummary)
+
+/** 收益卡整卡可点：失败态点击即重试，正常态进入收益明细 */
+function handleEarningsTap() {
+  if (earningsLoading.value)
+    return
+  if (earningsFailed.value) {
+    loadSummary()
+    return
+  }
+  router.push({ name: 'market-my-earnings' })
 }
 
 const globalDialog = useGlobalDialog()
@@ -46,26 +105,7 @@ function handleLogout() {
   })
 }
 
-/** 工单统计（共享缓存，与 work 页面复用，30秒内不重复请求） */
-const { pendingTickets, processingTickets, doneTickets, loadTicketStats } = useTicketStats()
-
-useTabbarActive('pages/mine/index', 'mine', loadTicketStats)
-
-const settingsList = [
-  { titleKey: 'common.profile', name: 'profile' },
-  { titleKey: 'mine.changePassword', name: 'account', dialog: true },
-  { titleKey: 'common.aboutUs', name: 'about' },
-]
-
-const quickLinks = [
-  { titleKey: 'common.nav.notices', name: 'work-notices', icon: 'notification', color: 'var(--wot-green-6)', soft: 'wot-bg-green-1' },
-  { titleKey: 'common.nav.tickets', name: 'work-tickets', icon: 'message', color: 'var(--wot-orange-6)', soft: 'wot-bg-orange-1' },
-  { titleKey: 'common.nav.aiChat', name: 'work-chat', icon: 'interaction', color: 'var(--wot-cyan-6)', soft: 'wot-bg-cyan-1' },
-  { titleKey: 'common.nav.aiModels', name: 'work-ai-models', icon: 'robot', color: 'var(--wot-purple-6)', soft: 'wot-bg-purple-1' },
-]
-
 /** 修改密码弹窗（内嵌于「我的」页，免跳转） */
-const toast = useToast()
 const showPasswordDialog = ref(false)
 const submitting = ref(false)
 const passwordForm = reactive<PasswordChangeForm>({
@@ -125,111 +165,120 @@ async function handleSubmitPassword() {
 
 <template>
   <view class="tabbar-wraper py-3">
-    <!-- 用户信息卡（品牌渐变 + 极光装饰圆环，与工作台一致） -->
+    <!-- 用户卡：头像 / 昵称 / 脱敏手机号，右侧设置入口 -->
     <view class="user-info-card mx-3 mb-3 flex items-center gap-4 rounded-3 px-5 py-6">
-      <wd-badge is-dot>
-        <wd-avatar
-          size="64px"
-          round
-          :src="userInfo?.avatar || ''"
-          icon="user"
-        />
-      </wd-badge>
+      <wd-avatar
+        size="64px"
+        round
+        :src="userInfo?.avatar || ''"
+        icon="user"
+      />
       <view class="min-w-0 flex-1">
-        <view class="text-4 text-white font-bold">
+        <view class="truncate text-4 text-white font-bold">
           {{ userInfo?.name || t('common.admin') }}
         </view>
-        <view class="mt-1 truncate text-3" style="color: rgba(255, 255, 255, 0.75);">
-          {{ userInfo?.roles?.map(r => r.name).join(', ') || t('mine.roleFallback') }}
+        <view class="mine-mobile">
+          {{ mobileText }}
         </view>
       </view>
-      <!-- 设置入口（纯 icon，打开设置页：内含主题设置） -->
       <view
-        class="relative z-10 h-9 w-9 flex shrink-0 items-center justify-center rounded-full active:opacity-70"
-        hover-class="none"
+        class="mine-setting"
+        hover-class="mine-setting--pressed"
         @click="navigateTo('setting')"
       >
         <wd-icon name="settings" size="20px" color="rgba(255, 255, 255, 0.9)" />
       </view>
     </view>
 
-    <!-- 工单统计 -->
-    <view class="mx-3 mb-3">
-      <wd-row :gutter="12">
-        <wd-col :span="8">
-          <view class="wot-bg-filled-oppo rounded-2 p-4 text-center active:opacity-70" @click="navigateTo('work-tickets')">
-            <view class="wot-text-warning-main text-5 font-bold">
-              {{ pendingTickets ?? '-' }}
-            </view>
-            <view class="wot-text-text-secondary mt-1 text-3">
-              {{ t('mine.pendingTickets') }}
-            </view>
-          </view>
-        </wd-col>
-        <wd-col :span="8">
-          <view class="wot-bg-filled-oppo rounded-2 p-4 text-center active:opacity-70" @click="navigateTo('work-tickets')">
-            <view class="wot-text-primary-6 text-5 font-bold">
-              {{ processingTickets ?? '-' }}
-            </view>
-            <view class="wot-text-text-secondary mt-1 text-3">
-              {{ t('mine.processingTickets') }}
-            </view>
-          </view>
-        </wd-col>
-        <wd-col :span="8">
-          <view class="wot-bg-filled-oppo rounded-2 p-4 text-center active:opacity-70" @click="navigateTo('work-tickets')">
-            <view class="wot-text-success-main text-5 font-bold">
-              {{ doneTickets ?? '-' }}
-            </view>
-            <view class="wot-text-text-secondary mt-1 text-3">
-              {{ t('mine.doneTickets') }}
-            </view>
-          </view>
-        </wd-col>
-      </wd-row>
-    </view>
-
-    <!-- 快捷入口 -->
-    <view class="wot-bg-filled-oppo mx-3 mb-3 rounded-2 p-2">
-      <wd-grid :column="4" :border="false" clickable>
-        <wd-grid-item
-          v-for="item in quickLinks"
-          :key="item.name"
-          @click="navigateTo(item.name)"
-        >
-          <view
-            class="h-11 w-11 flex items-center justify-center rounded-xl"
-            :class="item.soft"
-          >
-            <wd-icon :name="item.icon" size="20px" :color="item.color" />
-          </view>
-          <view class="wot-text-text-secondary mt-1 text-2.5">
-            {{ t(item.titleKey) }}
-          </view>
-        </wd-grid-item>
-      </wd-grid>
-    </view>
-
-    <!-- 设置列表 -->
-    <view class="mx-3 mb-3">
-      <view class="mb-2 mt-1 flex items-center gap-2 px-3">
-        <view class="wot-bg-primary-6 h-3.5 w-1 rounded-full" />
-        <wd-text class="wot-text-text-main text-3.5" :text="t('common.settings')" bold />
+    <!-- 收益卡：整卡进收益明细，失败态点击重试 -->
+    <view
+      class="earnings-card user-info-card mx-3 mb-3"
+      hover-class="earnings-card--pressed"
+      @click="handleEarningsTap"
+    >
+      <view v-if="earningsLoading" class="flex items-center justify-center py-6">
+        <wd-loading color="rgba(255, 255, 255, 0.9)" />
       </view>
+
+      <view v-else-if="earningsFailed" class="flex flex-col items-center gap-2 py-4">
+        <wd-icon name="exclamation-circle" size="24px" color="rgba(255, 255, 255, 0.9)" />
+        <text class="earnings-card__failed">
+          {{ t('mine.earningsFailed') }}
+        </text>
+      </view>
+
+      <template v-else>
+        <view class="flex items-start justify-between gap-3">
+          <view class="min-w-0">
+            <view class="earnings-card__label">
+              {{ t('mine.monthPayable') }}
+            </view>
+            <view class="earnings-card__amount">
+              ¥{{ monthPayableText }}
+            </view>
+          </view>
+          <text class="earnings-card__link">
+            {{ t('mine.earningsDetail') }} ›
+          </text>
+        </view>
+
+        <view class="earnings-card__footer">
+          <text>
+            {{ t('mine.allowanceBalance') }}
+            <text class="earnings-card__value">
+              ¥{{ allowanceText }}
+            </text>
+          </text>
+          <text>
+            {{ periodText ? `${periodText} ` : '' }}{{ t('mine.payoutLimit') }}
+            <text class="earnings-card__value">
+              ¥{{ payoutLimitText }}
+            </text>
+          </text>
+        </view>
+      </template>
+    </view>
+
+    <!-- 功能列表：可见性统一由 nav 真值表 + useAccess 决定 -->
+    <view class="mx-3 mb-3">
       <wd-cell-group border custom-class="rounded-2! overflow-hidden">
         <wd-cell
-          v-for="item in settingsList"
-          :key="item.name"
-          :title="t(item.titleKey)"
+          v-for="entry in entries"
+          :key="entry.name"
+          center
           is-link
-          @click="item.dialog ? openPasswordDialog() : navigateTo(item.name)"
+          @click="entry.dialog === 'password' ? openPasswordDialog() : navigateTo(entry.name)"
+        >
+          <template #title>
+            <view class="flex items-center gap-2.5">
+              <view
+                class="h-8 w-8 flex shrink-0 items-center justify-center rounded-lg"
+                :class="NAV_TONE_STYLE[entry.tone].soft"
+              >
+                <wd-icon :name="entry.icon" size="16px" :color="NAV_TONE_STYLE[entry.tone].color" />
+              </view>
+              <text>{{ t(entry.titleKey) }}</text>
+            </view>
+          </template>
+        </wd-cell>
+      </wd-cell-group>
+    </view>
+
+    <!-- 超管专属：全部功能 -->
+    <view v-if="isSuperuser" class="mx-3 mb-3">
+      <wd-cell-group border custom-class="rounded-2! overflow-hidden">
+        <wd-cell
+          :title="t('mine.allFeatures')"
+          :label="t('mine.allFeaturesTip')"
+          is-link
+          @click="navigateTo('work')"
         />
       </wd-cell-group>
     </view>
 
     <!-- 退出登录 -->
     <view class="mx-3">
-      <wd-button type="danger" plain round block @click="handleLogout">
+      <wd-button type="danger" size="large" plain round block @click="handleLogout">
         {{ t('mine.logout') }}
       </wd-button>
     </view>
@@ -270,7 +319,7 @@ async function handleSubmitPassword() {
           :placeholder="t('common.form.confirmNewPlaceholder')"
         />
         <view class="mt-5">
-          <wd-button type="primary" round block :loading="submitting" @click="handleSubmitPassword">
+          <wd-button type="primary" size="large" round block :loading="submitting" @click="handleSubmitPassword">
             {{ t('account.submit') }}
           </wd-button>
         </view>
@@ -279,3 +328,83 @@ async function handleSubmitPassword() {
     </wd-popup>
   </view>
 </template>
+
+<style lang="scss" scoped>
+.mine-mobile {
+  margin-top: 8rpx;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+
+.mine-setting {
+  position: relative;
+  z-index: 10;
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999rpx;
+  transition: opacity 0.15s ease;
+
+  &--pressed {
+    opacity: 0.7;
+  }
+}
+
+/* 收益卡：复用 user-info-card 的品牌渐变，金额作为主视觉 */
+.earnings-card {
+  padding: 32rpx;
+  transition: opacity 0.15s ease;
+
+  &--pressed {
+    opacity: 0.8;
+  }
+
+  &__failed {
+    font-size: 26rpx;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  &__label {
+    font-size: 24rpx;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  &__amount {
+    margin-top: 8rpx;
+    font-size: 60rpx;
+    font-weight: 700;
+    line-height: 1.1;
+    color: rgba(255, 255, 255, 1);
+    /* 金额按位数对齐，切换周期时不跳动 */
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__link {
+    flex-shrink: 0;
+    font-size: 24rpx;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  &__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8rpx 24rpx;
+    margin-top: 24rpx;
+    padding-top: 20rpx;
+    border-top: 1rpx solid rgba(255, 255, 255, 0.2);
+    font-size: 24rpx;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  &__value {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 1);
+    font-variant-numeric: tabular-nums;
+  }
+}
+</style>

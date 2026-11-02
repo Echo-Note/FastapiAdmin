@@ -31,6 +31,7 @@ from .task.schema import (
     AssignmentQueryParam,
     MiniAssignmentGroupSchema,
     MiniTaskGroupSchema,
+    MyAssignmentStatsOutSchema,
     SubmissionCreateSchema,
     SubmissionOutSchema,
     SubmissionQueryParam,
@@ -169,6 +170,27 @@ async def mini_my_payout_controller(
 ) -> JSONResponse:
     result = await PayoutService(auth, db).my_payout(user_id=auth.user.id, period=period)
     return SuccessResponse(data=result, msg="获取我的发放信息成功")
+
+
+@MiniRouter.get("/task-stats", summary="我的待办计数", response_model=ResponseSchema[MyAssignmentStatsOutSchema])
+async def mini_my_task_stats_controller(
+    auth: Annotated[AuthSchema, Security(require_market_member)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+) -> JSONResponse:
+    """我的待办计数：分派状态分组 + 被驳回成果数（C 端 Tab / 状态 Tab 角标）。"""
+    result = await AssignmentService(auth, db).my_stats()
+    return SuccessResponse(data=result, msg="获取我的待办计数成功")
+
+
+@MiniRouter.get("/submissions/{id}", summary="我的成果详情", response_model=ResponseSchema[SubmissionOutSchema])
+async def mini_my_submission_detail_controller(
+    auth: Annotated[AuthSchema, Security(require_market_member)],
+    db: Annotated[AsyncSession, Depends(db_getter)],
+    id: Annotated[int, Path(description="成果ID", ge=1)],
+) -> JSONResponse:
+    """我的成果详情：驳回后修改重提需要回填原表单与表单结构，运营端接口要 RBAC 权限码用不了。"""
+    result = await SubmissionService(auth, db).my_detail(id=id)
+    return SuccessResponse(data=result, msg="获取成果详情成功")
 
 
 @MiniRouter.get(

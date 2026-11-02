@@ -1,3 +1,7 @@
+import type { NavEntry } from '@/constants/nav'
+import { computed, ref } from 'vue'
+import { TABBAR_ITEMS } from '@/constants/nav'
+
 export interface TabbarItem {
   name: string
   value?: number
@@ -6,11 +10,20 @@ export interface TabbarItem {
   icon: string
 }
 
-const tabbarItems = ref<TabbarItem[]>([
-  { name: 'home', active: true, titleKey: 'common.tab.home', icon: 'home' },
-  { name: 'work', active: false, titleKey: 'common.tab.work', icon: 'apps' },
-  { name: 'mine', active: false, titleKey: 'common.tab.mine', icon: 'user' },
-])
+/**
+ * TabBar 条目直接由 `constants/nav.ts` 的 TABBAR_ITEMS 派生，
+ * 避免「导航配置」与「Tab 渲染」两处各写一份而漂移。
+ */
+function createTabbarItems(): TabbarItem[] {
+  return TABBAR_ITEMS.map((entry: NavEntry, index: number) => ({
+    name: entry.name,
+    active: index === 0,
+    titleKey: entry.titleKey,
+    icon: entry.icon,
+  }))
+}
+
+const tabbarItems = ref<TabbarItem[]>(createTabbarItems())
 
 export function useTabbar() {
   const tabbarList = computed(() => tabbarItems.value)

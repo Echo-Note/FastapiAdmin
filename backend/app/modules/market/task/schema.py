@@ -198,6 +198,21 @@ class TaskOutSchema(BaseSchema, UserBySchema):
     executor_requirement: str | None = Field(default=None, description="执行要求(item.config 优先，回退 template.config)")
 
 
+class MyAssignmentStatsOutSchema(BaseModel):
+    """C 端「我的任务」待办计数（TabBar / 状态 Tab 角标）
+
+    按分派状态分组计数，另附被驳回成果数——驳回不体现在分派状态上，
+    但它是 C 端唯一必须立刻返工的事，角标必须把它算进去。
+    """
+
+    pending: int = Field(default=0, description="待接收数")
+    accepted: int = Field(default=0, description="进行中数(已接收待提交)")
+    submitted: int = Field(default=0, description="已提交数")
+    reviewed: int = Field(default=0, description="已审核数")
+    settled: int = Field(default=0, description="已结算数")
+    rejected_submissions: int = Field(default=0, description="被驳回成果数(需修改重提)")
+
+
 class MiniTaskGroupSchema(BaseModel):
     """C 端按项目分组的最小单元任务组。"""
 

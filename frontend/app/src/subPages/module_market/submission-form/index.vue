@@ -16,6 +16,8 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const assignmentId = ref<number>()
+/** 编辑模式：带 submission_id 进来时是驳回重提，提交走 PUT 而不是新建 */
+const submissionId = ref<number>()
 const taskNo = ref('')
 const formLoading = ref(false)
 const formSchema = ref<FormSchema>([])
@@ -744,7 +746,10 @@ async function handleSubmit() {
     return
   submitting.value = true
   try {
-    await MarketAPI.createSubmission(buildPayload())
+    if (submissionId.value)
+      await MarketAPI.updateSubmission(submissionId.value, buildPayload())
+    else
+      await MarketAPI.createSubmission(buildPayload())
     // 已提交成功：本地草稿没有保留价值，清掉避免下次进来看到旧内容
     clearDraft()
     toast.success(t('market.submitSuccess'))
@@ -779,12 +784,35 @@ async function loadAssignment() {
     formLoading.value = false
   }
   initFormData()
-  restoreDraft()
+  if (submissionId.value) {
+    // 驳回重提：服务端成果优先于本地草稿，草稿在这条路径上没有意义
+    await applySubmission(submissionId.value)
+  }
+  else {
+    restoreDraft()
+  }
   draftReady.value = true
+}
+
+/** 用服务端成果覆盖表单：form_data 与 buildPayload 的分节结构同构，按分节整体覆盖 */
+async function applySubmission(id: number) {
+  try {
+    const submission = await MarketAPI.getMySubmission(id)
+    if (submission.period)
+      period.value = submission.period
+    for (const [sectionCode, fields] of Object.entries(submission.form_data ?? {})) {
+      if (fields && typeof fields === 'object')
+        Object.assign(sectionData(sectionCode), fields as Record<string, any>)
+    }
+  }
+  catch {
+    toast.error(t('common.loadFailed'))
+  }
 }
 
 onLoad((query) => {
   assignmentId.value = Number(query?.assignment_id)
+  submissionId.value = query?.submission_id ? Number(query.submission_id) : undefined
   taskNo.value = query?.task_no ?? ''
   loadAssignment()
 })

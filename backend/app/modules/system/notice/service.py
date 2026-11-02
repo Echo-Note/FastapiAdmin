@@ -1,4 +1,6 @@
+from sqlalchemy import false, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.base_schema import AuthSchema, BatchSetAvailable, PageResultSchema
 from app.core.exceptions import CustomException
@@ -6,8 +8,12 @@ from app.core.logger import logger
 from app.utils.common_util import search_to_dict
 
 from .crud import NoticeCRUD
+from .model import NoticeModel
 from .schema import NoticeCreateSchema, NoticeOutSchema, NoticeQueryParam, NoticeUpdateSchema
 from .stream import notice_stream_manager
+
+# 公告状态：0 草稿 / 1 已发布 / 2 已归档（与模型注释一致）
+NOTICE_STATUS_PUBLISHED = 1
 
 
 async def _broadcast_notice_update() -> None:
@@ -88,15 +94,32 @@ class NoticeService:
             out_schema=NoticeOutSchema,
         )
 
-    async def available_page(self) -> PageResultSchema[NoticeOutSchema]:
-        """获取已启用的公告（首页展示用，最多 10 条）"""
-        return await NoticeCRUD(self.auth, self.db).page(
-            offset=0,
-            limit=10,
-            order_by=[{"id": "asc"}],
-            search={"status": ("eq", 0)},
-            out_schema=NoticeOutSchema,
+    async def available_list(self, limit: int = 10) -> list[NoticeOutSchema]:
+        """已发布公告列表（C 端只读公告页 / 首页展示用）
+
+        两个关键点：
+        1. 口径以模型注释为准（`0:草稿 1:已发布 2:已归档`），只暴露 `status=1`；
+           此前过滤的是 `status=0`，等于把草稿推给了 C 端。
+        2. **绕过 CRUD 的数据权限**：公告是面向所有人的公开内容，而 `CRUDBase` 会给非超管
+           叠加 `created_id = 当前用户` 的数据范围条件——C 端用户据此查询会一条都看不到。
+           公开内容必须显式直查，而不是靠用户身份兜底。
+        """
+        stmt = (
+            select(NoticeModel)
+            .where(
+                NoticeModel.status == NOTICE_STATUS_PUBLISHED,
+                NoticeModel.is_deleted == false(),
+            )
+            .order_by(NoticeModel.id.desc())
+            .limit(limit)
+            # NoticeOutSchema 含 created_by/updated_by，必须预加载，否则异步序列化触发 MissingGreenlet
+            .options(
+                selectinload(NoticeModel.created_by),
+                selectinload(NoticeModel.updated_by),
+            )
         )
+        rows = (await self.db.execute(stmt)).scalars().all()
+        return [NoticeOutSchema.model_validate(row) for row in rows]
 
     async def create(self, data: NoticeCreateSchema) -> NoticeOutSchema:
         """创建公告

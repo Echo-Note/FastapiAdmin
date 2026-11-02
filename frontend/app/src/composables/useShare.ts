@@ -1,18 +1,19 @@
 import { onShareAppMessage, onShareTimeline } from '@dcloudio/uni-app'
 import { useI18n } from 'vue-i18n'
+import { HOME_ROUTE } from '@/constants'
 
 /** 分享配置 */
 interface ShareConfig {
   /** 分享标题 */
   title: string
-  /** 分享路径（带 / 开头，例如 /pages/index/index） */
+  /** 分享路径（带 / 开头，例如 /pages/market/task-hall/index） */
   path?: string
   /** 分享图片 URL（可选，不传则使用页面截图） */
   imageUrl?: string
 }
 
 /** 默认分享路径（全局兜底） */
-const DEFAULT_SHARE_PATH = '/pages/index/index'
+const DEFAULT_SHARE_PATH = HOME_ROUTE
 
 /**
  * 全局分享 composable
@@ -23,11 +24,11 @@ const DEFAULT_SHARE_PATH = '/pages/index/index'
  * @example
  * ```ts
  * // 静态分享
- * useShare({ title: '工作台', path: '/pages/work/index' })
+ * useShare({ title: '任务大厅', path: HOME_ROUTE })
  *
  * // 动态分享（标题随数据变化）
  * const shareTitle = computed(() => `${userInfo.value?.name || '管理员'} 邀请你使用`)
- * useShare(() => ({ title: shareTitle.value, path: '/pages/index/index' }))
+ * useShare(() => ({ title: shareTitle.value, path: HOME_ROUTE }))
  * ```
  */
 export function useShare(configOrGetter?: ShareConfig | (() => ShareConfig)) {
