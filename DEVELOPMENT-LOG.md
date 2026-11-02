@@ -2190,6 +2190,40 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 
 ---
 
+### 2026-11-02 — 修复「我的收益」切月数据不变：C 端收益改为按周期取数
+
+#### 1. 现象
+
+小程序「我的收益」页（C 端入口叫「收益明细」）顶部能切月份，但切到任何月份，hero 的「津贴余额」与下面的「津贴明细」完全一样；只有「发放额度」会变，而它绝大多数月份都是默认 20000——用户看起来就是「切月没反应」。
+
+#### 2. 根因
+
+`GET /market/mini/payout?period=YYYY-MM` 只有 `payable`（`period_payable`）与 `payout_limit`（`PayoutConfigCRUD(user, period)`）按周期取，而页面实际渲染的两块与月份无关：
+
+- `allowance_balance` 取 `market_allowance.balance`——一个用户一行，永远是「当前」余额；
+- `allowance_items` 取 `AllowanceDetailCRUD.get_list(user_id=...)`——**全量历史、无 period 过滤**。
+
+同时 `payable` 虽然随月份变，但这个页面根本没渲染（只有首页与「我的」收益卡用），所以切月视觉上零变化。
+`specs/market/payout` 早已按「用户 × 周期」定义口径，属**代码没跟上 spec**（bug 分类：right）。
+
+#### 3. 改法（后端）
+
+- `payout/schema.py` 新增 `MyPayoutOutSchema` / `MyPayoutSettlementOutSchema`，替换原来裸 `dict` 的 `response_model`（此前接口没有出参契约）。
+- `PayoutService.my_payout` 整屏按 period 取：应发/实发 = 该期结算单 `payable_amount`/`paid_amount` 之和；期初 = `prior_balance`；期末 = 该期账本快照 `amount`，**无快照（该期未归集）时等于期初**；明细 = 该期结算单（`selectinload(task, items)`），行内带任务编号/任务名 + 计价快照。
+- 读路径不重跑封顶公式：`paid` 取结算单已落的 `paid_amount`，不按 `min(pending, limit)` 现算——否则会出现「实发 0 但期末按额度减过」的自相矛盾。
+
+#### 4. 改法（C 端页面）
+
+`subPages/module_market/my-earnings` 重写：hero 主数字 = 当月应发，下方 2×2 显示 额度 / 实发 / 期初滚存 / 期末滚存；「津贴明细」换成「收益来源」（每行 任务名 + 任务编号 + 数量×单价 + 应发/实发）；新增空态「该月暂无收益记录」；顺延提示改按期末滚存 > 0 显示。`PayoutSummary` TS 类型同步换契约，`market.allowanceItems` 文案删除、新增按月口径文案（zh/en）。
+
+#### 5. 验证
+
+- `uv run pytest tests/test_market_mini_extras.py -x -q` → 7 passed（新增 `TestPayoutMonthView`：远期月份 + 额度 1 强制滚存，断言该期应发/实发/明细来源、下月期末 = 期初、更早月份滚存全 0）。
+- `frontend/app`：`npx vue-tsc --noEmit` 通过；`npx eslint` 对改动文件无告警。
+- 视觉对比：`.thinkrail/context/mockups/earnings-by-month-{before,after}.html`。
+
+---
+
 ## 四、踩坑记录（长期有效）
 
 > 这些坑已用时间验证，后续开发遇到相关场景请直接参考，不要重新踩。
@@ -2279,3 +2313,7 @@ C 端提交成果上传图片/附件调用通用接口 `/common/file/upload`，�
 22. **共享测试库上测「按用户 × 周期聚合」的口径，必须自己清表——否则红的是脏数据不是逻辑**（2026-11-01）
    - 现象：新写的 7 条发放算法测试首轮全红，失败信息看着像算法错（比如「应发 == 实发」不成立、结算单条数对不上）。实际原因是 `conftest` 的测试库只建一次（session 级共享），前面用例给同一个 `user` 账号留下了 2026-11 的结算单与津贴账本，而发放口径依赖「该用户该期的**全部**结算单之和 + 上期账本」——脏数据把每条断言都顶偏了。
    - 结论：凡测试依赖「某用户某周期的全量聚合」，开头必须先 `_reset_payout_state(user_id)`（同步 `engine.begin()` 直删 `market_settlement` / `market_settlement_item` / `market_allowance` / `market_allowance_detail` / `market_payout_config`）。不要靠改断言值迁就——那会把「跨任务共享封顶」这个真正被测的行为一起改掉。
+
+23. **筛选 UI 有了、后端没按参数收敛——切月时三种数据两份是全量**（2026-11-02）
+   - 现象：小程序「我的收益」切月份数据不变。接口确实收了 `period`，但同一份响应里 `allowance_balance` 取单行账户余额、`allowance_items` 取全量账本，只有 `payable` / `payout_limit` 真按周期取，而页面又没渲染 `payable`——「接口有这个参数」骗过了自查。
+   - 结论：给页面加周期性/筛选类交互时，要逐个出参字段问「这个字段是否随该筛选条件变化」，而不是「接口有没有这个参数」；同一响应里混入「周期口径 + 全局口径」字段是最隐蔽的一类不一致。读接口也不要重跑写路径的公式（封顶/滚存类），两套口径迟早自相矛盾（见 `specs/market/payout` 的「C 端按月视图」）。

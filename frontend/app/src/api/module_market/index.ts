@@ -208,21 +208,40 @@ export interface MyTaskStats {
 }
 
 /** 我的发放/津贴（对齐后端 mini/payout 返回） */
+/** C 端收益明细的一行：该周期的一条结算单（收益来源） */
+export interface PayoutSettlement {
+  id?: number
+  task_id?: number
+  task_no?: string
+  /** 任务名（C 端显示名），即这笔钱的来源 */
+  task_name?: string
+  category_name?: string | null
+  template_name?: string | null
+  unit?: string | null
+  price?: number | null
+  qty?: number
+  /** 应发金额 */
+  payable?: number
+  /** 实发金额（受当月发放额度封顶） */
+  paid?: number
+  pay_status?: string | null
+}
+
 export interface PayoutSummary {
   user_id?: number
+  /** 出参所属周期；页面切月只改这个参数，其余数字都由后端按周期给出 */
   period?: string
-  /** 本月应发（该周期结算单应发合计，收益卡主数字） */
+  /** 当月应发（该周期结算单应发合计，收益卡主数字） */
   payable?: number
+  /** 当月实发（该周期结算单实发合计） */
+  paid?: number
   payout_limit?: number
+  /** 期初滚存（上期期末未发放额） */
+  prev_balance?: number
+  /** 期末滚存（该期未结算时等于期初） */
   allowance_balance?: number
-  allowance_items?: {
-    id?: number
-    user_id?: number
-    from_period?: string
-    amount?: number
-    status?: string
-    paid_at?: string | null
-  }[]
+  /** 该周期结算单列表（按 id 升序） */
+  settlements?: PayoutSettlement[]
 }
 
 /** C 端按项目分组的任务组（对齐后端 MiniTaskGroupSchema，任务大厅） */

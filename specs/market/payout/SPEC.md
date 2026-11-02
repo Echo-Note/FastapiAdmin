@@ -74,7 +74,26 @@ balance_after  = pending - paid          # 期末累计未发放，滚入下月
 - `GET /market/settlements/list|detail/{id}`、`POST /settlements/settle`、`POST /settlements/confirm/{id}`
 - `GET /market/payout/list|detail/{id}`、`POST|PUT|DELETE` 额度配置、`GET /payout/allowance`、`GET /payout/allowance/detail`
 - `GET /market/payout/results`——按 `user_id` / `period` 筛选的发放结果分页，行 = 用户 × 周期，列出 应发 / 期初津贴 / 额度 / 实发 / 期末津贴。分组与分页在 SQL 侧完成。
+- `GET /market/mini/payout?period=YYYY-MM`——C 端「我的收益」按月视图（见下节）。
 - 结算单与发放结果的出参都带 `user: {id, name, username, mobile}`（见 [market 域](../SPEC.md) 的共享契约），前端展示「昵称 + 手机号」而不是 `#3`。
+
+## C 端按月视图（我的收益）
+
+`GET /market/mini/payout?period=YYYY-MM` 是 C 端「我的收益」页的唯一数据源，出参 `MyPayoutOutSchema`，
+**整屏都是该周期的数**——页面顶部切月只改 `period`，不需要也不允许前端自己再筛一遍：
+
+| 字段 | 口径 |
+|---|---|
+| `payable` / `paid` | 该期结算单 `payable_amount` / `paid_amount` 之和 |
+| `payout_limit` | 该期额度配置；缺行/停用 → 20000 |
+| `prev_balance` | 早于该期最近一条账本行的 `amount`（与归集时的 `prior_balance` 同口径） |
+| `allowance_balance` | 该期账本快照 `amount`；**该期没有快照 = 还没归集结算，滚存没发生变化，等于 `prev_balance`** |
+| `settlements` | 该期结算单，行内带任务来源（`task_no` / `task_name`）与计价快照（`category_name` / `template_name` / `unit` / `price` / `qty`），回答「这笔钱由哪个任务产生」 |
+
+两条不能走回头路的口径：
+
+- **读路径不重跑封顶公式**：`pending / paid / balance_after` 是归集时的写路径（`apply`），C 端读结算单与账本。两套算法并存必然出现「同屏实发 0、期末却按额度减过」这类自相矛盾——「该期未结算」不等于「滚存被清空」。
+- **明细是结算单，不是津贴账本行**：账本行只记期末累计余额（一期一行），当明细既看不出收入来源、又会让切月前后出现「同一批行」。账本滚存由 hero 的期初/期末两个数字表达，`AllowanceDetailOutSchema` 只服务于运营端账本查询。
 
 ## 历史补算
 

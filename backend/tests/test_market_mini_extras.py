@@ -4,6 +4,7 @@
 计数是「该用户全库」口径，同一 session 内多个用例共享数据库，所以断言用增量而不是绝对值。
 """
 
+from decimal import Decimal
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -12,7 +13,9 @@ from tests.test_market_submission_flow import (
     _form_data,
     _login,
     _prepare_claimed_task,
+    _reset_payout_state,
     _review,
+    _set_payout_limit,
     _settlements,
     _submit,
 )
@@ -90,6 +93,68 @@ class TestPayoutPayable:
         resp = test_client.get("/market/mini/payout", params={"period": PERIOD}, headers=user)
         assert resp.json()["success"] is True, resp.text
         assert resp.json()["data"]["payable"] == expected
+
+
+def _payout_view(client: TestClient, user: dict[str, str], period: str) -> dict[str, Any]:
+    resp = client.get("/market/mini/payout", params={"period": period}, headers=user)
+    assert resp.json()["success"] is True, resp.text
+    return resp.json()["data"]
+
+
+class TestPayoutMonthView:
+    """切月必须换数字：出参全部按 ``period`` 取数，未结算月份不会复用上一期余额与明细。"""
+
+    # 用远期月份 + 极小额度，让滚存确定非 0，避免与其他用例共享的月份互相污染
+    LIMIT_PERIOD = "2027-03"
+    NEXT_PERIOD = "2027-04"
+
+    def test_month_view_is_period_scoped(self, test_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """回归：曾因 `allowance_balance` / `allowance_items` 取全量，切到任何月份都一样。"""
+        user = _login(test_client, "user", "123456")
+        uid = _user_id(test_client, auth_headers)
+        _reset_payout_state(uid)
+        try:
+            self._prepare_income(test_client, auth_headers, user, uid)
+
+            earned = _payout_view(test_client, user, self.LIMIT_PERIOD)
+            assert Decimal(str(earned["payable"])) > 0
+            assert Decimal(str(earned["paid"])) == Decimal("1")
+            assert Decimal(str(earned["allowance_balance"])) == Decimal(str(earned["payable"])) - 1
+
+            # 明细是该期结算单，且带任务来源（用户要看到这笔钱由哪个任务产生）
+            assert len(earned["settlements"]) == 1
+            row = earned["settlements"][0]
+            assert row["task_no"].startswith("TK-")
+            assert row["task_name"]
+            assert Decimal(str(row["payable"])) == Decimal(str(earned["payable"]))
+            assert Decimal(str(row["paid"])) == Decimal("1")
+
+            # 下一个月：没归集结算 → 没有明细、没有应发，期末滚存等于期初（不按公式把没发的钱算成已发）
+            nxt = _payout_view(test_client, user, self.NEXT_PERIOD)
+            assert nxt["settlements"] == []
+            assert Decimal(str(nxt["payable"])) == 0
+            assert Decimal(str(nxt["paid"])) == 0
+            assert Decimal(str(nxt["prev_balance"])) == Decimal(str(earned["allowance_balance"]))
+            assert Decimal(str(nxt["allowance_balance"])) == Decimal(str(nxt["prev_balance"]))
+            assert nxt != earned
+
+            # 更早的月份连滚存都没有：两期视角必须不同（旧实现三期一模一样）
+            early = _payout_view(test_client, user, "2026-01")
+            assert early["settlements"] == []
+            assert Decimal(str(early["prev_balance"])) == 0
+            assert Decimal(str(early["allowance_balance"])) == 0
+        finally:
+            _reset_payout_state(uid)
+
+    def _prepare_income(
+        self, test_client: TestClient, auth_headers: dict[str, str], user: dict[str, str], uid: int
+    ) -> None:
+        """某月份挣一笔：额度设为 1（强制滚存），提交 + 审核通过触发归集。"""
+        _set_payout_limit(test_client, auth_headers, uid, self.LIMIT_PERIOD, "1")
+        _, assignment_id = _prepare_claimed_task(test_client, auth_headers, user)
+        submitted = _submit(test_client, user, assignment_id, period=self.LIMIT_PERIOD)
+        assert submitted.json()["success"] is True, submitted.text
+        _review(test_client, auth_headers, submitted.json()["data"]["id"], approved=True)
 
 
 class TestWeekProgress:
